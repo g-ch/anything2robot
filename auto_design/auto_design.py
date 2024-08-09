@@ -38,12 +38,12 @@ if __name__=="__main__":
     motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib)
     motor_results = motor_opt.run_opt()
     # np.save('./results/' + args.model_name + '_motor_results1.npy', motor_results)
-    motor_opt.render()
+    # motor_opt.render()
     
     # motor_opt = Motor_Opt(args, mesh_decomp, None, None)
     # motor_opt.motor_results = np.load('./auto_design/results/' + args.model_name + '_motor_results1.npy')
     # motor_opt.render()
     
-    # joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
-    # joint_connect_opt.run_opt()
-    # mesh_decomp.render()
+    joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
+    joint_connect_opt.run_opt()
+    mesh_decomp.render()
