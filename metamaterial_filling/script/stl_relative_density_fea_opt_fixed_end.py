@@ -1,0 +1,275 @@
+'''
+@Author: Clarence
+@Date: 2024-7-1
+@Description: This script is used to do the FEA optimization for the metamaterial structure. The script will do meshing and FEA optimization to get the best relative density for the metamaterial structure.
+'''
+
+import os
+import argparse
+import subprocess
+from format_transform.stl_to_off import stlToOff
+from format_transform.vtu_to_ansys_msh import write_msh_file
+from pyansys_fea.mapdl_msh_analysis_fix_end import static_fea_analysis
+import time
+
+
+'''
+@breif: Do meshing using tetrahedralMeshing
+@param: stl_file: str: Path to the input stl file
+@param: output_folder: str: Path to the output folder
+@param: cmake_build_dir: str: Path to the cmake build directory to execute the tetrahedralMeshing
+@param: mesh_desired_element_number: int: Desired number of elements in the mesh
+@param: mesh_surface_accuracy: float: Surface accuracy of the mesh. Range: (0, 1]
+@return: str: Path to the output msh file
+'''
+def meshing(stl_file: str, output_folder: str, cmake_build_dir: str, mesh_desired_element_number: int = 10000, mesh_surface_accuracy: float = 0.5):
+    stl_file_name = os.path.basename(stl_file)
+    off_file_name = stl_file_name.replace('.stl', '.off')
+    mesh_vtu_file_name = stl_file_name.replace('.stl', '.vtu')
+    mesh_msh_file_name = stl_file_name.replace('.stl', '.msh')
+
+    # Convert the stl file to off file
+    off_file_path = os.path.join(output_folder, off_file_name)
+    stlToOff(stl_file, off_file_path)
+
+    off_file_path = cmake_build_dir + "/../" + off_file_path
+    vtu_file_path = cmake_build_dir + "/../" + os.path.join(output_folder, mesh_vtu_file_name)
+
+    # Do Meshing using tetrahedralMeshing
+    time.sleep(1)
+    print(f'Meshing the model using tetrahedralMeshing...')
+    subprocess.run(['gnome-terminal', '--', 'bash', '-c', f'cd {cmake_build_dir}; ./tetrahedralMeshing {off_file_path} {vtu_file_path} {mesh_desired_element_number} {mesh_surface_accuracy}'])  # Add "; exec bash" for keeping the terminal open
+    
+    # Check if the vtu file exists. If not wait for 1 second and check again.
+    print(f'Waiting for the mesh vtu file to be generated in a seperate thread. Do not close the terminal!!!!!')
+    while not os.path.exists(os.path.join(output_folder, mesh_vtu_file_name)):
+        time.sleep(1)
+
+    # Wait for 3 seconds to make sure the vtu file is generated. Big models may take longer time.
+    time.sleep(5)
+
+    # Convert the vtu file to msh file
+    print(f'Converting the vtu file to msh file...')
+    write_msh_file(os.path.join(output_folder, mesh_vtu_file_name), os.path.join(output_folder, mesh_msh_file_name))
+
+    # Wait for 3 seconds to make sure the msh file is generated. Big models may take longer time.
+    time.sleep(5)
+
+    print(f'Meshing completed! The msh file is saved at {os.path.join(output_folder, mesh_msh_file_name)}')
+    return os.path.join(output_folder, mesh_msh_file_name)
+
+
+
+'''
+@breif: Get the equivalent young modulus for the metamaterial structure using linear interpolation
+@param: material_young_modulus: float: Young's modulus of the material. MPa
+@param: relative_density: float: Relative density of the metamaterial structure
+@param: young_modulus_curve_points_x: list: X values of the young modulus curve. Relative density.
+@param: young_modulus_curve_points_y: list: Y values of the young modulus curve. metamaterial_structure_young_modulus/(Relative density * material_young_modulus)
+@return: float: Equivalent young modulus of the metamaterial structure
+'''
+def get_equivalent_young_modulus(material_young_modulus, relative_density, young_modulus_curve_points_x, young_modulus_curve_points_y):
+    for i in range(len(young_modulus_curve_points_x) - 1):
+        if relative_density >= young_modulus_curve_points_x[i] and relative_density <= young_modulus_curve_points_x[i+1]:
+            # Linear interpolation
+            interploation_value = young_modulus_curve_points_y[i] + (young_modulus_curve_points_y[i+1] - young_modulus_curve_points_y[i]) * (relative_density - young_modulus_curve_points_x[i]) / (young_modulus_curve_points_x[i+1] - young_modulus_curve_points_x[i])
+            return interploation_value * material_young_modulus * relative_density
+    
+
+'''
+@breif: Main function to do the FEA optimization. The function will do meshing and FEA optimization to get the best relative density for the metamaterial structure.
+        We use CGAL to do the meshing and pyansys to do the FEA analysis. The optimization is realized by computational gradient descent.
+        
+'''
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Generate the final model and export to an STL file')
+
+    #### Parameters for input and output
+    #### NOTE: The input STL file must be in the relative path from root folder of this package
+    parser.add_argument('--input_stl_path', type=str, default='data/FL.stl', help='Input STL file path')
+    parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. Note FEA uses mm as the unit. If the unit is in meter, we will scale the model to mm.')
+    parser.add_argument('--output_folder', type=str, default='data/output', help='Output folder path')
+
+    #### Parameters for tetrahedralMeshing
+    parser.add_argument('--mesh_desired_element_number', type=int, default=10000, help='Desired number of elements in the mesh')
+    parser.add_argument('--mesh_surface_accuracy', type=float, default=0.5, help='Surface accuracy of the mesh. Range: (0, 1]')
+
+    #### Parameters for FEA
+    parser.add_argument('--material_young_modulus', type=float, default=3100.0, help='Young\'s modulus of the material. MPa')
+    parser.add_argument('--material_poisson_ratio', type=float, default=0.35, help='Poisson\'s ratio of the material')
+    # The default young_modulus_curve for meta-material is from https://www.sciencedirect.com/science/article/pii/S2352431619302640
+    parser.add_argument('--young_modulus_curve_points_x', type=float, nargs='+', default=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0], help='X values of the young modulus curve. Relative density.')
+    parser.add_argument('--young_modulus_curve_points_y', type=float, nargs='+', default=[0.5, 0.52, 0.54, 0.565, 0.595, 0.625, 1.0], help='Y values of the young modulus curve. metamaterial_structure_young_modulus/(Relative density * material_young_modulus)') 
+    
+    parser.add_argument("--fixed_end", type=int, default=5, help="define the fixed end. 0:-x most, 1:+x most, 2:-y most, 3:+y most, 4:-z most, 5:+z most")
+    parser.add_argument("--forces_nodes", type=float, nargs='+', default=[[50, 50, 150], [0, 0, 200]], help="List of nodes where the forces are applied. The format is [node1_x, node1_y, node1_z, node2_x, node2_y, node2_z, ...]. Unit: mm")
+    parser.add_argument("--forces", type=float, nargs='+', default=[[0, 100, 0], [0, 0, -100]], help="List of forces applied at the nodes. The format is [F1_x, F1_y, F1_z, F2_x, F2_y, F2_z, ...]. Unit: N")
+    parser.add_argument("--closest_node_num_per_force", type=int, default=1, help="Number of closest nodes to the forces_nodes to apply the forces")
+    parser.add_argument("--display_fea_result", type=bool, default=False, help="Display the models")
+
+    ### Optimization parameters
+    parser.add_argument("--max_allowd_stress", type=float, default=500, help="Maximum allowed von Mises stress. MPa")
+    parser.add_argument("--max_allowd_displacement", type=float, default=2, help="Maximum allowed displacement. mm")
+    parser.add_argument("--max_iteration", type=int, default=5, help="Maximum number of iterations")
+    parser.add_argument("--initial_relative_density", type=float, default=0.2, help="Initial relative density of the metamaterial structure")
+    parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate for the gradient descent")
+    args = parser.parse_args()
+
+
+    #################  Run checking  ########################
+    # Check if the input STL file exists
+    if not os.path.exists(args.input_stl_path):
+        raise FileNotFoundError(f'Input STL file not found at {args.input_stl_path}')
+
+    # Check if the output folder exists. If not, create it
+    if not os.path.exists(args.output_folder):
+        os.makedirs(args.output_folder)
+
+    # Clear the output folder
+    os.system(f'rm -rf {args.output_folder}/*')
+    
+    # Check if young_modulus_curve_points_x and young_modulus_curve_points_y have the same length > 2
+    if len(args.young_modulus_curve_points_x) != len(args.young_modulus_curve_points_y):
+        raise ValueError('The length of young_modulus_curve_points_x and young_modulus_curve_points_y must be the same')
+    
+    if len(args.young_modulus_curve_points_x) < 2:
+        raise ValueError('The length of young_modulus_curve_points_x must be at least 2')
+    
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    cmake_build_dir = os.path.join(current_dir, '../build')
+    
+    # If the unit is in meter, convert the unit to mm
+    stl_file_name = os.path.basename(args.input_stl_path)
+    scaled_file_name = stl_file_name.replace('.stl', '_scaled.stl')
+
+    ori_stl_file_path = current_dir + "/../" + args.input_stl_path
+    scaled_file_path = current_dir + "/../" + args.output_folder + "/" + scaled_file_name
+
+    print(f'Original STL file path: {ori_stl_file_path}')
+
+    #################  Scale if the mesh is in m rather than mm  ########################
+    if args.unit == 'm':
+        # Use gnome-terminal to run the command
+        subprocess.run(['gnome-terminal', '--', 'bash', '-c', f'cd {cmake_build_dir}; ./scaleMesh {ori_stl_file_path} {scaled_file_path} 1000'])
+    else:
+        os.system(f'cp {args.input_stl_path} {scaled_file_path}')
+    
+    # Check if the scaled file exists. If not wait for 1 second and check again.
+    while not os.path.exists(scaled_file_path):
+        time.sleep(1)
+
+    # Wait for 3 seconds to make sure the scaled file is generated. Big models may take longer time.
+    time.sleep(3)
+    
+    #################  Do meshing  ########################
+    # Do meshing
+    print(f'Meshing the model...')
+    mesh_file_path = meshing(scaled_file_path, args.output_folder, cmake_build_dir, args.mesh_desired_element_number, args.mesh_surface_accuracy)
+    
+    mesh_file_path = current_dir + "/../" + mesh_file_path
+
+
+    #################  Do FEA optimization using searching by Computational Gradient Descent  ########################
+    # Do FEA optimization
+    mesh_file_path_no_ext = mesh_file_path.replace('.msh', '')
+    print(f'Mesh file path: {mesh_file_path_no_ext}')
+
+    # Check if using fully filled structure (relative_density=1) can meet the target
+    relative_density = 1.0
+    max_stress, max_displacement = static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=args.material_young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_end=args.fixed_end, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
+    stress_to_allowed =  max_stress - args.max_allowd_stress
+    displacement_to_allowed = max_displacement- args.max_allowd_displacement
+
+    if stress_to_allowed > 0 or displacement_to_allowed > 0:
+        print(f'The metamaterial cannot be used with the given conditions. The best relative density is 1')
+        print(f'The best von Mises stress and displacement are:')
+        print(f"Max von Mises stress: {max_stress}")
+        print(f"Max displacement: {max_displacement}")
+        exit()
+
+    # Set the initial best values
+    best_relative_density = relative_density
+    stress_of_best_relative_density = max_stress
+    displacement_of_best_relative_density = max_displacement
+
+    # Start the optimization
+    relative_density = args.initial_relative_density
+    young_modulus = get_equivalent_young_modulus(args.material_young_modulus, relative_density, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)
+    max_stress, max_displacement  = static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_end=args.fixed_end, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
+    stress_to_allowed =  max_stress - args.max_allowd_stress
+    displacement_to_allowed = max_displacement- args.max_allowd_displacement 
+
+    print(f"The maximum von Mises stress and displacement of relative_density={relative_density} are:")
+    print(f"Max von Mises stress: {max_stress}")
+    print(f"Max displacement: {max_displacement}")
+    print(f"Stress to target: {stress_to_allowed}")
+    print(f"Displacement to target: {displacement_to_allowed}")
+
+    # For the first iteration, we will decrease the relative_density by 0.05
+    relative_density_new = relative_density - 0.05
+
+    for i in range(args.max_iteration):
+        print(f'Iteration {i+1}:')
+        
+        young_modulus = get_equivalent_young_modulus(args.material_young_modulus, relative_density_new, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)
+        max_stress_new, max_displacement_new  = static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_end=args.fixed_end, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
+        stress_to_allowed_new = max_stress_new - args.max_allowd_stress
+        displacement_to_allowed_new = max_displacement_new - args.max_allowd_displacement
+
+        print(f"The maximum von Mises stress and displacement of relative_density={relative_density_new} are:")
+        print(f"Max von Mises stress: {max_stress_new}")
+        print(f"Max displacement: {max_displacement_new}")
+        print(f"Stress to target: {stress_to_allowed_new}")
+        print(f"Displacement to target: {displacement_to_allowed_new}")
+
+        # Check if the stress and displacement are within the target
+        if stress_to_allowed_new < 0 and displacement_to_allowed_new < 0:
+            if relative_density_new < best_relative_density:
+                # If the stress and displacement are within the target, we choose the one with the smallest relative_density as the best solution
+                best_relative_density = relative_density_new
+                stress_of_best_relative_density = max_stress_new
+                displacement_of_best_relative_density = max_displacement_new
+
+        # Update the relative_density by gradient descent
+        gradient_stress = (stress_to_allowed_new - stress_to_allowed) / (relative_density_new - relative_density)
+        gradient_displacement = (displacement_to_allowed_new - displacement_to_allowed) / (relative_density_new - relative_density)
+
+        # Choose the gradient with the largest absolute value
+        if abs(gradient_stress) > abs(gradient_displacement):
+            gradient = gradient_stress
+            distance_to_target = stress_to_allowed_new
+        else:
+            gradient = gradient_displacement
+            distance_to_target = displacement_to_allowed_new
+        
+        # Store the current values for the next iteration
+        relative_density = relative_density_new
+        stress_to_allowed = stress_to_allowed_new
+        displacement_to_allowed = displacement_to_allowed_new
+
+
+        # Update the relative_density
+        if distance_to_target > 0:
+            relative_density_new = relative_density - args.learning_rate * gradient
+        else:
+            relative_density_new = relative_density + args.learning_rate * gradient
+
+        # Check if the relative_density is in the range [0, 1]
+        if relative_density_new < 0.01:
+            relative_density_new = 0.01
+        elif relative_density_new > 1:
+            relative_density_new = 1
+
+        time.sleep(3) # Wait for 2 seconds to make sure the FEA analysis is completed
+    
+
+    print(f'Optimization completed! The best relative density is {best_relative_density}')
+    print(f'The best von Mises stress and displacement are:')
+    print(f"Max von Mises stress: {stress_of_best_relative_density}")
+    print(f"Max displacement: {displacement_of_best_relative_density}")
+    young_modulus = get_equivalent_young_modulus(args.material_young_modulus, best_relative_density, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)
+    print(f'The equivalent young modulus is {young_modulus}')
+    
+
+    # max_stress_new, max_displacement_new = static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_end=args.fixed_end, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=True)
+
