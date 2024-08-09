@@ -363,6 +363,7 @@ class Mesh_Decomp:
         dir = './urdf/' + self.args.model_name + '/tmp/'
         if not os.path.exists(dir):
             os.makedirs(dir)
+        self.temp_dir = dir
         urdf_file = open(dir + self.args.model_name + '_ideal.urdf', 'w+')
 
         self.urdf_dir = dir + self.args.model_name + '_ideal.urdf'
