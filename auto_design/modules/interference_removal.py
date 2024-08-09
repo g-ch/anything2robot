@@ -70,6 +70,7 @@ class LinkResult:
         self.applied_force = []
         self.applied_torque = []
         self.tenon_pos = []
+        self.tenon_type = []
 
     def add_force(self, force):
         self.applied_force.append(force)
@@ -77,8 +78,9 @@ class LinkResult:
     def add_torque(self, torque):
         self.applied_torque.append(torque)
     
-    def add_tenon_pos(self, tenon_pos):
+    def add_tenon_pos(self, tenon_pos, tenon_type):
         self.tenon_pos.append(tenon_pos)
+        self.tenon_type.append(tenon_type)
 
 class RobotOptResult:
     def __init__(self, interference_removal, urdf_dir):
@@ -116,11 +118,11 @@ class RobotOptResult:
                 self.link_dict[current_link.name] = LinkResult()
                 tenon_pos = (motor_child_side + self.tenon_height * motor_direct) / 100.0
                 tenon_direct = -motor_direct
-                self.link_dict[current_link.name].add_tenon_pos(np.hstack((tenon_pos, tenon_direct))) 
+                self.link_dict[current_link.name].add_tenon_pos(np.hstack((tenon_pos, tenon_direct)), 'child') 
 
                 tenon_pos_father = (motor_father_side - self.tenon_height * motor_direct) / 100.0
                 tenon_direct_father = motor_direct
-                self.link_dict[self.father_link_dict[current_link.name]].add_tenon_pos(np.hstack((tenon_pos_father, tenon_direct_father)))
+                self.link_dict[self.father_link_dict[current_link.name]].add_tenon_pos(np.hstack((tenon_pos_father, tenon_direct_father)), 'father')
                 cur_idx += 1
             
             elif len(current_link.axis) == 3:
@@ -138,11 +140,11 @@ class RobotOptResult:
                 self.link_dict[current_link.name] = LinkResult()
                 tenon_pos = (motor_child_side + self.tenon_height * motor_direct1) / 100.0
                 tenon_direct = -motor_direct1
-                self.link_dict[current_link.name].add_tenon_pos(np.hstack((tenon_pos, tenon_direct))) 
+                self.link_dict[current_link.name].add_tenon_pos(np.hstack((tenon_pos, tenon_direct)), 'child') 
 
                 tenon_pos_father = (motor_father_side - self.tenon_height * motor_direct2) / 100.0
                 tenon_direct_father = -motor_direct2
-                self.link_dict[self.father_link_dict[current_link.name]].add_tenon_pos(np.hstack((tenon_pos_father, tenon_direct_father)))
+                self.link_dict[self.father_link_dict[current_link.name]].add_tenon_pos(np.hstack((tenon_pos_father, tenon_direct_father)), 'father')
                 cur_idx += 2
         
         #check the tenon position with mesh
