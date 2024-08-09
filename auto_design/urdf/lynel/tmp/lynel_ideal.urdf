@@ -1,0 +1,403 @@
+<?xml version="1.0"?>
+<robot name="robot">
+  <material name="red">
+    <color rgba="1 0 0 1"/>
+  </material>
+  <material name="magenta">
+    <color rgba="0.2 0 0.2 1"/>
+  </material>
+  <material name="green">
+    <color rgba="0 1 0 1"/>
+  </material>
+  <material name="cyan">
+    <color rgba="0 1 1 1"/>
+  </material>
+  <material name="blue">
+    <color rgba="0 0 1 1"/>
+  </material>
+  <material name="orange">
+    <color rgba="1 0.5 0 1"/>
+  </material>
+  <material name="yellow">
+    <color rgba="1 1 0 1"/>
+  </material>
+  <material name="pink">
+    <color rgba="1 0 1 1"/>
+  </material>
+  <material name="grey">
+    <color rgba="0.8 0.8 0.8 1"/>
+  </material>
+  <material name="motor">
+    <color rgba="0.2 0.2 0.2 1"/>
+  </material>
+  <link name="BODY">
+    <visual>
+      <origin xyz="-0.0 -0.0 -0.23417923317610603" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/BODY_ideal.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.0 -0.0 -0.23417923317610603" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/BODY_ideal.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="-3.0474563637895627e-05 -0.04452141019063178 0.026586784961568743" rpy="0 0 0"/>
+      <mass value="3.8865000000000003"/>
+      <inertia ixx="0.05603117559539408" ixy="-6.259367682997833e-06" ixz="-1.6374440306186815e-05" iyy="0.014648911415926238" iyz="0.011813242853466884" izz="0.04883118631712222"/>
+    </inertial>
+  </link>
+  <link name="FL_UP">
+    <visual>
+      <origin xyz="-0.04293285941561944 0.1561194887840707 -0.19514936098008837" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/FL_UP_ideal.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.04293285941561944 0.1561194887840707 -0.19514936098008837" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/FL_UP_ideal.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.0020913432988056285 0.0259642461195026 -0.006265928860659686" rpy="0 0 0"/>
+      <mass value="0.5453"/>
+      <inertia ixx="0.0013320918622776482" ixy="-3.455412616908163e-06" ixz="-0.0001345461512011743" iyy="0.00100663500733541" iyz="-7.887458692462876e-05" izz="0.0007080620245736328"/>
+    </inertial>
+  </link>
+  <link name="FL_UP_virtual">
+  </link>
+  <joint name="FL_UP_joint1" type="revolute">
+    <parent link="BODY"/>
+    <child link="FL_UP_virtual"/>
+    <origin xyz="0.04293285941561944 -0.1561194887840707 -0.039029872196017695" rpy="0 0 0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <joint name="FL_UP_joint2" type="revolute">
+    <parent link="FL_UP_virtual"/>
+    <child link="FL_UP"/>
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+    <axis xyz="0.0 -1.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <link name="FR_UP">
+    <visual>
+      <origin xyz="0.04293285941561944 0.1561194887840707 -0.19514936098008837" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/FR_UP_ideal.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0.04293285941561944 0.1561194887840707 -0.19514936098008837" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/FR_UP_ideal.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="-0.0015466534716430114 0.02602697105639526 -0.006314103417179695" rpy="0 0 0"/>
+      <mass value="0.5527000000000001"/>
+      <inertia ixx="0.0013320978406006876" ixy="-4.6741279174962065e-06" ixz="0.00013969974986430324" iyy="0.0010133310050660536" iyz="-6.982415234304325e-05" izz="0.0007296717152162035"/>
+    </inertial>
+  </link>
+  <link name="FR_UP_virtual">
+  </link>
+  <joint name="FR_UP_joint1" type="revolute">
+    <parent link="BODY"/>
+    <child link="FR_UP_virtual"/>
+    <origin xyz="-0.04293285941561944 -0.1561194887840707 -0.039029872196017695" rpy="0 0 0"/>
+    <axis xyz="-1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <joint name="FR_UP_joint2" type="revolute">
+    <parent link="FR_UP_virtual"/>
+    <child link="FR_UP"/>
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+    <axis xyz="0.0 1.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <link name="RR_UP">
+    <visual>
+      <origin xyz="0.04293285941561944 -0.11708961658805302 -0.21856728429769898" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/RR_UP_ideal.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0.04293285941561944 -0.11708961658805302 -0.21856728429769898" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/RR_UP_ideal.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="-0.0052380962955688795 -0.01167548108745571 -0.007563823473195452" rpy="0 0 0"/>
+      <mass value="0.5838"/>
+      <inertia ixx="0.0016392255429941757" ixy="-5.6704023638233594e-05" ixz="0.00015188998629667695" iyy="0.0013449951905618286" iyz="0.00025769188591983553" izz="0.0006360708911442172"/>
+    </inertial>
+  </link>
+  <link name="RR_UP_virtual">
+  </link>
+  <joint name="RR_UP_joint1" type="revolute">
+    <parent link="BODY"/>
+    <child link="RR_UP_virtual"/>
+    <origin xyz="-0.04293285941561944 0.11708961658805302 -0.015611948878407063" rpy="0 0 0"/>
+    <axis xyz="-1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <joint name="RR_UP_joint2" type="revolute">
+    <parent link="RR_UP_virtual"/>
+    <child link="RR_UP"/>
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+    <axis xyz="0.0 -1.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <link name="RL_UP">
+    <visual>
+      <origin xyz="-0.04293285941561944 -0.11708961658805302 -0.21856728429769898" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/RL_UP_ideal.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.04293285941561944 -0.11708961658805302 -0.21856728429769898" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/RL_UP_ideal.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.005226704501114891 -0.011718859987681324 -0.007548154740297103" rpy="0 0 0"/>
+      <mass value="0.5841000000000001"/>
+      <inertia ixx="0.001639886819893849" ixy="5.709543100496423e-05" ixz="-0.00015147555041944758" iyy="0.0013445943519945153" iyz="0.0002585077974661884" izz="0.0006373098758774093"/>
+    </inertial>
+  </link>
+  <link name="RL_UP_virtual">
+  </link>
+  <joint name="RL_UP_joint1" type="revolute">
+    <parent link="BODY"/>
+    <child link="RL_UP_virtual"/>
+    <origin xyz="0.04293285941561944 0.11708961658805302 -0.015611948878407063" rpy="0 0 0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <joint name="RL_UP_joint2" type="revolute">
+    <parent link="RL_UP_virtual"/>
+    <child link="RL_UP"/>
+    <origin xyz="0.0 0.0 0.0" rpy="0 0 0"/>
+    <axis xyz="0.0 1.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <link name="BODY_UP">
+    <visual>
+      <origin xyz="-0.0 0.1561194887840707 -0.3122389775681414" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/BODY_UP_ideal.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.0 0.1561194887840707 -0.3122389775681414" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/BODY_UP_ideal.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="-0.0012994817849618578 0.011652907328184942 0.1536699907998919" rpy="0 0 0"/>
+      <mass value="2.1256"/>
+      <inertia ixx="0.011367599389348833" ixy="-0.00018386649651863136" ixz="-2.69483087128337e-05" iyy="0.008453050838351456" iyz="-0.0010351868446556176" izz="0.007306620352841462"/>
+    </inertial>
+  </link>
+  <joint name="BODY_UP_joint" type="revolute">
+    <parent link="BODY"/>
+    <child link="BODY_UP"/>
+    <origin xyz="0.0 -0.1561194887840707 0.07805974439203535" rpy="0 0 0"/>
+    <axis xyz="0.0 0.0 1.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <link name="FL_LOW">
+    <visual>
+      <origin xyz="-0.04293285941561944 0.14050753990566361 -0.09757468049004418" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/FL_LOW_ideal.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.04293285941561944 0.14050753990566361 -0.09757468049004418" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/FL_LOW_ideal.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="-0.004571339553415994 -0.013354114207160817 -0.06970433684910372" rpy="0 0 0"/>
+      <mass value="0.0988"/>
+      <inertia ixx="5.883784412955463e-05" ixy="-7.528188259109294e-07" ixz="-1.252115384615378e-06" iyy="4.3667477226720964e-05" iyz="-1.4726538461538442e-05" izz="4.430839827935207e-05"/>
+    </inertial>
+  </link>
+  <joint name="FL_LOW_joint" type="revolute">
+    <parent link="FL_UP"/>
+    <child link="FL_LOW"/>
+    <origin xyz="0.0 0.01561194887840708 -0.09757468049004418" rpy="0 0 0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <link name="FR_LOW">
+    <visual>
+      <origin xyz="0.04293285941561944 0.14050753990566361 -0.09757468049004418" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/FR_LOW_ideal.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0.04293285941561944 0.14050753990566361 -0.09757468049004418" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/FR_LOW_ideal.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.004682946608402926 -0.013504918837600466 -0.06971631984098622" rpy="0 0 0"/>
+      <mass value="0.0995"/>
+      <inertia ixx="5.867710050251255e-05" ixy="6.218969849246218e-07" ixz="1.1142035175879393e-06" iyy="4.375130653266331e-05" iyz="-1.42797738693467e-05" izz="4.4478879396984875e-05"/>
+    </inertial>
+  </link>
+  <joint name="FR_LOW_joint" type="revolute">
+    <parent link="FR_UP"/>
+    <child link="FR_LOW"/>
+    <origin xyz="0.0 0.01561194887840708 -0.09757468049004418" rpy="0 0 0"/>
+    <axis xyz="-1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <link name="RR_LOW">
+    <visual>
+      <origin xyz="0.04293285941561944 -0.14050753990566361 -0.11708961658805302" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/RR_LOW_ideal.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0.04293285941561944 -0.14050753990566361 -0.11708961658805302" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/RR_LOW_ideal.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.002205617028104588 -0.019925480404837867 -0.08559787194202083" rpy="0 0 0"/>
+      <mass value="0.1139"/>
+      <inertia ixx="7.99454433713784e-05" ixy="-7.389201053555694e-07" ixz="-6.002633889377644e-08" iyy="6.511172958735716e-05" iyz="-1.9130827480245784e-05" izz="4.974343283582073e-05"/>
+    </inertial>
+  </link>
+  <joint name="RR_LOW_joint" type="revolute">
+    <parent link="RR_UP"/>
+    <child link="RR_LOW"/>
+    <origin xyz="0.0 0.023417923317610594 -0.10147766770964596" rpy="0 0 0"/>
+    <axis xyz="-1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <link name="RL_LOW">
+    <visual>
+      <origin xyz="-0.04293285941561944 -0.14050753990566361 -0.11708961658805302" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/RL_LOW_ideal.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.04293285941561944 -0.14050753990566361 -0.11708961658805302" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/RL_LOW_ideal.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="-0.002248602649395269 -0.01959390946250819 -0.08452756626614213" rpy="0 0 0"/>
+      <mass value="0.1177"/>
+      <inertia ixx="8.390430756159716e-05" ixy="1.0624787595581974e-06" ixz="1.176956244689894e-06" iyy="6.900115548003401e-05" iyz="-2.00690675446049e-05" izz="5.1357204757858865e-05"/>
+    </inertial>
+  </link>
+  <joint name="RL_LOW_joint" type="revolute">
+    <parent link="RL_UP"/>
+    <child link="RL_LOW"/>
+    <origin xyz="0.0 0.023417923317610594 -0.10147766770964596" rpy="0 0 0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <link name="L_ARM">
+    <visual>
+      <origin xyz="-0.10147766770964595 0.1561194887840707 -0.4293285941561944" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/L_ARM_ideal.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.10147766770964595 0.1561194887840707 -0.4293285941561944" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/L_ARM_ideal.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.002400387061571835 -0.0014341800434474195 -0.041250594227717485" rpy="0 0 0"/>
+      <mass value="0.9404"/>
+      <inertia ixx="0.0055792154290726865" ixy="0.0003008972636643989" ixz="0.0010913191134091962" iyy="0.00564178700925136" iyz="-0.001303604376063379" izz="0.0018192584469374552"/>
+    </inertial>
+  </link>
+  <joint name="L_ARM_joint" type="revolute">
+    <parent link="BODY_UP"/>
+    <child link="L_ARM"/>
+    <origin xyz="0.10147766770964595 0.0 0.117089616588053" rpy="0 0 0"/>
+    <axis xyz="1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+  <link name="R_ARM">
+    <visual>
+      <origin xyz="0.10147766770964595 0.1561194887840707 -0.4293285941561944" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/R_ARM_ideal.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0.10147766770964595 0.1561194887840707 -0.4293285941561944" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://auto_design/urdf/lynel/tmp/R_ARM_ideal.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="-0.008864484398925454 0.002299251020453391 -0.03583566799630711" rpy="0 0 0"/>
+      <mass value="0.9401"/>
+      <inertia ixx="0.004726589667056738" ixy="-0.00018182407164131435" ixz="-0.001067978254175069" iyy="0.005088344897883192" iyz="-0.0008853933541644556" izz="0.0019271628246995162"/>
+    </inertial>
+  </link>
+  <joint name="R_ARM_joint" type="revolute">
+    <parent link="BODY_UP"/>
+    <child link="R_ARM"/>
+    <origin xyz="-0.10147766770964595 0.0 0.117089616588053" rpy="0 0 0"/>
+    <axis xyz="-1.0 0.0 0.0"/>
+    <limit lower="-1.57" upper="1.57" effort="20" velocity="1.5"/>
+  </joint>
+<gazebo>
+   <plugin filename="libgazebo_ros_p3d.so" name="p3d_base_controller">
+   <alwaysOn>true</alwaysOn>
+       <updateRate>10.0</updateRate>
+       <bodyName>base_link</bodyName>
+       <topicName>odom/ground_truth</topicName>
+       <gaussianNoise>0.00000001</gaussianNoise>
+       <frameName>world</frameName>
+       <xyzOffsets>0 0 0</xyzOffsets>
+       <rpyOffsets>0 0 0</rpyOffsets>
+   </plugin>
+</gazebo>
+<gazebo>
+   <plugin filename="libgazebo_ros_control.so" name="gazebo_ros_control">
+       <legacyModeNS>true</legacyModeNS>
+   </plugin>
+</gazebo>
+</robot>
