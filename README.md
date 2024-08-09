@@ -44,17 +44,13 @@ python -m pip install pyansys
 - Then clone the code to your PC and compile the C++ part.
 
 ```
-cd catkin_ws/src
-git clone git@github.com:Anything-robot/metamaterial_filling.git
+git clone git@github.com:Anything-robot/anything2robot.git
 
-cd metamaterial_filling
+cd anything2robot/metamaterial_filling
 mkdir build
 cd build
 cmake ..
 make
-
-cd ../..
-git clone git@github.com:Anything-robot/auto_design.git
 ```
 Repo auto_design is required to read the torque pkl file for FEA analysis. Eigen and igl have been packed in the include folder to make sure the right version is used.
 
