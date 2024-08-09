@@ -61,10 +61,53 @@ git clone git@github.com:Anything-robot/auto_design.git
 ```
 Repo auto_design is required to read the torque pkl file for FEA analysis. Eigen and igl have been packed in the include folder to make sure the right version is used.
 
+- Make a data folder. Put your stl file/folder in the data folder.
+```
+cd data
+mkdir build
+```
+
+## File Tree
+You should have the following file tree.
+```
+├── assets
+├── build
+├── CMakeLists.txt
+├── data
+├── include
+│   ├── CellStructure
+│   ├── Eigen
+│   ├── igl
+│   └── meshFilling.h
+├── readme.md
+├── script
+│   ├── format_transform
+│   ├── freecad
+│   ├── io_interface
+│   ├── metamaterial
+│   ├── pyansys_fea
+│   └── visualization
+│   ├── example_read_fea_result.py
+│   ├── final_model.scad
+│   ├── stl_metamaterial_filling.py
+│   ├── stl_meta_m_test.py
+│   ├── stl_relative_density_fea_opt_fixed_end.py
+│   ├── stl_relative_density_fea_opt.py
+│   ├── user_stl_force_relative_density_fea_opt.py
+└── src
+    ├── checkIfWatertight.cpp
+    ├── filling.cpp
+    ├── innerPointsCalculation.cpp
+    ├── replaceMesh.cpp
+    ├── scaleMesh.cpp
+    ├── smallModelGeneration.cpp
+    └── tetrahedralMeshing.cpp
+```
+
 ## Quick Use
+Put your .stl file in the data/ folder.
 
 ### FEA Analysis
-
 ```
 cd metamaterial_filling
 python script/user_stl_force_relative_density_fea_opt.py --input_stl_path data/stl_file_path --unit m --robot_result_file torque_pkl_file_path
