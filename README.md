@@ -2,6 +2,8 @@
 
 
 ## Installation
+__Tested Environment: Ubuntu 20.04__
+
 - Create a conda environment
 ```
 conda create --name anything2robot python=3.8
@@ -52,10 +54,9 @@ cd build
 cmake ..
 make
 ```
-Repo auto_design is required to read the torque pkl file for FEA analysis. Eigen and igl have been packed in the include folder to make sure the right version is used.
 
 - Make a data folder. Put your stl file/folder in the data folder.
 ```
-cd data
-mkdir build
+cd metamaterial_filling
+mkdir data
 ```
