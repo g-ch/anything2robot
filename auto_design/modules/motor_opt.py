@@ -14,11 +14,11 @@ import os
 import heapq
 import matplotlib.pyplot as plt
 import pickle as pkl
-from mesh_decomp import Mesh_Decomp, is_points_in_cylinder, is_points_in_shell_top, is_points_in_sphere
-from mesh_loader import Custom_Mesh_Loader
-from generic import Generic_Algorithm, Improved_Generic_Algorithm
-from plot_utils import rotation_matrix_from_vectors
-from collision_check import check_collision
+from modules.mesh_decomp import Mesh_Decomp, is_points_in_cylinder, is_points_in_shell_top, is_points_in_sphere
+from modules.mesh_loader import Custom_Mesh_Loader
+from modules.generic import Generic_Algorithm, Improved_Generic_Algorithm
+from modules.plot_utils import rotation_matrix_from_vectors
+from modules.collision_check import check_collision
 from sklearn import svm
 
 def set_diff_numpy(A, B):

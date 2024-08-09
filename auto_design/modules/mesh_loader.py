@@ -7,8 +7,8 @@ author: Moji Shi
 date: 2024-03-01
 
 """
-from plot_utils import *
-from data_struct import *
+from modules.plot_utils import *
+from modules.data_struct import *
 import open3d as o3d
 import os.path
 import argparse
