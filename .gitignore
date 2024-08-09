@@ -1,6 +1,6 @@
-.vscode/
-data/
-build/
+**/.vscode/
+**/data/
+**/build/
 *.bag
-docs/
-__pycache__/
+**/docs/
+**/__pycache__/
