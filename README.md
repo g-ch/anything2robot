@@ -1,1 +1,65 @@
 # anything2robot
+
+
+## Installation
+- Create a conda environment
+```
+conda create --name anything2robot python=3.8
+conda activate anything2robot
+pip install open3d
+```
+
+- Install openscad and solidpython. Run the following command
+```
+sudo apt-get install openscad
+pip install solidpython
+```
+
+- Install CGAL. By default this will install CGAL 5.0.2-3. when using Ubuntu 20.04.
+```
+sudo apt-get install libcgal-dev
+```
+
+- Install meshio by
+```
+pip install meshio[all]
+```
+
+- Install pinochhio
+```
+python -m pip install pin
+```
+
+- Install Ansys 2023 R2 (Note: Student edition can't be installed in Ubuntu. Make sure you have the license). To install Ansys on ubuntu, first, install the dependencies shown below. Then follow the official instructions of Ansys to install it in Ubuntu. __NOTE__: Use the default ```/root/ansys_inc``` folder to install. Install only MAPDL is sufficient. Finally, install PyAnsy.
+```
+sudo apt install ubuntu-desktop alien freeglut3 libxcb-xinerama0 lsb xterm libmotif-common  libmotif-dev
+```
+```
+Install MAPDL on your ubuntu system
+```
+```
+python -m pip install pyansys
+```
+
+- Then clone the code to your PC and compile the C++ part.
+
+```
+cd catkin_ws/src
+git clone git@github.com:Anything-robot/metamaterial_filling.git
+
+cd metamaterial_filling
+mkdir build
+cd build
+cmake ..
+make
+
+cd ../..
+git clone git@github.com:Anything-robot/auto_design.git
+```
+Repo auto_design is required to read the torque pkl file for FEA analysis. Eigen and igl have been packed in the include folder to make sure the right version is used.
+
+- Make a data folder. Put your stl file/folder in the data folder.
+```
+cd data
+mkdir build
+```
