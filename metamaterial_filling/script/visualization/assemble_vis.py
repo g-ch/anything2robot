@@ -3,8 +3,15 @@ import numpy as np
 import trimesh
 import open3d as o3d
 import sys
+import os
 
-sys.path.append('/home/clarence/ros_ws/metamaterial_ws/src/auto_design/modules')
+# Get the path of this script
+script_path = os.path.dirname(os.path.realpath(__file__))
+print("Script path: ", script_path)
+
+#sys.path.append('/home/clarence/ros_ws/metamaterial_ws/src/auto_design/modules')
+
+sys.path.append(os.path.join(script_path, '../../../auto_design/modules'))
 from interference_removal import RobotOptResult, LinkResult
 
 
@@ -89,15 +96,16 @@ if __name__ == "__main__":
     #     print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
 
     stl_file_path = '/home/clarence/ros_ws/metamaterial_ws/src/metamaterial_filling/data/lynel/20240721/tmp/FR_LOW.stl'
-    tenon_stl = '/home/clarence/ros_ws/metamaterial_ws/src/metamaterial_filling/data/tenon/tenon_robot_1.stl'
+    tenon_stl = '/home/clarence/git/anything2robot/anything2robot/metamaterial_filling/tenon/connection_child.stl'
 
     eye_transformation_matrix = np.eye(4)
 
-    tenon_transformation_matrix = np.array([[1, 0, 0, 0.0], 
-                                            [0, 1, 0, -0.05], 
-                                            [0, 0, 1, 0], 
+    # Rotate 90 degrees around x-axis
+    tenon_transformation_matrix = np.array([[1, 0, 0, 0.0],
+                                            [0, 0, -1, 0.0],
+                                            [0, 1, 0, 0.0],
                                             [0, 0, 0, 1]])
-    
+
     tenon_direction_vector = np.array([0, -1, 0])
     FR_LOW_tenon_pos_direction_vector = np.array([FR_LOW_link.tenon_pos[0][3], FR_LOW_link.tenon_pos[0][4], FR_LOW_link.tenon_pos[0][5]])
 

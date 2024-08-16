@@ -126,6 +126,8 @@ if __name__ == "__main__":
     print("Link name: ", input_stl_name_no_ext)
     print("Link Tenon Positions: ", link_dict.tenon_pos)
     print("Link Torques: ", link_dict.applied_torque)
+    #print("Joint type: ", link_dict.joint_type)
+
 
     # For the links with only one node. We need to add a fixed end.
     if len(link_dict.tenon_pos) < 2:
