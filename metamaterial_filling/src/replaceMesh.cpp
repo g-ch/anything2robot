@@ -6,7 +6,8 @@
 #include <fstream>
 
 // Function to move center to origin and align largest side to the bottom
-void processMesh(const std::string& inputFilename, const std::string& outputFilename, double scale=1.0) {
+void processMesh(const std::string& inputFilename, const std::string& outputFilename, double scale=1.0) 
+{
     Eigen::MatrixXd V;  // Vertex coordinates
     Eigen::MatrixXi F;  // Face indices
     Eigen::MatrixXd norms;  // Face normals
@@ -74,12 +75,20 @@ void processMesh(const std::string& inputFilename, const std::string& outputFile
     Eigen::RowVector3d minCoords_new = V.colwise().minCoeff();
     Eigen::RowVector3d maxCoords_new = V.colwise().maxCoeff();
 
+    Eigen::RowVector3d moved_vec = -centerPoint;
+
     // Write coordinates to a csv file
     std::string outputFilename_csv = outputFilename.substr(0, outputFilename.find_last_of(".")) + ".csv";
     std::ofstream out_file(outputFilename_csv);
     out_file << minCoords_new[0] << "," << minCoords_new[1] << "," << minCoords_new[2] << std::endl;
     out_file << maxCoords_new[0] << "," << maxCoords_new[1] << "," << maxCoords_new[2] << std::endl;
+    out_file << scale << "," << 0 << "," << 0 << std::endl;
+    out_file << moved_vec[0] << "," << moved_vec[1] << "," << moved_vec[2] << std::endl;
+    out_file << rotationMatrix(0, 0) << "," << rotationMatrix(0, 1) << "," << rotationMatrix(0, 2) << std::endl;
+    out_file << rotationMatrix(1, 0) << "," << rotationMatrix(1, 1) << "," << rotationMatrix(1, 2) << std::endl;
+    out_file << rotationMatrix(2, 0) << "," << rotationMatrix(2, 1) << "," << rotationMatrix(2, 2) << std::endl;
     out_file.close();
+
 }
 
 int main(int argc, char* argv[]) {

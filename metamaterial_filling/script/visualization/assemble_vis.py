@@ -12,16 +12,21 @@ print("Script path: ", script_path)
 #sys.path.append('/home/clarence/ros_ws/metamaterial_ws/src/auto_design/modules')
 
 sys.path.append(os.path.join(script_path, '../../../auto_design/modules'))
+sys.path.append(os.path.join(script_path, '../../../auto_design'))
 from interference_removal import RobotOptResult, LinkResult
 
 
-def load_and_transform_stl(file_path, transformation_matrix, scale=1.0):
+def load_and_transform_stl(file_path, transformation_matrix, scale=1.0, save_path=None):
     # Load STL file using trimesh
     mesh = trimesh.load(file_path)
     # Scale mesh
     mesh.apply_scale(scale)
     # Apply transformation
     mesh.apply_transform(transformation_matrix)
+
+    if save_path is not None:
+        mesh.export(save_path)
+
     return mesh
 
 def convert_to_open3d(trimesh_mesh):
@@ -49,7 +54,7 @@ def visualize_meshes(stl_files, transformation_matrices, scales=None):
     open3d_meshes.append(coordinate_frame)
 
     o3d.visualization.draw_geometries(open3d_meshes)
-    
+
 
 def get_rotation_matrix(v1, v2):
     # Normalize the vectors
@@ -84,16 +89,21 @@ def get_rotation_matrix(v1, v2):
     
     return R
 
+
 if __name__ == "__main__":
     # Load robot result
     robot_result = pkl.load(open('/home/clarence/ros_ws/metamaterial_ws/src/auto_design/results/lynel_robot_result.pkl', 'rb'))
-    
+    #robot_result = pkl.load(open('/home/clarence/git/anything2robot/anything2robot/auto_design/modules/lynel_robot_result.pkl', 'rb'))
+
     FR_LOW_link = robot_result.link_dict['FR_LOW']
 
     # for link_name in robot_result.link_dict:
     #     print("Link name: ", link_name)
     #     print("Link Tenon Positions: ", robot_result.link_dict[link_name].tenon_pos)
     #     print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
+    #     print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
+
+    # exit()
 
     stl_file_path = '/home/clarence/ros_ws/metamaterial_ws/src/metamaterial_filling/data/lynel/20240721/tmp/FR_LOW.stl'
     tenon_stl = '/home/clarence/git/anything2robot/anything2robot/metamaterial_filling/tenon/connection_child.stl'
