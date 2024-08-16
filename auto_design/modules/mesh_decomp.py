@@ -17,9 +17,9 @@ import os
 import time
 import pinocchio as pin
 
-from modules.mesh_loader import *
-from modules.urdf_generator import *
-from modules.data_struct import TreeNode, Graph
+from mesh_loader import *
+from urdf_generator import *
+from data_struct import TreeNode, Graph
 from scipy.ndimage import binary_dilation
 from os.path import abspath, dirname, join
 from scipy.ndimage import label, find_objects
