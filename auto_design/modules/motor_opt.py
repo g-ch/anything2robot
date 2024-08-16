@@ -744,7 +744,7 @@ class Joint_Connect_Opt:
             projected_voxels = np.dot(classify_voxels - motor_param[:3], np.array([x_direct, y_direct, motor_direct]))[:, :2]
 
             # SVM to classify the voxels
-            clf = svm.LinearSVC(C=1.0, fit_intercept=False, max_iter=100, tol=10)
+            clf = svm.LinearSVC(C=1.0, fit_intercept=False, max_iter=100, tol=10, dual=True)
             clf.fit(projected_voxels, classify_voxels_values)
             
             def condition_child_link_radical(pts):
@@ -873,7 +873,7 @@ def get_bounds(link_tree, threshold=5):
 
         cur_idx += 1
 
-    return bounds
+    return np.array(bounds).reshape(-1, 2)
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')

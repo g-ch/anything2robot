@@ -476,9 +476,7 @@ class Mesh_Decomp:
         """
         self.generate_ideal_urdf()
         urdf_dir = self.urdf_dir
-        pkg_dir = self.urdf_dir.replace(self.args.model_name + '_ideal.urdf', '') + '../../../../'
-        
-        print(pkg_dir)
+        pkg_dir = './..'
 
         model, collision_model, visual_model = pin.buildModelsFromUrdf(urdf_dir, pkg_dir)
 

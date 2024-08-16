@@ -196,7 +196,7 @@ class RobotOptResult:
         # o3d.visualization.draw_geometries([mesh] + tenon_vector_o3d)
         
         # 2. Add force and torque information
-        pkg_dir = self.urdf_dir.replace(self.args.model_name + '.urdf', '') + '../../../../'
+        pkg_dir = './..'
         model, collision_model, visual_model = pin.buildModelsFromUrdf(self.urdf_dir, pkg_dir)
         data = model.createData()
         max_torque = np.zeros((model.nv))
@@ -386,7 +386,7 @@ class InterferenceRemoval:
         if not os.path.exists(dir):
             os.makedirs(dir)
         urdf_file = open(dir + self.args.model_name + timestr + '.urdf', 'w+')
-        package_name = "urdf_description"
+        package_name = "anything2robot"
 
         self.urdf_dir = dir + self.args.model_name + timestr + '.urdf'
         urdf_file.write('<?xml version="1.0"?>\n')
@@ -542,6 +542,9 @@ class InterferenceRemoval:
         urdf_file.write('</gazebo>\n')
         urdf_file.write('</robot>\n')
 
+        # Return the dir of urdf file
+        return self.urdf_dir
+
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
     parser.add_argument('--model_name', type=str, default='lynel', help='The model name')
@@ -587,11 +590,10 @@ if __name__=="__main__":
                                                    link_tree=link_tree, 
                                                    father_link_dict=father_link_dict)
         
-        # Use pkl to save the result
-        # robot_result = RobotOptResult(interference_removal, './" + dir + "lynel.urdf')
         # pkl.dump(robot_result, open('./results/' + args.model_name + '_robot_result.pkl', 'wb'))
         joint_limits = np.vstack([np.array([-1.0, 1.0]) for _ in range(2*len(motor_results))])
         interference_removal.set_joint_limit(joint_limits)
         interference_removal.remove_interference()
         interference_removal.mesh_group.render()
-        interference_removal.generate_urdf()
+        urdf_dir = interference_removal.generate_urdf()
+        robot_result = RobotOptResult(interference_removal, urdf_dir)
