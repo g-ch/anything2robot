@@ -2,7 +2,7 @@ import os
 import argparse
 import numpy as np
 import pickle as pkl
-
+import time
 # Add dependencies path
 import sys
 sys.path.append(os.path.normpath('./auto_design/modules'))
@@ -56,4 +56,4 @@ if __name__=="__main__":
     robot_result = RobotOptResult(interference_removal, urdf_dir)
     results_dir = './auto_design/results'
     os.makedirs(results_dir, exist_ok=True)
-    pkl.dump(robot_result, open('./auto_design/results/' + args.model_name + '_robot_result.pkl', 'wb'))
+    pkl.dump(robot_result, open('./auto_design/results/' + args.model_name + time.strftime("%Y%m%d-%H%M%S") + '_robot_result.pkl', 'wb'))

@@ -10,6 +10,7 @@ date: 2024-03-01
 from plot_utils import *
 from data_struct import *
 import open3d as o3d
+import ast
 import os.path
 import argparse
 import tkinter as tk
@@ -116,6 +117,7 @@ class LinkTreeGUI:
         # Joints in current link
         self.joint_list = tk.Listbox(self.frame)
         self.joint_list.grid(column=3, row=0, columnspan=4, sticky='nsew')
+        self.joint_list.bind('<<ListboxSelect>>',self.joint_select)
 
         # Axis of current link
         self.cur_rotation_axis = tk.StringVar()
@@ -175,8 +177,7 @@ class LinkTreeGUI:
         self.fig.show(renderer="browser")  # Opens the plot in a browser window
 
     def save(self):
-        with open('./model/given_models/' + self.args.model_name + '_joints.pkl', 'wb') as f:
-            pkl.dump(self.nodes, f)
+        pkl.dump(self.nodes, open('./auto_design/model/given_models/' + self.args.model_name + '_joints.pkl', 'wb'))
 
     def remove_link(self):
         selected_item = self.tree.selection()[0]
@@ -204,7 +205,20 @@ class LinkTreeGUI:
                 self.tree.insert('', 'end', link_name, text=link_name)
             self.link_name.set("")
             self.parent_name.set("")
-        
+    
+    def joint_select(self, event):
+        selected_joint = self.joint_list.curselection()
+        joint_name = self.joint_list.get(selected_joint[0]).split(":")[0]
+        joint_pos = self.joint_list.get(selected_joint[0]).split(":")[1]
+        self.joint_name.set(joint_name)
+        tuple_val = ast.literal_eval(joint_pos[1:])
+        joint_pos = list(tuple_val)
+
+        self.joint_x.set(joint_pos[0])
+        self.joint_y.set(joint_pos[1])
+        self.joint_z.set(joint_pos[2])
+
+
     def on_tree_select(self, event):
         selected_item = self.tree.selection()[0]
         self.current_link = self.nodes[selected_item].val if selected_item in self.nodes else None
@@ -219,15 +233,16 @@ class LinkTreeGUI:
         if self.current_link:
             
             renderings = ""
-            
+            renderings_modify = ""
             for i, axis in enumerate(self.current_link.axis):
                 if i == 0:
                     renderings += f"Origin: {axis}\n"
+                    renderings_modify += ','.join(map(str, axis)) + ','
                 else:
                     renderings += f"Axis {i}: {axis}\n"
-
-
+                    renderings_modify += ','.join(map(str, axis)) + ','
             self.cur_rotation_axis.set(renderings)
+            self.rotation_axis.set(renderings_modify[:-1])
         else:
             self.cur_rotation_axis.set("")
 
@@ -569,8 +584,8 @@ if __name__ == "__main__":
     parser.add_argument('--expected_x', type=float, default=40, help='The expected width of the model')
     args = parser.parse_args()
     mesh_loader = Custom_Mesh_Loader(args)
-    mesh_dir = os.path.normpath('./model/given_models/' + args.model_name + '.stl')
-    joint_dir = os.path.normpath('./model/given_models/' + args.model_name + '_joints.pkl')
+    mesh_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
+    joint_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '_joints.pkl')
     mesh_loader.load_mesh(mesh_dir)
     mesh_loader.load_joint_positions(joint_dir)
     # print(mesh_loader.link_tree.get_all_children())
