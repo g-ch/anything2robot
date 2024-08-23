@@ -15,8 +15,15 @@ import os.path
 import argparse
 import tkinter as tk
 import pickle as pkl
+import threading
+from threading import Thread
 from tkinter import ttk
 from plotly.subplots import make_subplots
+from dash import Dash, dcc, html, Input, Output
+import requests
+from wsgiref.simple_server import make_server
+from flask import Flask
+
 
 
 class Mesh:
@@ -165,7 +172,7 @@ class LinkTreeGUI:
         ttk.Button(self.frame, text="Remove Joint", command=self.remove_joint).grid(column=2, row=6, columnspan=2)
 
         # quit button
-        ttk.Button(self.frame, text="Quit", command=self.root.quit).grid(column=0, row=7, columnspan=4)
+        ttk.Button(self.frame, text="Quit", command=self.quit).grid(column=0, row=7, columnspan=4)
 
         # save button
         ttk.Button(self.frame, text="Save", command=self.save).grid(column=0, row=8, columnspan=4)
@@ -174,7 +181,35 @@ class LinkTreeGUI:
         self.fig = make_subplots(specs=[[{"type": "scene"}]])
         self.fig.add_trace(mesh.mesh_plotly)
         self.mesh = mesh
-        self.fig.show(renderer="browser")  # Opens the plot in a browser window
+
+        self.server = Flask(__name__)
+        self.app = Dash(__name__, server=self.server)
+        self.server = make_server("localhost", 8050, self.server)
+        self.server_thread = threading.Thread(target=self.server.serve_forever)
+        self.server_thread.start()
+        self.app.layout = html.Div([
+            html.H4('Interactive plot with custom data source'),
+            dcc.Graph(id="graph", style={'width': '90vh', 'height': '90vh'}),
+            html.Button("Update Data", id="update-button", n_clicks=0),
+        ])
+        @self.app.callback(
+            Output("graph", "figure"), 
+            Input("update-button", "n_clicks"))
+        def update_bar_chart(n_clicks):
+            return self.fig
+        def run_dash():
+            self.app.run_server(debug=True)
+        # Create a thread to run the Dash app
+        self.dash_thread = Thread(target=run_dash)
+        self.dash_thread.start()
+        import webbrowser
+        webbrowser.open('http://127.0.0.1:8050/')
+
+    def quit(self):
+        self.server.shutdown()
+        self.server_thread.join()
+        self.dash_thread.join()
+        self.root.quit()
 
     def save(self):
         pkl.dump(self.nodes, open('./auto_design/model/given_models/' + self.args.model_name + '_joints.pkl', 'wb'))
@@ -230,7 +265,7 @@ class LinkTreeGUI:
                 self.joint_list.insert(tk.END, f"{joint_name}: {joint_position}")
         
         # Update rotation axis
-        if self.current_link:
+        if self.current_link.axis:
             
             renderings = ""
             renderings_modify = ""
@@ -276,10 +311,10 @@ class LinkTreeGUI:
                 y.append(pos[1])
                 z.append(pos[2])
         
-        # Add joint markers
+        # Add joint markersplotly 
         self.fig.add_trace(self.mesh.mesh_plotly)
         self.fig.add_trace(go.Scatter3d(x=x, y=y, z=z, mode='markers'))
-        self.fig.show(renderer="browser")  # Refresh the plot in the browser window
+        # self.fig.show(renderer="browser")  # Refresh the plot in the browser window
     
     def get_tree(self):
         return self.nodes["BODY"]
@@ -296,6 +331,8 @@ class Mesh_Loader:
         self.args = args
         self.scaled_mesh = None
         self.scaled_joint_dict = {}
+        self.joint_dict = {}
+        self.link_tree = None
     
     def load_mesh(self, mesh_path : str):
         """
@@ -331,25 +368,27 @@ class Mesh_Loader:
         self.scaled_mesh.scale(self.scale_factor)
 
         # Scale the joint data
-        
         for joint_name in self.joint_dict:
             self.scaled_joint_dict[joint_name] = np.array(self.joint_dict[joint_name]) * self.scale_factor
 
         # self.scaled_joint_dict = {joint_name: joint_position * self.scale_factor for joint_name, joint_position in self.joint_dict.items()}
 
         # Update the link tree
-        for joint_name in self.link_tree.val.joints:
-            self.link_tree.val.joints[joint_name] = np.array(self.link_tree.val.joints[joint_name]) * self.scale_factor
 
-        self.link_tree.val.axis = list(self.link_tree.val.axis)
-        self.link_tree.val.axis[0] = np.array(self.link_tree.val.axis[0]) * self.scale_factor
-        
-        for link in self.link_tree.get_all_children()[0]:
-            for joint_name in link.val.joints:
-                link.val.joints[joint_name] = np.array(link.val.joints[joint_name]) * self.scale_factor
+        if self.link_tree is not None:
 
-            link.val.axis = list(link.val.axis)
-            link.val.axis[0] = np.array(link.val.axis[0]) * self.scale_factor
+            for joint_name in self.link_tree.val.joints:
+                self.link_tree.val.joints[joint_name] = np.array(self.link_tree.val.joints[joint_name]) * self.scale_factor
+
+            self.link_tree.val.axis = list(self.link_tree.val.axis)
+            self.link_tree.val.axis[0] = np.array(self.link_tree.val.axis[0]) * self.scale_factor
+            
+            for link in self.link_tree.get_all_children()[0]:
+                for joint_name in link.val.joints:
+                    link.val.joints[joint_name] = np.array(link.val.joints[joint_name]) * self.scale_factor
+
+                link.val.axis = list(link.val.axis)
+                link.val.axis[0] = np.array(link.val.axis[0]) * self.scale_factor
 
     def update_link_tree(self):
         pass
@@ -587,5 +626,6 @@ if __name__ == "__main__":
     mesh_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
     joint_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '_joints.pkl')
     mesh_loader.load_mesh(mesh_dir)
+    mesh_loader.scale()
     mesh_loader.load_joint_positions(joint_dir)
     # print(mesh_loader.link_tree.get_all_children())
