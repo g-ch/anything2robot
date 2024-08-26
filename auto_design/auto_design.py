@@ -26,8 +26,8 @@ if __name__=="__main__":
     
     mesh_loader = Custom_Mesh_Loader(args)
     mesh_loader.load_mesh(mesh_dir)
-    mesh_loader.load_joint_positions(joint_dir)
     mesh_loader.scale()
+    mesh_loader.load_joint_positions(joint_dir)
     mesh_decomp = Mesh_Decomp(args, mesh_loader)
     mesh_decomp.decompose()
 

@@ -305,7 +305,31 @@ class LinkTreeGUI:
     def update_plot(self):
         self.fig.data = []  # Clear existing data
         x, y, z = [], [], []
+        cone_size = 10
+        axis_x, axis_y, axis_z, direct_x, direct_y, direct_z = [], [], [], [], [], []
         for link in self.nodes.values():
+            if len(link.val.axis) == 2:
+                axis_x.append(link.val.axis[0][0])
+                axis_y.append(link.val.axis[0][1])
+                axis_z.append(link.val.axis[0][2])
+                direct_x.append(link.val.axis[1][0]*cone_size)
+                direct_y.append(link.val.axis[1][1]*cone_size)
+                direct_z.append(link.val.axis[1][2]*cone_size)
+            elif len(link.val.axis) == 3:
+                axis_x.append(link.val.axis[0][0])
+                axis_y.append(link.val.axis[0][1])
+                axis_z.append(link.val.axis[0][2])
+                direct_x.append(link.val.axis[1][0]*cone_size)
+                direct_y.append(link.val.axis[1][1]*cone_size)
+                direct_z.append(link.val.axis[1][2]*cone_size)
+
+                axis_x.append(link.val.axis[0][0])
+                axis_y.append(link.val.axis[0][1])
+                axis_z.append(link.val.axis[0][2])
+                direct_x.append(link.val.axis[2][0]*cone_size)
+                direct_y.append(link.val.axis[2][1]*cone_size)
+                direct_z.append(link.val.axis[2][2]*cone_size)
+
             for pos in link.val.joints.values():
                 x.append(pos[0])
                 y.append(pos[1])
@@ -314,6 +338,8 @@ class LinkTreeGUI:
         # Add joint markersplotly 
         self.fig.add_trace(self.mesh.mesh_plotly)
         self.fig.add_trace(go.Scatter3d(x=x, y=y, z=z, mode='markers'))
+        cone = go.Cone(x=axis_x, y=axis_y, z=axis_z, u=direct_x, v=direct_y, w=direct_z)
+        self.fig.add_trace(cone)
         # self.fig.show(renderer="browser")  # Refresh the plot in the browser window
     
     def get_tree(self):
