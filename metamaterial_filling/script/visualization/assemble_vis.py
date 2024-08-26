@@ -16,6 +16,17 @@ sys.path.append(os.path.join(script_path, '../../../auto_design'))
 from interference_removal import RobotOptResult, LinkResult
 
 
+
+def transform_trimesh(mesh, transformation_matrix, save_path=None):
+    # Apply transformation
+    mesh.apply_transform(transformation_matrix)
+
+    if save_path is not None:
+        mesh.export(save_path)
+
+    return mesh
+
+
 def load_and_transform_stl(file_path, transformation_matrix, scale=1.0, save_path=None):
     # Load STL file using trimesh
     mesh = trimesh.load(file_path)
@@ -88,6 +99,72 @@ def get_rotation_matrix(v1, v2):
     R = I + K + K @ K * ((1 - dot_prod) / (np.linalg.norm(cross_prod) ** 2))
     
     return R
+
+
+
+def get_rotation_matrix_from_angle(axis, angle):
+    """
+    Returns the rotation matrix for a rotation around a given axis by a specified angle.
+    
+    Parameters:
+    axis (numpy array): The axis of rotation (must be a unit vector).
+    angle (float): The rotation angle in radians.
+    
+    Returns:
+    numpy array: The rotation matrix (3x3).
+    """
+    # Ensure the axis is a unit vector
+    axis = axis / np.linalg.norm(axis)
+    
+    # Calculate trigonometric functions
+    cos_angle = np.cos(angle)
+    sin_angle = np.sin(angle)
+    one_minus_cos = 1 - cos_angle
+    
+    # Components of the axis
+    x, y, z = axis
+    
+    # Rotation matrix using the Rodrigues' rotation formula
+    R = np.array([
+        [cos_angle + x**2 * one_minus_cos,       x*y*one_minus_cos - z*sin_angle, x*z*one_minus_cos + y*sin_angle],
+        [y*x*one_minus_cos + z*sin_angle, cos_angle + y**2 * one_minus_cos,       y*z*one_minus_cos - x*sin_angle],
+        [z*x*one_minus_cos - y*sin_angle, z*y*one_minus_cos + x*sin_angle, cos_angle + z**2 * one_minus_cos]
+    ])
+    
+    return R
+
+def get_transformation_matrix_from_angle(rotation_point, axis, angle):
+    """
+    Returns the transformation matrix for a rotation around a given axis and a specific point.
+    
+    Parameters:
+    rotation_point (numpy array): The point around which to rotate.
+    axis (numpy array): The axis of rotation.
+    angle (float): The rotation angle in radians.
+    
+    Returns:
+    numpy array: The 4x4 transformation matrix.
+    """
+    # Translate the point of rotation to the origin
+    T1 = np.eye(4)
+    T1[:3, 3] = -rotation_point
+
+    # Rotation matrix
+    R = get_rotation_matrix_from_angle(axis, angle)
+    
+    # 4x4 rotation matrix
+    R4 = np.eye(4)
+    R4[:3, :3] = R
+    
+    # Translate back to the original point
+    T2 = np.eye(4)
+    T2[:3, 3] = rotation_point
+
+    # Combine transformations
+    transformation_matrix = T2 @ R4 @ T1
+    
+    return transformation_matrix
+
 
 
 if __name__ == "__main__":

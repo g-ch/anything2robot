@@ -65,22 +65,28 @@ class SixFoldPlatesFillingWithShellTenon:
     def final_model(self):
         if self.thickness is None or self.thickness <= 0:
             stl_import = import_stl(self.input_stl_path)
-            stl_smaller_model_import = import_stl(self.input_smaller_model_stl_path)
-            shell_model = difference()(stl_import, stl_smaller_model_import)
+            shell_model = stl_import # Use original model as the shell model. Solid.
+            print("Use original model as the shell model")
+            
         else:
             stl_import = import_stl(self.input_stl_path)
-            shell_model = stl_import # Use original model as the shell model. Solid.
+            stl_smaller_model_import = import_stl(self.input_smaller_model_stl_path)
+            shell_model = difference()(stl_import, stl_smaller_model_import)
+            print("Use real shell model")
 
         # Add tenons to the shell model if input_tenon_stl_list_path is not None
         if self.input_tenon_stl_list_path is not None:
+            print("Tenons will be added to the shell model")
             for tenon_stl_path in self.input_tenon_stl_list_path:
                 tenon_stl_import = import_stl(tenon_stl_path)
                 shell_model = union()(shell_model, tenon_stl_import)
 
         # If interval is negative or None, then no boards will be generated
         if self.interval is None or self.interval <= 0:
+            print("No boards will be generated")
             return shell_model
         else:
+            print("Boards will be generated")
             # Combine the boards and the shell model
             combined = self.combined_boards()
             intersection_model = intersection()(combined, stl_import)

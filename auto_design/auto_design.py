@@ -33,9 +33,9 @@ if __name__=="__main__":
 
 
     bounds = get_bounds(mesh_decomp.link_tree, threshold=6)
-    motor_lib = [[3.6, 3.8, 12],   # DM6006         # Height, Radius, Torque
+    motor_lib = [[5.6, 4.2, 12],   # DM6006         # Height, Radius, Torque DM6006 [3.6, 3.8, 12]  DM8009 [6.1, 4.9, 20 ]
                 #  [4.5, 2.5, 8 ], # DM4310
-                 [6.1, 4.9, 20 ]]  # DM8009
+                 [8.1, 5.3, 20 ]]  # DM8009
     motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib)
     motor_results = motor_opt.run_opt()
     joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)

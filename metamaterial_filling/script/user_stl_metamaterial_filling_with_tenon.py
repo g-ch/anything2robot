@@ -22,7 +22,202 @@ import numpy as np
 import math
 from format_transform.off_to_stl import off_to_stl
 
-from visualization.assemble_vis import load_and_transform_stl, get_rotation_matrix, visualize_meshes
+from visualization.assemble_vis import get_rotation_matrix, visualize_meshes, transform_trimesh
+
+
+from skimage import measure
+import trimesh
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import open3d as o3d
+
+
+'''
+@Description: Voxelize a trimesh mesh with a given voxel size
+@Input:
+    trimesh_mesh: The trimesh mesh to voxelize
+    voxel_size: The size of the voxels
+@Output:
+    voxels: The 3D array of voxels
+    min_bound: The minimum bounds of the voxel grid
+    max_bound: The maximum bounds of the voxel grid
+    voxel_size: The size of the voxels
+'''
+def voxelize_mesh(trimesh_mesh, voxel_size):
+    # Convert trimesh mesh to Open3D mesh
+    o3d_mesh = o3d.geometry.TriangleMesh(
+        vertices=o3d.utility.Vector3dVector(trimesh_mesh.vertices),
+        triangles=o3d.utility.Vector3iVector(trimesh_mesh.faces)
+    )
+    
+    # Create a voxel grid from the Open3D mesh
+    voxel_grid = o3d.geometry.VoxelGrid.create_from_triangle_mesh(o3d_mesh, voxel_size=voxel_size)
+    
+    # Extract voxel coordinates
+    voxel_indices = np.array([voxel.grid_index for voxel in voxel_grid.get_voxels()])
+    
+    # Calculate the bounds of the voxel grid
+    min_bound = voxel_indices.min(axis=0) * voxel_size + voxel_grid.origin
+    max_bound = voxel_indices.max(axis=0) * voxel_size + voxel_grid.origin
+
+    # Create a 3D array to hold the voxels
+    shape = ((max_bound - min_bound) / voxel_size).astype(int) + 1
+    voxels = np.zeros(shape, dtype=bool)
+
+    # Set the corresponding voxels to True, clamping to avoid out-of-bounds errors
+    for idx in voxel_indices:
+        grid_idx = ((idx * voxel_size + voxel_grid.origin) - min_bound) / voxel_size
+        grid_idx = np.clip(grid_idx.astype(int), 0, np.array(shape) - 1)
+        voxels[tuple(grid_idx)] = True
+
+    return voxels, min_bound, max_bound, voxel_size
+
+
+'''
+@Description: Check if a point is occupied in the voxel grid
+@Input:
+    point: The point to check
+    voxels: The 3D array of voxels
+    min_bound: The minimum bounds of the voxel grid
+    max_bound: The maximum bounds of the voxel grid
+    voxel_size: The size of the voxels
+@Output:
+    Whether the point is occupied
+
+'''
+def is_point_occupied(point, voxels, min_bound, max_bound, voxel_size):
+    # Check if the point is outside the mesh bounds
+    if np.any(point < min_bound) or np.any(point > max_bound):
+        return False
+
+    # Convert the point to voxel grid indices
+    index = ((point - min_bound) / voxel_size).astype(int)
+
+    # Check if the indices are within the voxel grid shape
+    if np.any(index < 0) or np.any(index >= np.array(voxels.shape)):
+        return False
+
+    # Return the occupancy of the voxel at the given index
+    return voxels[tuple(index)]
+
+
+'''
+@Description: Generate a set of perpendicular vectors to a given direction
+@Input:
+    direction: The direction vector
+    angle_interval: The interval between the angles of the perpendicular vectors
+@Output:
+    vectors: The list of perpendicular vectors
+    angles: The angles of the perpendicular vectors
+'''
+def generate_perpendicular_vectors(direction, angle_interval):
+    # Ensure direction is a unit vector
+    direction = direction / np.linalg.norm(direction)
+    
+    # Find two vectors perpendicular to the direction
+    if np.allclose(direction, [1, 0, 0]) or np.allclose(direction, [-1, 0, 0]):
+        v1 = np.array([0, 1, 0])
+        angles = np.arange(0, 2 * np.pi, angle_interval) - np.pi / 2
+    else:
+        v1 = np.cross(direction, [1, 0, 0])
+        angles = np.arange(0, 2 * np.pi, angle_interval)
+    
+    v1 = v1 / np.linalg.norm(v1)
+    v2 = np.cross(direction, v1)
+    
+    # Sample angles
+    vectors = [np.cos(angle) * v1 + np.sin(angle) * v2 for angle in angles]
+
+    normalized_vectors = []
+    for vec in vectors:
+        normalized_vectors.append(vec / np.linalg.norm(vec))
+
+    print(f"Direction: {direction}")
+    print(f"Perpendicular vectors: {vectors}")
+    
+    return vectors, angles
+
+
+'''
+@Description: Check the occupancy of the voxels along perpendicular rays from a point
+@Input:
+    point: The point to check from
+    direction: The direction of the rays
+    voxel_size: The size of the voxels
+    checking_distance: The distance to check along the rays
+    angle_interval: The interval between the angles of the perpendicular vectors
+    voxels: The 3D array of voxels
+    min_bound: The minimum bounds of the voxel grid
+    max_bound: The maximum bounds of the voxel grid
+@Output:
+    results: The list of whether the rays hit an occupied voxel
+    vectors: The list of vectors along the rays
+'''
+def check_perpendicular_rays_occupancy(point, direction, voxel_size, checking_distance, angle_interval, voxels, min_bound, max_bound):
+    vectors, angles = generate_perpendicular_vectors(direction, angle_interval)
+    
+    results = []    
+    for vec in vectors:
+        hit = False
+        normalized_vec = vec / np.linalg.norm(vec)
+        for i in range(1, int(checking_distance / voxel_size) + 1):
+            # Calculate the point along the ray
+            ray_point = point + normalized_vec * i * voxel_size
+            
+            # Check if the point is occupied
+            if is_point_occupied(ray_point, voxels, min_bound, max_bound, voxel_size):
+                hit = True
+                break
+        
+        results.append(hit)
+    
+    return results, vectors, angles
+
+'''
+@Description: Visualize the mesh, occupied voxels, and direction vectors
+@Input:
+    mesh: The trimesh mesh to visualize
+    voxels: The 3D array of voxels
+    voxel_size: The size of the voxels
+    min_bound: The minimum bounds of the voxel grid
+    start_point: The starting point of the direction vectors
+    direction_vectors: The list of direction vectors
+    results: The list of whether the rays hit an occupied voxel
+'''
+def visualize_mesh_voxels_vectors(mesh, voxels, voxel_size, min_bound, start_point, direction_vectors, results):
+    # Create a figure and a 3D axis
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Plot the mesh
+    ax.add_collection3d(Poly3DCollection(mesh.triangles, alpha=0.2, color='gray'))
+    
+    # Plot the occupied voxels
+    occupied_voxel_coords = np.array(np.nonzero(voxels)).T * voxel_size + min_bound
+    for voxel in occupied_voxel_coords:
+        # Plot the voxel as a small cube
+        ax.bar3d(voxel[0], voxel[1], voxel[2], voxel_size, voxel_size, voxel_size, color='blue', alpha=0.5)
+
+    # Plot the direction vectors
+    for vec, hit in zip(direction_vectors, results):
+        end_point = start_point + vec  # Calculate the end point of the vector
+        
+        # Choose color based on whether the direction is occupied
+        color = 'red' if hit else 'green'
+        
+        # Plot the vector
+        ax.quiver(
+            start_point[0], start_point[1], start_point[2], 
+            vec[0], vec[1], vec[2], 
+            color=color, length=1.0, normalize=True
+        )
+    
+    # Set the limits for better visualization
+    ax.set_xlim(min_bound[0], min_bound[0] + voxel_size * voxels.shape[0])
+    ax.set_ylim(min_bound[1], min_bound[1] + voxel_size * voxels.shape[1])
+    ax.set_zlim(min_bound[2], min_bound[2] + voxel_size * voxels.shape[2])
+    
+    plt.show()
 
 
 '''
@@ -34,8 +229,7 @@ from visualization.assemble_vis import load_and_transform_stl, get_rotation_matr
 @Output:
     transformed_file_save_path: The path of the saved transformed tenon file
 '''
-def transform_tenon_and_save(link, tenon_id=0, unit='m', tenon_file_folder=project_dir+'/tenon'):
-    # Set the transformation matrix for the tenon according to the tenon position
+def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=None):
     tenon_basic_transformation_matrix = np.array([[1, 0, 0, 0.0],
                                             [0, 0, -1, 0.0],
                                             [0, 1, 0, 0.0],
@@ -56,20 +250,10 @@ def transform_tenon_and_save(link, tenon_id=0, unit='m', tenon_file_folder=proje
         transformation[:, 3] = transformation[:, 3] * 1000
         transformation[3, 3] = 1
 
-
     tenon_transformation_matrix = np.dot(transformation, tenon_basic_transformation_matrix)
+    
+    transform_trimesh(tenon_mesh, tenon_transformation_matrix, save_path=save_path)
 
-    # Load the tenon file
-    tenon_file_name = 'connection_' + link.tenon_type[tenon_id] + '.stl'
-    transformed_file_save_folder = os.path.join(project_dir, 'data/transformed_tenon')
-    if not os.path.exists(transformed_file_save_folder):
-        os.makedirs(transformed_file_save_folder)
-
-    transformed_file_save_path = os.path.join(transformed_file_save_folder, tenon_file_name)
-
-    load_and_transform_stl(os.path.join(tenon_file_folder, tenon_file_name), tenon_transformation_matrix, scale=1.0, save_path=transformed_file_save_path)
-
-    return transformed_file_save_path
 
 
 '''
@@ -78,12 +262,12 @@ def transform_tenon_and_save(link, tenon_id=0, unit='m', tenon_file_folder=proje
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--input_stl_path', type=str, default='data/../../urdf/lynel20240816-111233/FR_UP.stl', help='Input STL file path')
+    parser.add_argument('--input_stl_path', type=str, default='data/../../urdf/lynel20240823-110559/FR_LOW.stl', help='Input STL file path')
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
-    parser.add_argument('--relative_density', type=float, default=0.05, help='Relative density of the metamaterial given by FEA results')
-    parser.add_argument('--shell_thickness', type=float, default=1, help='Thickness of the shell. mm')
+    parser.add_argument('--relative_density', type=float, default=0.1, help='Relative density of the metamaterial given by FEA results')
+    parser.add_argument('--shell_thickness', type=float, default=2, help='Thickness of the shell. mm')
     parser.add_argument('--shell_generation_voxel_resolution', type=float, default=1, help='Voxel resolution for shell generation. mm')
-    parser.add_argument('--output_stl_name', type=str, default='FR_UP_final_output_with_shell.stl', help='Output STL file path')
+    parser.add_argument('--output_stl_name', type=str, default='20240823_FR_LOW_final_output_with_shell.stl', help='Output STL file path')
     parser.add_argument('--use_existing_shell', type=bool, default=False, help='Whether to use the existing shell file')
     
     parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/../auto_design/results/lynel_robot_result.pkl', help='Pickle file path for the tenon position results')
@@ -114,16 +298,90 @@ if __name__ == '__main__':
     # Check and read pkl file
     robot_result = pkl.load(open(args.pkl_result_path, 'rb'))
 
-    # for link_name in robot_result.link_dict:
-    #     print("Link name: ", link_name)
-    #     print("Link Tenon Positions: ", robot_result.link_dict[link_name].tenon_pos)
-    #     print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
-    #     print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
+    for link_name in robot_result.link_dict:
+        print("Link name: ", link_name)
+        print("Link Tenon Positions: ", robot_result.link_dict[link_name].tenon_pos)
+        print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
+        print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
 
     link_name = args.input_stl_path.split('/')[-1].split('.')[0]
     link = robot_result.link_dict[link_name]
 
-    
+    #######  Find good orientation for tenon  ########
+    # Load mesh and voxelize
+    mesh = trimesh.load_mesh(args.input_stl_path)
+    if args.unit == 'm':
+        voxel_size = 0.005
+        checking_distance = 0.1
+    else:
+        voxel_size = 5
+        checking_distance = 100
+
+    voxels, min_bound, max_bound, voxel_size = voxelize_mesh(mesh, voxel_size)
+    tenon_center_top_bias = 20 # mm
+    checking_angle_interval = np.pi / 12
+    safe_angle_range = np.pi # 180 degrees
+
+    # Find the best orientation for each tenon
+    tenon_best_orientation_angles = []
+    for i in range(len(link.tenon_pos)): # For each tenon
+        tenon_root_point = link.tenon_pos[i][:3]
+        tenon_root_direction = link.tenon_pos[i][3:6]
+        tenon_root_direction_norm = np.linalg.norm(tenon_root_direction)
+
+        print(f"Tenon {i} root point: {tenon_root_point}")
+        print(f"Tenon {i} root direction: {tenon_root_direction}")
+
+        if args.unit == 'm':
+            tenon_root_point_biased = tenon_root_point + tenon_root_direction_norm * 0.001 * tenon_center_top_bias
+        else:
+            tenon_root_point_biased = tenon_root_point + tenon_root_direction_norm * tenon_center_top_bias
+
+        hit_results, vectors, angles = check_perpendicular_rays_occupancy(tenon_root_point_biased, tenon_root_direction, voxel_size, checking_distance, checking_angle_interval, voxels, min_bound, max_bound)
+
+
+        # check if results and vectors have the same length
+        if len(hit_results) != len(vectors):
+            raise ValueError('Results and vectors have different lengths')
+
+        if args.preview:
+            visualize_mesh_voxels_vectors(mesh, voxels, voxel_size, min_bound, tenon_root_point, vectors, hit_results)
+
+        # Find the best direction. The best direction is the one whose adjacent directions are all free.
+        best_direction = None
+        adjacent_free_score_list = []
+        range_min = int(- safe_angle_range / checking_angle_interval / 2)
+        range_max = - range_min
+        check_num = range_max - range_min + 1
+        
+        for j, hit in enumerate(hit_results):
+            adjacent_free_score = 0    
+
+            # Check the adjacent directions
+            for k in range(range_min, range_max + 1):
+                seq = j+k
+                if seq < 0:
+                    seq = len(hit_results) + seq
+                elif seq >= len(hit_results):
+                    seq = seq - len(hit_results)
+                
+                if hit_results[seq] == False:
+                    # Use a V shape to calculate the score
+                    adjacent_free_score += range_max + 1 - abs(k)
+
+            adjacent_free_score_list.append(adjacent_free_score)
+
+        # Find the index of the best direction whose adjacent directions are all free. 
+        adjacent_free_num_array = np.array(adjacent_free_score_list)
+        best_direction_index = np.argmax(adjacent_free_num_array)
+
+        tenon_best_orientation_angles.append(angles[best_direction_index])
+
+        # Print the best direction and free adjacent direction number
+        print(f"Tenon {i} best direction: {vectors[best_direction_index]}")
+        print(f"Tenon {i} best direction angle: {angles[best_direction_index]}")
+        print(f"Tenon {i} free adjacent direction number: {adjacent_free_num_array[best_direction_index]}")
+        
 
     ###### Replace and scale the stl ######
     replaced_stl_name = args.input_stl_path.split('/')[-1].split('.')[0] + '_replaced.stl'
@@ -171,20 +429,49 @@ if __name__ == '__main__':
         applied_placement = np.array([float(x) for x in lines[3].split(',')])
         applied_rotation = np.array([[float(x) for x in line.split(',')] for line in lines[4:7]])
 
-        print(f"min_x: {min_x} mm, min_y: {min_y} mm, min_z: {min_z} mm")
-        print(f"max_x: {max_x} mm, max_y: {max_y} mm, max_z: {max_z} mm")
-        print(f"applied_scale: {applied_scale}")
-        print(f"applied_placement: {applied_placement}")
-        print(f"applied_rotation: {applied_rotation}")
+        # print(f"min_x: {min_x} mm, min_y: {min_y} mm, min_z: {min_z} mm")
+        # print(f"max_x: {max_x} mm, max_y: {max_y} mm, max_z: {max_z} mm")
+        # print(f"applied_scale: {applied_scale}")
+        # print(f"applied_placement: {applied_placement}")
+        # print(f"applied_rotation: {applied_rotation}")
 
     
     ##### Transform tenons and save as stl files for later use #####
     print("Transforming tenons...")
+
+    # Calculate the pre-rotation transformation for the tenons to get the right orientation for inserting tenon pairs without interference
+    tenon_pre_transformation_matrix_list = []
+    for i in range(len(tenon_best_orientation_angles)):
+        best_angle = tenon_best_orientation_angles[i]
+        
+        # Rotate the tenon along the z-axis with the best angle
+        rotation_matrix = np.array([[np.cos(best_angle), -np.sin(best_angle), 0],
+                                    [np.sin(best_angle), np.cos(best_angle), 0],
+                                    [0, 0, 1]])
+        
+        tenon_pre_transformation_matrix = np.eye(4)
+        tenon_pre_transformation_matrix[:3, :3] = rotation_matrix
+
+        tenon_pre_transformation_matrix_list.append(tenon_pre_transformation_matrix)
+
+
+    # Transform the tenons and save the transformed tenon files
     transformed_tenon_files = []                                        
     for i in range(len(link.tenon_pos)):
-        file = transform_tenon_and_save(link, i, unit=args.unit, tenon_file_folder=args.tenon_file_folder)
-        transformed_tenon_files.append(file)
-        print(f"Transformed tenon file saved at {file}")
+        tenon_file_name = 'connection_' + link.tenon_type[i] + '.stl'
+        tenon_file_path = os.path.join(args.tenon_file_folder, tenon_file_name)
+        tenon_mesh = trimesh.load(tenon_file_path)
+
+        # Add transformation for tenon pair alignment without interference
+        tenon_mesh = transform_trimesh(tenon_mesh, tenon_pre_transformation_matrix_list[i])
+
+        # Transform to the right position in the stl file
+        tenon_file_name_transformed = tenon_file_name.replace('.stl', '_transformed.stl')
+        file_save_path = os.path.join(output_folder, tenon_file_name_transformed)
+        transform_tenon_and_save(link, tenon_mesh, i, unit=args.unit, save_path=file_save_path)
+
+        transformed_tenon_files.append(file_save_path)
+        print(f"Transformed tenon file saved at {file_save_path}")
 
     # Transform again based on the placement and rotation for the replaced model
     second_transformation_matrix = np.eye(4)
@@ -197,11 +484,15 @@ if __name__ == '__main__':
     final_transformed_tenon_files = []
     for i in range(len(transformed_tenon_files)):
         transformed_tenon_file_path = transformed_tenon_files[i]
+        transformed_tenon_mesh = trimesh.load(transformed_tenon_file_path)
+
         transformed_file_save_path = transformed_tenon_file_path.replace('.stl', '_second_transformed.stl')
 
-        load_and_transform_stl(transformed_tenon_file_path, second_transformation_matrix, scale=1.0, save_path=transformed_file_save_path)
-        load_and_transform_stl(transformed_file_save_path, third_transformation_matrix, scale=1.0, save_path=transformed_file_save_path)
+        transformed_tenon_mesh = transform_trimesh(transformed_tenon_mesh, second_transformation_matrix)
+        transform_trimesh(transformed_tenon_mesh, third_transformation_matrix, save_path=transformed_file_save_path)
+
         final_transformed_tenon_files.append(transformed_file_save_path)
+
 
     ##### Preview the transformed tenons and the link  #####
     if args.preview:
@@ -214,7 +505,6 @@ if __name__ == '__main__':
             scales_vis.append(1.0)
 
         visualize_meshes(stl_to_visualize, transformation_matrices_vis, scales_vis)
-
 
     ###### Generate the shell ######
     # smaller_model_stl_name = args.input_stl_path.split('/')[-1].split('.')[0] + '_smaller.stl'
@@ -274,7 +564,8 @@ if __name__ == '__main__':
         thickness = 0.2
         print('Thickness should be larger than 0.2, set to 0.2')
         # Correct the interval
-        interval = thickness * 6.0 / relative_density
+        # interval = thickness * 6.0 / relative_density  # No change to the interval for now
+
         print(f"Corrected interval: {interval}")
     
     plates_num = int(width / (thickness + interval) / 2)
