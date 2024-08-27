@@ -192,11 +192,15 @@ class LinkTreeGUI:
             dcc.Graph(id="graph", style={'width': '90vh', 'height': '90vh'}),
             html.Button("Update Data", id="update-button", n_clicks=0),
         ])
+
+
         @self.app.callback(
             Output("graph", "figure"), 
             Input("update-button", "n_clicks"))
         def update_bar_chart(n_clicks):
             return self.fig
+        
+
         def run_dash():
             self.app.run_server(debug=True)
         # Create a thread to run the Dash app
@@ -293,6 +297,7 @@ class LinkTreeGUI:
             axis_str = self.rotation_axis.get()
             axis = tuple(map(float, axis_str.split(",")))
             self.current_link.add_axis(axis)
+            self.update_plot()
     
     def remove_joint(self):
         if self.current_link:
@@ -652,6 +657,5 @@ if __name__ == "__main__":
     mesh_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
     joint_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '_joints.pkl')
     mesh_loader.load_mesh(mesh_dir)
-    mesh_loader.scale()
     mesh_loader.load_joint_positions(joint_dir)
     # print(mesh_loader.link_tree.get_all_children())

@@ -322,7 +322,7 @@ class General_GA(Improved_Generic_Algorithm):
         self.scene = o3d.t.geometry.RaycastingScene()
         _ = self.scene.add_triangles(o3d.t.geometry.TriangleMesh.from_legacy(mesh_decomp.mesh.mesh_o3d))
         self.motor_type_params = motor_type_params
-        self.connector_params = [6, 6]
+        self.connector_params = [0, 6]
         self.father_link_dict = mesh_decomp.father_link_dict
         
         # Get the initial state from bounds

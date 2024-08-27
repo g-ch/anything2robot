@@ -16,9 +16,9 @@ from modules.interference_removal import InterferenceRemoval, RobotOptResult
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
     parser.add_argument('--model_name', type=str, default='lynel', help='The model name')
-    parser.add_argument('--expected_x', type=float, default=40, help='The expected width of the model')
+    parser.add_argument('--expected_x', type=float, default=50, help='The expected width of the model')
     parser.add_argument('--voxel_size', type=float, default=0.5, help='The size of the voxel')
-    parser.add_argument('--voxel_density', type=float, default=1e-4, help='The density of the voxel')
+    parser.add_argument('--voxel_density', type=float, default=2e-5, help='The density of the voxel')
     args = parser.parse_args()
     mesh_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
     joint_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '_joints.pkl')
@@ -26,10 +26,11 @@ if __name__=="__main__":
     
     mesh_loader = Custom_Mesh_Loader(args)
     mesh_loader.load_mesh(mesh_dir)
-    mesh_loader.scale()
     mesh_loader.load_joint_positions(joint_dir)
+    mesh_loader.scale()
     mesh_decomp = Mesh_Decomp(args, mesh_loader)
     mesh_decomp.decompose()
+    mesh_decomp.render()
 
 
     bounds = get_bounds(mesh_decomp.link_tree, threshold=6)
@@ -38,6 +39,7 @@ if __name__=="__main__":
                  [6.1, 4.9, 20 ]]  # DM8009
     motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib)
     motor_results = motor_opt.run_opt()
+    motor_opt.render()
     joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
     joint_connect_opt.run_opt()
 

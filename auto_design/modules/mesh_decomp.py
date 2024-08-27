@@ -469,6 +469,8 @@ class Mesh_Decomp:
         urdf_file.write('   </plugin>\n')
         urdf_file.write('</gazebo>\n')
         urdf_file.write('</robot>\n')
+
+        print("ideal mass:", self.ideal_mass)
     
     def generate_constraints(self):
         """
@@ -502,7 +504,7 @@ class Mesh_Decomp:
                     break
 
         # Contact force that will be applied to foot links
-        force = np.array([0, 0, 9.81 * self.ideal_mass])
+        force = np.array([0, 0, 9.81 * self.ideal_mass / 2])
 
         # Sample a random joint configuration, joint velocities and accelerations
         for i in range(10):
