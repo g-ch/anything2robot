@@ -828,7 +828,6 @@ class Joint_Connect_Opt:
                 father_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), self.father_dict[cur_link_name]),
                                                                                           target_group_name=None,
                                                                                           condition_func=condition_child_link_top)
-                
                 non_removal_voxels = np.vstack((father_link_addition_voxels_top, child_link_addition_voxels_top))
                 non_removal_voxels = np.unique(non_removal_voxels, axis=0)
                 non_removal_indices = self.mesh_decomp.mesh_group.position_to_index(non_removal_voxels)
@@ -842,11 +841,12 @@ class Joint_Connect_Opt:
             
         
         # render all paths
-        fig = go.Figure(data=[self.mesh.mesh_plotly])
-        for path in all_path:
-            fig.add_trace(go.Scatter3d
-                (x=path[:, 0], y=path[:, 1], z=path[:, 2], mode='lines', line=dict(color='red', width=5)))
-        fig.show()
+
+        # fig = go.Figure(data=[self.mesh.mesh_plotly])
+        # for path in all_path:
+        #     fig.add_trace(go.Scatter3d
+        #         (x=path[:, 0], y=path[:, 1], z=path[:, 2], mode='lines', line=dict(color='red', width=5)))
+        # fig.show()
 
 def get_bounds(link_tree, threshold=5):
     """
@@ -879,12 +879,12 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
     parser.add_argument('--model_name', type=str, default='lynel', help='The model name')
     parser.add_argument('--expected_x', type=float, default=40, help='The expected width of the model')
-    parser.add_argument('--voxel_size', type=float, default=0.5, help='The size of the voxel')
+    parser.add_argument('--voxel_size', type=float, default=1.0, help='The size of the voxel')
     parser.add_argument('--voxel_density', type=float, default=1e-4, help='The density of the voxel')
     args = parser.parse_args()
     mesh_loader = Custom_Mesh_Loader(args)
-    mesh_dir = os.path.normpath('./model/given_models/' + args.model_name + '.stl')
-    joint_dir = os.path.normpath('./model/given_models/' + args.model_name + '_joints.pkl')
+    mesh_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
+    joint_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '_joints.pkl')
     mesh_loader.load_mesh(mesh_dir)
     mesh_loader.load_joint_positions(joint_dir)
 
@@ -898,18 +898,53 @@ if __name__=="__main__":
     motor_lib = [[3.6, 3.8, 12],  # DM6006         # Height, Radius, Torque
                 #  [4.5, 2.5, 8 ],  # DM4310
                  [3.75, 4.8, 20 ]]  # DM4310
-    # motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib)
-    # motor_results = motor_opt.run_opt()
+    motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib)
+    motor_results = motor_opt.run_opt()
     # np.save('./results/' + args.model_name + '_motor_results1.npy', motor_results)
-    # motor_opt.render()
+    motor_opt.render()
     
-    motor_opt = Motor_Opt(args, mesh_decomp, None, None)
-    motor_opt.motor_results = np.load('./results/' + args.model_name + '_motor_results1.npy')
+    # motor_opt = Motor_Opt(args, mesh_decomp, None, None)
+    # motor_opt.motor_results = np.load('./results/' + args.model_name + '_motor_results1.npy')
     # motor_opt.render()
     
     joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
     joint_connect_opt.run_opt()
     mesh_decomp.render()
+
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+
+    def render_3d_binary_array(data):
+        """
+        Render a 3D binary numpy array using matplotlib where '1' values are occupied.
+
+        Parameters:
+        - data: numpy.ndarray, a 3D binary array where 1 represents an occupied voxel.
+        """
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Extract the indices of all occupied voxels
+        x, y, z = np.where(data == 1)
+
+        # Plot each voxel as a point; you can also use plot_trisurf for surface visualization
+        ax.scatter(x, y, z, c='blue', marker='o', s=100)  # s is the size of the point
+
+        # Setting plot limits to match the data array size
+        ax.set_xlim([0, data.shape[0]])
+        ax.set_ylim([0, data.shape[1]])
+        ax.set_zlim([0, data.shape[2]])
+
+        # Labels and title
+        ax.set_xlabel('X Dimension')
+        ax.set_ylabel('Y Dimension')
+        ax.set_zlabel('Z Dimension')
+        ax.set_title('3D Visualization of Binary Array')
+
+        plt.show()
+    render_3d_binary_array(mesh_decomp.mesh_group.voxel_no_removal)
     # pkl.dump(mesh_decomp.mesh_group, open('./results/' + args.model_name + '_mesh_group.pkl', 'wb'))
     # pkl.dump(mesh_decomp.link_tree, open('./results/' + args.model_name + '_link_tree.pkl', 'wb'))
     # pkl.dump(mesh_decomp.father_link_dict, open('./results/' + args.model_name + '_father_link_dict.pkl', 'wb'))
