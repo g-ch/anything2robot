@@ -610,7 +610,7 @@ class Motor_Opt:
                                     mesh_decomp=self.mesh_decomp, 
                                     motor_type_params=self.motor_lib,
                                     genome_length=500, 
-                                    generation_num=10, 
+                                    generation_num=5, 
                                     population_size=100, 
                                     mutation_rate=0.05, 
                                     crossover_rate=0.3)
@@ -807,11 +807,11 @@ class Joint_Connect_Opt:
 
                 def condition_shell(pts):
                     return is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 1.0, self.motor_shell)
-                self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), self.father_dict[cur_link_name]),
+                check_voxels = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), self.father_dict[cur_link_name]),
                                                         target_group_name=cur_link_name,
                                                         condition_func=condition_shell)
                 # Connect the addictive child link voxels to child link
-                child_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), cur_link_name),
+                child_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=list(self.mesh_decomp.mesh_group.link_value_dict.keys()),
                                                                                          target_group_name=None,
                                                                                          condition_func=condition_child_link_top)
                 start_idx = self.mesh_decomp.mesh_group.position_to_index(child_link_addition_voxels_top)
@@ -822,10 +822,10 @@ class Joint_Connect_Opt:
                 
                 # Connect the addictive father link voxels to father link
                 motor_param = self.motor_params_results[cur_idx + 1]
-                self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), self.father_dict[cur_link_name]),
+                check_voxels = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), self.father_dict[cur_link_name]),
                                                         target_group_name=self.father_dict[cur_link_name],
                                                         condition_func=condition_shell)
-                father_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), self.father_dict[cur_link_name]),
+                father_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=list(self.mesh_decomp.mesh_group.link_value_dict.keys()),
                                                                                           target_group_name=None,
                                                                                           condition_func=condition_child_link_top)
                 non_removal_voxels = np.vstack((father_link_addition_voxels_top, child_link_addition_voxels_top))
