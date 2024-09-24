@@ -42,13 +42,13 @@ if __name__=="__main__":
     motor_opt.render()
     joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
     joint_connect_opt.run_opt()
-
+    mesh_decomp.mesh_group.render()
     interference_removal = InterferenceRemoval(args=args, 
                                                mesh_group=mesh_decomp.mesh_group, 
                                                motor_param_result=motor_results, 
                                                link_tree=mesh_decomp.link_tree, 
                                                father_link_dict=mesh_decomp.father_link_dict)
-    joint_limits = np.vstack([np.array([-1.0, 1.0]) for _ in range(2*len(motor_results))])
+    joint_limits = np.vstack([np.array([-0.3, 0.3]) for _ in range(2*len(motor_results))])
     interference_removal.set_joint_limit(joint_limits)
     interference_removal.remove_interference()
     interference_removal.mesh_group.render()
