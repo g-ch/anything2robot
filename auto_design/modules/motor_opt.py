@@ -650,7 +650,7 @@ class Motor_Opt:
                 circle_points += c1 + direction * step * h  # Translate to position
 
                 cylinder_surface = go.Scatter3d(x=circle_points[:, 0], y=circle_points[:, 1], z=circle_points[:, 2],
-                                                mode='lines', line=dict(color=colors[i // 4], width=3),
+                                                mode='lines', line=dict(color="red", width=3),
                                                 showlegend=False)
                 objs.append(cylinder_surface)
         return objs
