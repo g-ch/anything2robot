@@ -179,8 +179,8 @@ class Improved_Generic_Algorithm(Generic_Algorithm):
         super().__init__(bounds, int_bounds, genome_length, generation_num, population_size, mutation_rate, crossover_rate, mutate_ratio)
 
     def random_select(self, lower, upper):
-        return random.uniform(lower, upper)
-        # return random.gauss((lower + upper) / 2, (upper - lower) / 6)
+        # return random.uniform(lower, upper)
+        return random.gauss((lower + upper) / 2, (upper - lower) / 6)
     
     def fitness_function(self, genome) -> float:
         pass

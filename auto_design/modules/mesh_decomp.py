@@ -398,12 +398,12 @@ class Mesh_Decomp:
             rel_pos = (np.array(cur_link.axis[0]) - np.array(self.father_link_dict[cur_link.name].axis[0]) if cur_link.name != "BODY" else np.array(cur_link.axis[0])) / 100.0
             link_visual = {
                 "origin": {"xyz": ' '.join(map(str, -np.array(cur_link.axis[0]) / 100.0)), "rpy": '0 0 0'},
-                "geometry": {"filename": "package://anything2robot/urdf/lynel/tmp/" + cur_link.name + "_ideal.stl"},
+                "geometry": {"filename": "package://anything2robot/urdf/" + self.args.model_name + "/tmp/" + cur_link.name + "_ideal.stl"},
                 "material": "grey"
             }
             link_collision = {
                 "origin": {"xyz": ' '.join(map(str, -np.array(cur_link.axis[0]) / 100.0)), "rpy": '0 0 0'},
-                "geometry": {"filename": "package://anything2robot/urdf/lynel/tmp/" + cur_link.name + "_ideal.stl"}
+                "geometry": {"filename": "package://anything2robot/urdf/" + self.args.model_name + "/tmp/" + cur_link.name + "_ideal.stl"}
             }
             inetial_matrix, CoM = calculate_inertia_tensor(self.mesh_group.get_voxels(cur_link.name) / 100.0, self.args.voxel_density, np.eye(4), self.args.voxel_size)
             link_inertial = {
@@ -469,6 +469,8 @@ class Mesh_Decomp:
         urdf_file.write('   </plugin>\n')
         urdf_file.write('</gazebo>\n')
         urdf_file.write('</robot>\n')
+
+        print("ideal mass:", self.ideal_mass)
     
     def generate_constraints(self):
         """
@@ -502,7 +504,7 @@ class Mesh_Decomp:
                     break
 
         # Contact force that will be applied to foot links
-        force = np.array([0, 0, 9.81 * self.ideal_mass])
+        force = np.array([0, 0, 9.81 * self.ideal_mass / 2])
 
         # Sample a random joint configuration, joint velocities and accelerations
         for i in range(10):

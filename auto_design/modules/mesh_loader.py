@@ -10,12 +10,20 @@ date: 2024-03-01
 from plot_utils import *
 from data_struct import *
 import open3d as o3d
+import ast
 import os.path
 import argparse
 import tkinter as tk
 import pickle as pkl
+import threading
+from threading import Thread
 from tkinter import ttk
 from plotly.subplots import make_subplots
+from dash import Dash, dcc, html, Input, Output
+import requests
+from wsgiref.simple_server import make_server
+from flask import Flask
+
 
 
 class Mesh:
@@ -116,6 +124,7 @@ class LinkTreeGUI:
         # Joints in current link
         self.joint_list = tk.Listbox(self.frame)
         self.joint_list.grid(column=3, row=0, columnspan=4, sticky='nsew')
+        self.joint_list.bind('<<ListboxSelect>>',self.joint_select)
 
         # Axis of current link
         self.cur_rotation_axis = tk.StringVar()
@@ -163,7 +172,7 @@ class LinkTreeGUI:
         ttk.Button(self.frame, text="Remove Joint", command=self.remove_joint).grid(column=2, row=6, columnspan=2)
 
         # quit button
-        ttk.Button(self.frame, text="Quit", command=self.root.quit).grid(column=0, row=7, columnspan=4)
+        ttk.Button(self.frame, text="Quit", command=self.quit).grid(column=0, row=7, columnspan=4)
 
         # save button
         ttk.Button(self.frame, text="Save", command=self.save).grid(column=0, row=8, columnspan=4)
@@ -172,11 +181,42 @@ class LinkTreeGUI:
         self.fig = make_subplots(specs=[[{"type": "scene"}]])
         self.fig.add_trace(mesh.mesh_plotly)
         self.mesh = mesh
-        self.fig.show(renderer="browser")  # Opens the plot in a browser window
+
+        self.server = Flask(__name__)
+        self.app = Dash(__name__, server=self.server)
+        self.server = make_server("localhost", 8050, self.server)
+        self.server_thread = threading.Thread(target=self.server.serve_forever)
+        self.server_thread.start()
+        self.app.layout = html.Div([
+            html.H4('Interactive plot with custom data source'),
+            dcc.Graph(id="graph", style={'width': '90vh', 'height': '90vh'}),
+            html.Button("Update Data", id="update-button", n_clicks=0),
+        ])
+
+
+        @self.app.callback(
+            Output("graph", "figure"), 
+            Input("update-button", "n_clicks"))
+        def update_bar_chart(n_clicks):
+            return self.fig
+        
+
+        def run_dash():
+            self.app.run_server(debug=True)
+        # Create a thread to run the Dash app
+        self.dash_thread = Thread(target=run_dash)
+        self.dash_thread.start()
+        import webbrowser
+        webbrowser.open('http://127.0.0.1:8050/')
+
+    def quit(self):
+        self.server.shutdown()
+        self.server_thread.join()
+        self.dash_thread.join()
+        self.root.quit()
 
     def save(self):
-        with open('./model/given_models/' + self.args.model_name + '_joints.pkl', 'wb') as f:
-            pkl.dump(self.nodes, f)
+        pkl.dump(self.nodes, open('./auto_design/model/given_models/' + self.args.model_name + '_joints.pkl', 'wb'))
 
     def remove_link(self):
         selected_item = self.tree.selection()[0]
@@ -204,7 +244,20 @@ class LinkTreeGUI:
                 self.tree.insert('', 'end', link_name, text=link_name)
             self.link_name.set("")
             self.parent_name.set("")
-        
+    
+    def joint_select(self, event):
+        selected_joint = self.joint_list.curselection()
+        joint_name = self.joint_list.get(selected_joint[0]).split(":")[0]
+        joint_pos = self.joint_list.get(selected_joint[0]).split(":")[1]
+        self.joint_name.set(joint_name)
+        tuple_val = ast.literal_eval(joint_pos[1:])
+        joint_pos = list(tuple_val)
+
+        self.joint_x.set(joint_pos[0])
+        self.joint_y.set(joint_pos[1])
+        self.joint_z.set(joint_pos[2])
+
+
     def on_tree_select(self, event):
         selected_item = self.tree.selection()[0]
         self.current_link = self.nodes[selected_item].val if selected_item in self.nodes else None
@@ -216,18 +269,19 @@ class LinkTreeGUI:
                 self.joint_list.insert(tk.END, f"{joint_name}: {joint_position}")
         
         # Update rotation axis
-        if self.current_link:
+        if self.current_link.axis:
             
             renderings = ""
-            
+            renderings_modify = ""
             for i, axis in enumerate(self.current_link.axis):
                 if i == 0:
                     renderings += f"Origin: {axis}\n"
+                    renderings_modify += ','.join(map(str, axis)) + ','
                 else:
                     renderings += f"Axis {i}: {axis}\n"
-
-
+                    renderings_modify += ','.join(map(str, axis)) + ','
             self.cur_rotation_axis.set(renderings)
+            self.rotation_axis.set(renderings_modify[:-1])
         else:
             self.cur_rotation_axis.set("")
 
@@ -243,6 +297,7 @@ class LinkTreeGUI:
             axis_str = self.rotation_axis.get()
             axis = tuple(map(float, axis_str.split(",")))
             self.current_link.add_axis(axis)
+            self.update_plot()
     
     def remove_joint(self):
         if self.current_link:
@@ -255,16 +310,42 @@ class LinkTreeGUI:
     def update_plot(self):
         self.fig.data = []  # Clear existing data
         x, y, z = [], [], []
+        cone_size = 10
+        axis_x, axis_y, axis_z, direct_x, direct_y, direct_z = [], [], [], [], [], []
         for link in self.nodes.values():
+            if len(link.val.axis) == 2:
+                axis_x.append(link.val.axis[0][0])
+                axis_y.append(link.val.axis[0][1])
+                axis_z.append(link.val.axis[0][2])
+                direct_x.append(link.val.axis[1][0]*cone_size)
+                direct_y.append(link.val.axis[1][1]*cone_size)
+                direct_z.append(link.val.axis[1][2]*cone_size)
+            elif len(link.val.axis) == 3:
+                axis_x.append(link.val.axis[0][0])
+                axis_y.append(link.val.axis[0][1])
+                axis_z.append(link.val.axis[0][2])
+                direct_x.append(link.val.axis[1][0]*cone_size)
+                direct_y.append(link.val.axis[1][1]*cone_size)
+                direct_z.append(link.val.axis[1][2]*cone_size)
+
+                axis_x.append(link.val.axis[0][0])
+                axis_y.append(link.val.axis[0][1])
+                axis_z.append(link.val.axis[0][2])
+                direct_x.append(link.val.axis[2][0]*cone_size)
+                direct_y.append(link.val.axis[2][1]*cone_size)
+                direct_z.append(link.val.axis[2][2]*cone_size)
+
             for pos in link.val.joints.values():
                 x.append(pos[0])
                 y.append(pos[1])
                 z.append(pos[2])
         
-        # Add joint markers
+        # Add joint markersplotly 
         self.fig.add_trace(self.mesh.mesh_plotly)
         self.fig.add_trace(go.Scatter3d(x=x, y=y, z=z, mode='markers'))
-        self.fig.show(renderer="browser")  # Refresh the plot in the browser window
+        cone = go.Cone(x=axis_x, y=axis_y, z=axis_z, u=direct_x, v=direct_y, w=direct_z)
+        self.fig.add_trace(cone)
+        # self.fig.show(renderer="browser")  # Refresh the plot in the browser window
     
     def get_tree(self):
         return self.nodes["BODY"]
@@ -281,6 +362,8 @@ class Mesh_Loader:
         self.args = args
         self.scaled_mesh = None
         self.scaled_joint_dict = {}
+        self.joint_dict = {}
+        self.link_tree = None
     
     def load_mesh(self, mesh_path : str):
         """
@@ -316,25 +399,27 @@ class Mesh_Loader:
         self.scaled_mesh.scale(self.scale_factor)
 
         # Scale the joint data
-        
         for joint_name in self.joint_dict:
             self.scaled_joint_dict[joint_name] = np.array(self.joint_dict[joint_name]) * self.scale_factor
 
         # self.scaled_joint_dict = {joint_name: joint_position * self.scale_factor for joint_name, joint_position in self.joint_dict.items()}
 
         # Update the link tree
-        for joint_name in self.link_tree.val.joints:
-            self.link_tree.val.joints[joint_name] = np.array(self.link_tree.val.joints[joint_name]) * self.scale_factor
 
-        self.link_tree.val.axis = list(self.link_tree.val.axis)
-        self.link_tree.val.axis[0] = np.array(self.link_tree.val.axis[0]) * self.scale_factor
-        
-        for link in self.link_tree.get_all_children()[0]:
-            for joint_name in link.val.joints:
-                link.val.joints[joint_name] = np.array(link.val.joints[joint_name]) * self.scale_factor
+        if self.link_tree is not None:
 
-            link.val.axis = list(link.val.axis)
-            link.val.axis[0] = np.array(link.val.axis[0]) * self.scale_factor
+            for joint_name in self.link_tree.val.joints:
+                self.link_tree.val.joints[joint_name] = np.array(self.link_tree.val.joints[joint_name]) * self.scale_factor
+
+            self.link_tree.val.axis = list(self.link_tree.val.axis)
+            self.link_tree.val.axis[0] = np.array(self.link_tree.val.axis[0]) * self.scale_factor
+            
+            for link in self.link_tree.get_all_children()[0]:
+                for joint_name in link.val.joints:
+                    link.val.joints[joint_name] = np.array(link.val.joints[joint_name]) * self.scale_factor
+
+                link.val.axis = list(link.val.axis)
+                link.val.axis[0] = np.array(link.val.axis[0]) * self.scale_factor
 
     def update_link_tree(self):
         pass
@@ -569,8 +654,8 @@ if __name__ == "__main__":
     parser.add_argument('--expected_x', type=float, default=40, help='The expected width of the model')
     args = parser.parse_args()
     mesh_loader = Custom_Mesh_Loader(args)
-    mesh_dir = os.path.normpath('./model/given_models/' + args.model_name + '.stl')
-    joint_dir = os.path.normpath('./model/given_models/' + args.model_name + '_joints.pkl')
+    mesh_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
+    joint_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '_joints.pkl')
     mesh_loader.load_mesh(mesh_dir)
     mesh_loader.load_joint_positions(joint_dir)
     # print(mesh_loader.link_tree.get_all_children())
