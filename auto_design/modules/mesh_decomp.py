@@ -318,9 +318,18 @@ class Mesh_Decomp:
             
             ## Cluster the voxels according to joint clusters
             distances = [np.min(np.linalg.norm(joint_cluster[i] - (np.repeat(self.mesh_group.get_voxels(root_node.val.name), joint_cluster[i].shape[0], axis=0).reshape(-1, joint_cluster[i].shape[0], 3)), axis=-1), axis=1) for i in range(len(joint_cluster))]
-            min_indices = np.argmin(distances, axis=0)
+            distances = np.array(distances).T
+            min_indices = [np.argwhere(distances[i] == np.min(distances[i])) for i in range(len(distances))]
+            ## If there are multiple minimum values, randomly choose one
+            min_indice = []
+            for i in range(len(min_indices)):
+                if min_indices[i].shape != (1,1):
+                    min_indice.append(min_indices[i][0][0])
+                else:
+                    min_indice.append(min_indices[i][0][0])
+
             name_cluster = np.array(name_cluster)
-            self.decompose_result = name_cluster[min_indices]
+            self.decompose_result = name_cluster[min_indice]
 
             clustered_voxels = {}
             for link_name in np.unique(self.decompose_result):

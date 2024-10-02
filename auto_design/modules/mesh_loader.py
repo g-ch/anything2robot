@@ -24,7 +24,27 @@ import requests
 from wsgiref.simple_server import make_server
 from flask import Flask
 
+class Line:
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
 
+    def __eq__(self, __value: object) -> bool:
+        return (self.start == __value.start and self.end == __value.end) or (self.start == __value.end and self.end == __value.start)
+    
+    def get_distance(self, point):
+        """
+        Get the distance between the point and the line segment.
+        """
+        line_vec = self.end - self.start
+        point_vec = point - self.start
+        line_len_sq = np.dot(line_vec, line_vec)
+        t = max(0, min(1, np.dot(point_vec, line_vec) / line_len_sq))
+        closest = self.start + t * line_vec
+        return np.linalg.norm(closest - point)
+    
+    def __str__(self):
+        return f"Line: {self.start} -> {self.end}"
 
 class Mesh:
     def __init__(self, mesh_path):
@@ -85,9 +105,30 @@ class Link:
         self.name = name
         self.joints = {}
         self.axis = None
+        self.joint_lines = [] # list of Line
+
+    def construct_joint_lines(self):
+        """
+        Construct the joint lines.
+        """
+        self.joint_lines = []
+        for joint_name, joint_position in self.joints.items():
+            for joint_name_2, joint_position_2 in self.joints.items():
+                if joint_name != joint_name_2:
+                    new_line = Line(joint_position, joint_position_2)
+                    add_line = True
+                    for line in self.joint_lines:
+                        if line == new_line:
+                            add_line = False
+                            break
+                    if add_line:
+                        self.joint_lines.append(new_line)
     
     def add_joint(self, joint_name, joint_position):
+        for origin_joints in self.joints.values():
+            self.joint_lines.append(Line(origin_joints, joint_position))
         self.joints[joint_name] = joint_position
+
 
     def add_joints(self, joint_dict):
         for joint_name, joint_position in joint_dict.items():
@@ -98,6 +139,11 @@ class Link:
             self.axis = [axis[:3], axis[3:6]]
         elif len(axis) == 9:
             self.axis = [axis[:3], axis[3:6], axis[6:9]]
+
+    def get_min_axis_distance(self, point):
+        """
+        Get the minimum distance between the point and the lines made by any two joints.
+        """
 
     def __str__(self):
         return self.name
@@ -304,6 +350,13 @@ class LinkTreeGUI:
             selected_joint = self.joint_list.curselection()
             if selected_joint:
                 joint_name = self.joint_list.get(selected_joint[0]).split(":")[0]
+                
+                # remove the line made by the joint
+                for line in self.current_link.joint_lines:
+                    if line.start == self.current_link.joints[joint_name] or line.end == self.current_link.joints[joint_name]:
+                        self.current_link.joint_lines.remove(line)
+                
+                # remove the joint
                 del self.current_link.joints[joint_name]
                 self.update_plot()
 
@@ -500,6 +553,7 @@ class Custom_Mesh_Loader(Mesh_Loader):
             self.joint_dict[joint_name] = self.link_tree.val.joints[joint_name]
 
         for link in self.link_tree.get_all_children()[0]:
+            link.val.construct_joint_lines()
             for joint_name, joint_position in link.val.joints.items():
                 self.joint_dict[joint_name] = joint_position
 
