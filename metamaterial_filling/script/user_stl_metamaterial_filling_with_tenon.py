@@ -30,7 +30,7 @@ import trimesh
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import open3d as o3d
-
+import time
 
 '''
 @Description: Voxelize a trimesh mesh with a given voxel size
@@ -265,7 +265,7 @@ if __name__ == '__main__':
     parser.add_argument('--input_stl_path', type=str, default='data/../../urdf/lynel20240823-110559/FR_LOW.stl', help='Input STL file path')
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--relative_density', type=float, default=0.1, help='Relative density of the metamaterial given by FEA results')
-    parser.add_argument('--shell_thickness', type=float, default=2, help='Thickness of the shell. mm')
+    parser.add_argument('--shell_thickness', type=float, default=1.5, help='Thickness of the shell. mm')
     parser.add_argument('--shell_generation_voxel_resolution', type=float, default=1, help='Voxel resolution for shell generation. mm')
     parser.add_argument('--output_stl_name', type=str, default='20240823_FR_LOW_final_output_with_shell.stl', help='Output STL file path')
     parser.add_argument('--use_existing_shell', type=bool, default=False, help='Whether to use the existing shell file')
@@ -306,6 +306,8 @@ if __name__ == '__main__':
 
     link_name = args.input_stl_path.split('/')[-1].split('.')[0]
     link = robot_result.link_dict[link_name]
+
+    time_stamp_sec = time.time()
 
     #######  Find good orientation for tenon  ########
     # Load mesh and voxelize
@@ -556,13 +558,13 @@ if __name__ == '__main__':
     delf_y = max_y - min_y
     width = max(delf_x, delf_y) * safe_scale
 
-    interval = 10 # mm. The interval between plates
+    interval = 8 # mm. The interval between plates
     thickness = relative_density / 6.0 * interval
 
     # Check if thickness is smaller than 0.2
     if thickness < 0.2:
         thickness = 0.2
-        print('Thickness should be larger than 0.2, set to 0.2')
+        print('Thickness should be smaller than 0.2, set to 0.2')
         # Correct the interval
         # interval = thickness * 6.0 / relative_density  # No change to the interval for now
 
@@ -582,4 +584,9 @@ if __name__ == '__main__':
     print(f"Final model generated at {final_output_stl_path}")
 
     print("All done! When you do 3d FDM printing, please make sure the model is placed in the generated orientation.")
+
+    # Print the time used
+    time_stamp_sec_end = time.time()
+    time_used = time_stamp_sec_end - time_stamp_sec
+    print(f"Time used: {time_used} seconds, which is {time_used / 60} minutes.")
 
