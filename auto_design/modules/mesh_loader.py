@@ -26,11 +26,11 @@ from flask import Flask
 
 class Line:
     def __init__(self, start, end):
-        self.start = start
-        self.end = end
+        self.start = np.array(start)
+        self.end = np.array(end)
 
     def __eq__(self, __value: object) -> bool:
-        return (self.start == __value.start and self.end == __value.end) or (self.start == __value.end and self.end == __value.start)
+        return ((self.start == __value.start).all() and (self.end == __value.end).all()) or ((self.start == __value.end).all() and (self.end == __value.start).all())
     
     def get_distance(self, point):
         """
@@ -144,6 +144,12 @@ class Link:
         """
         Get the minimum distance between the point and the lines made by any two joints.
         """
+        min_distance = float('inf')
+        for line in self.joint_lines:
+            distance = line.get_distance(point)
+            if distance < min_distance:
+                min_distance = distance
+        return min_distance
 
     def __str__(self):
         return self.name
@@ -552,6 +558,7 @@ class Custom_Mesh_Loader(Mesh_Loader):
         for joint_name in self.link_tree.val.joints:
             self.joint_dict[joint_name] = self.link_tree.val.joints[joint_name]
 
+        self.link_tree.val.construct_joint_lines()
         for link in self.link_tree.get_all_children()[0]:
             link.val.construct_joint_lines()
             for joint_name, joint_position in link.val.joints.items():
