@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str, default='/home/clarence/git/anything2robot/Animal3d')
-    parser.add_argument('--json_file_name', type=str, default='test.json')
+    parser.add_argument('--json_file_name', type=str, default='train.json')
     parser.add_argument('--save_to_new_json', type=bool, default=True)
     parser.add_argument('--new_json_path', type=str, default='neutral_pose_images.json')
     args = parser.parse_args()
