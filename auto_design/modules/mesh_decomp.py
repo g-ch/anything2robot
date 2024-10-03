@@ -305,9 +305,12 @@ class Mesh_Decomp:
             ## Cluster the voxels according to joint clusters
             joint_cluster = []
             name_cluster = []
+            link_dict = {}
             joint_cluster.append(np.array(list(root_node.val.joints.values())))
             name_cluster.append(root_node.val.name)
+            link_dict[root_node.val.name] = root_node.val
             for child_node in child_nodes:
+                link_dict[child_node.val.name] = child_node.val
                 self.father_link_dict[child_node.val.name] = root_node.val
                 all_child_nodes, _ = child_node.get_all_children()
                 all_child_nodes.append(child_node)
@@ -318,9 +321,26 @@ class Mesh_Decomp:
             
             ## Cluster the voxels according to joint clusters
             distances = [np.min(np.linalg.norm(joint_cluster[i] - (np.repeat(self.mesh_group.get_voxels(root_node.val.name), joint_cluster[i].shape[0], axis=0).reshape(-1, joint_cluster[i].shape[0], 3)), axis=-1), axis=1) for i in range(len(joint_cluster))]
-            min_indices = np.argmin(distances, axis=0)
+            distances = np.array(distances).T
+            min_indices = [np.argwhere(distances[i] == np.min(distances[i])) for i in range(len(distances))]
+
+            ## If there are multiple minimum values, choose the one with the largest distance to the nearest joint line
+            min_indice = []
+            import tqdm
+            for i in tqdm.tqdm(range(len(min_indices))):
+                if min_indices[i].shape != (1,1):
+                    link1 = name_cluster[min_indices[i][0][0]]
+                    link2 = name_cluster[min_indices[i][1][0]]
+                    voxel_pos = self.mesh_group.get_voxels(root_node.val.name)[i]
+                    if link_dict[link1].get_min_axis_distance(voxel_pos) > link_dict[link2].get_min_axis_distance(voxel_pos):
+                        min_indice.append(min_indices[i][1][0])
+                    else:
+                        min_indice.append(min_indices[i][0][0])
+                else:
+                    min_indice.append(min_indices[i][0][0])
+
             name_cluster = np.array(name_cluster)
-            self.decompose_result = name_cluster[min_indices]
+            self.decompose_result = name_cluster[min_indice]
 
             clustered_voxels = {}
             for link_name in np.unique(self.decompose_result):
