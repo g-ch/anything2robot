@@ -38,7 +38,7 @@ if __name__=="__main__":
                 #  [4.5, 2.5, 8 ], # DM4310
                  [8.1, 5.3, 20 ]]  # DM8009
     motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib)
-    motor_results = motor_opt.run_opt()
+    motor_results = motor_opt.run_opt(generation_num=50)
     motor_opt.render()
     joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
     joint_connect_opt.run_opt()

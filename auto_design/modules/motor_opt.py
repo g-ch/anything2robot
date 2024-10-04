@@ -602,7 +602,7 @@ class Motor_Opt:
 
         return np.array(motor_types)
 
-    def run_opt(self):
+    def run_opt(self, generation_num=10):
         self.motor_types = self.choose_motor_type()
         self.ga_runner = General_GA(bounds=self.bounds, 
                                     int_bounds=[[self.motor_types[i]] for i in range(self.motor_types.shape[0])],
@@ -610,7 +610,7 @@ class Motor_Opt:
                                     mesh_decomp=self.mesh_decomp, 
                                     motor_type_params=self.motor_lib,
                                     genome_length=500, 
-                                    generation_num=5, 
+                                    generation_num=generation_num, 
                                     population_size=100, 
                                     mutation_rate=0.05, 
                                     crossover_rate=0.3)

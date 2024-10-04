@@ -413,6 +413,7 @@ class LinkTreeGUI:
         self.nodes = nodes
         self.tree.insert('', 'end', "BODY", text="BODY")
         for node_name, node in nodes.items():
+            node.val.construct_joint_lines()
             parent_name = node_name
             for child in node.children:
                 self.tree.insert(parent_name, 'end', child.val.name, text=child.val.name)
