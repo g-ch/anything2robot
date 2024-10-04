@@ -20,14 +20,15 @@ if __name__=="__main__":
     parser.add_argument('--voxel_size', type=float, default=0.5, help='The size of the voxel')
     parser.add_argument('--voxel_density', type=float, default=2e-5, help='The density of the voxel')
     args = parser.parse_args()
-    mesh_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
-    joint_dir = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '_joints.pkl')
+    mesh_path = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
+    joint_path = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '_joints.pkl')
     
     
     mesh_loader = Custom_Mesh_Loader(args)
-    mesh_loader.load_mesh(mesh_dir)
-    mesh_loader.load_joint_positions(joint_dir)
+    mesh_loader.load_mesh(mesh_path)
+    mesh_loader.load_joint_positions(joint_path)
     mesh_loader.scale()
+    
     mesh_decomp = Mesh_Decomp(args, mesh_loader)
     mesh_decomp.decompose()
     mesh_decomp.render()

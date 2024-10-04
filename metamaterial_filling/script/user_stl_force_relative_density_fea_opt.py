@@ -1,3 +1,9 @@
+'''
+@Author: Clarence
+@Date: 2024-7-5
+@Description: This script is used to do the FEA analysis for the input STL file with given forces and fixed nodes. Then output the result, inlcuding relative density, to a pkl file.
+'''
+
 import pickle as pkl
 import numpy as np
 import sys
