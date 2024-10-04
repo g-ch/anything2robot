@@ -10,7 +10,7 @@ import numpy as np
 import pyvista as pv
 import os
 import argparse
-
+import pickle as pkl
 '''
 Visualize the animal3d mesh and keypoint_3d
 '''
@@ -35,9 +35,10 @@ def visualize_animal3d(mesh_path, keypoint_3d):
 
 class Quadruped_Mesh_Loader():
 
-    def __init__(self, stl_path : str, joint_path : str):
+    def __init__(self, stl_path : str, joint_path : str, output_path : str):
         self.stl_path = stl_path
         self.joint_path = joint_path
+        self.output_path = output_path
 
         self.joint_dict = None
         self.mesh = pv.read(stl_path)
@@ -203,16 +204,19 @@ class Quadruped_Mesh_Loader():
             for child_link_name in children_link_names:
                 if child_link_name in self.nodes:
                     self.nodes[link_name].add_child(self.nodes[child_link_name])
+
+        # Save the nodes to a pkl file
+        pkl.dump(self.nodes, open(self.output_path, 'wb'))
+        print("Save the nodes to a pkl file: " + self.output_path)
         
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Quadruped Mesh Loader')
     parser.add_argument('--joint_path', type=str, default='/media/clarence/Clarence/dataset/standford_dogs/images/result/batch_1/n02088364_3752_neutral_joints.npy', help='The path to the joint data')
     parser.add_argument('--stl_path', type=str, default='/media/clarence/Clarence/dataset/standford_dogs/images/result/batch_1/n02088364_3752_neutral_res_e300_smoothed.stl', help='The path to the stl file')
-    parser.add_argument('--output_path', type=str, default='', help='The path to the output pkl file')
+    parser.add_argument('--output_path', type=str, default='/media/clarence/Clarence/dataset/standford_dogs/images/result/batch_1/n02088364_3752_neutral_joints.pkl', help='The path to the output pkl file')
     args = parser.parse_args()
 
-    quadruped_mesh_loader = Quadruped_Mesh_Loader(args.stl_path, args.joint_path)
+    quadruped_mesh_loader = Quadruped_Mesh_Loader(args.stl_path, args.joint_path, args.output_path)
 
     quadruped_mesh_loader.visualize_mesh_with_joints()
-
