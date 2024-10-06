@@ -524,7 +524,7 @@ class Mesh_Decomp:
                     break
 
         # Contact force that will be applied to foot links
-        force = np.array([0, 0, 9.81 * self.ideal_mass / 2])
+        force = np.array([0, 0, 9.81 * self.ideal_mass / 2])  #CHG.
 
         # Sample a random joint configuration, joint velocities and accelerations
         for i in range(10):
