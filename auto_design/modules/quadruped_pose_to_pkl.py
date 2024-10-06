@@ -11,6 +11,10 @@ import pyvista as pv
 import os
 import argparse
 import pickle as pkl
+
+# Get path
+current_path = os.path.dirname(os.path.abspath(__file__))
+
 '''
 Visualize the animal3d mesh and keypoint_3d
 '''
@@ -35,13 +39,18 @@ def visualize_animal3d(mesh_path, keypoint_3d):
 
 class Quadruped_Mesh_Loader():
 
-    def __init__(self, stl_path : str, joint_path : str, output_path : str):
+    def __init__(self, stl_path : str, joint_path : str, output_name : str, expected_x : float):
         self.stl_path = stl_path
         self.joint_path = joint_path
-        self.output_path = output_path
 
+        self.output_pkl_path = current_path + "/../model/given_models/" + output_name + "_joints.pkl"
+        self.output_stl_path = current_path + "/../model/given_models/" + output_name + ".stl"
+
+        self.expected_x = expected_x
         self.joint_dict = None
-        self.mesh = pv.read(stl_path)
+        self.mesh = None
+
+        self.scale_factor = self.load_mesh(self.stl_path)
         self.load_joint_positions(self.joint_path)
 
         self.links = {}
@@ -54,12 +63,31 @@ class Quadruped_Mesh_Loader():
         for link_name, link in self.links.items():
             print(link_name)
             print(link.joints)
-            print(link.axis)
+            print("Axis: ", link.axis)
         
         for node_name, node in self.nodes.items():
             print("Parent: ", node_name)
             for child in node.children:
                 print("Child: ", child.val.name)
+
+
+    def load_mesh(self, stl_path : str):
+        """
+        Load the mesh from the file system.
+        """
+        self.mesh = pv.read(stl_path)
+        # Scale the mesh to the expected x and return the scale factor
+        scale_factor = self.expected_x / (self.mesh.bounds[1] - self.mesh.bounds[0])
+
+        print("Original bounds: ", self.mesh.bounds)
+        print("Expected x: ", self.expected_x)
+        print("Scale factor: ", scale_factor)
+
+        self.mesh = self.mesh.scale(scale_factor, inplace=False)
+        # Save the mesh to the output stl file
+        self.mesh.save(self.output_stl_path)
+
+        return scale_factor
 
 
     def load_joint_positions(self, joint_path : str):
@@ -68,6 +96,10 @@ class Quadruped_Mesh_Loader():
         """
 
         joint_data = np.load(joint_path)
+
+        # Scale the joint positions to the expected x
+        joint_data = joint_data * self.scale_factor
+
         joint_dict = {
             "waist": joint_data[4],
             "hip": joint_data[1],
@@ -84,8 +116,8 @@ class Quadruped_Mesh_Loader():
             "right_elbow":joint_data[12],
             "left_wrist":joint_data[9],
             "right_wrist":joint_data[13],
-            'left_hand':joint_data[10],
-            'right_hand':joint_data[14],
+            'left_front_foot':joint_data[10],
+            'right_front_foot':joint_data[14],
             'left_foot':joint_data[20],
             'right_foot':joint_data[24],
             'head':joint_data[16],
@@ -119,7 +151,7 @@ class Quadruped_Mesh_Loader():
         joint_list = []
         for joint in self.joint_dict:
             joint_list.append(self.joint_dict[joint])
-        visualize_animal3d(self.stl_path, joint_list)
+        visualize_animal3d(self.output_stl_path, joint_list)
     
     def set_links_and_nodes(self):
         """
@@ -130,9 +162,9 @@ class Quadruped_Mesh_Loader():
         link_config_dict = {
             "BODY": ["waist", "hip", "scapula", "head", "tail", "left_shoulder", "right_shoulder", "left_hip", "right_hip"],
             "FL_UP": ["left_shoulder", "left_elbow"],
-            "FL_LOW": ["left_elbow", "left_wrist", "left_hand"],
+            "FL_LOW": ["left_elbow", "left_wrist", "left_front_foot"],
             "FR_UP": ["right_shoulder", "right_elbow"],
-            "FR_LOW": ["right_elbow", "right_wrist", "right_hand"],
+            "FR_LOW": ["right_elbow", "right_wrist", "right_front_foot"],
             "RL_UP": ["left_hip", "left_knee"],
             "RL_LOW": ["left_knee", "left_ankle", "left_foot"],
             "RR_UP": ["right_hip", "right_knee"],
@@ -159,8 +191,8 @@ class Quadruped_Mesh_Loader():
             "right_elbow": [0, -1, 0],
             "left_wrist": None,
             "right_wrist": None,
-            "left_hand": None,
-            "right_hand": None,
+            "left_front_foot": None,
+            "right_front_foot": None,
             "left_hip": [1, 0, 0, 0, 1, 0],
             "right_hip": [1, 0, 0, 0,-1, 0],
             "left_knee": [0, 1, 0],
@@ -176,6 +208,7 @@ class Quadruped_Mesh_Loader():
         for link_name, joints in link_config_dict.items():
             if link_name == "BODY":
                 link_axis_dict[link_name] = None
+                continue
 
             for joint in joints:
                 if joints_axis_dict[joint] is not None:
@@ -190,6 +223,9 @@ class Quadruped_Mesh_Loader():
             
             if link_axis_dict[link_name] is not None:
                 link.add_axis(link_axis_dict[link_name])
+            else:
+                body_axis = [self.joint_dict["waist"][0], self.joint_dict["waist"][1], self.joint_dict["waist"][2], 0, 0, 0]
+                link.add_axis(body_axis)
 
             # for joint_name, joint_position in link.joints.items():
             #     if joints_axis_dict[joint_name] is not None:
@@ -206,17 +242,18 @@ class Quadruped_Mesh_Loader():
                     self.nodes[link_name].add_child(self.nodes[child_link_name])
 
         # Save the nodes to a pkl file
-        pkl.dump(self.nodes, open(self.output_path, 'wb'))
-        print("Save the nodes to a pkl file: " + self.output_path)
+        pkl.dump(self.nodes, open(self.output_pkl_path, 'wb'))
+        print("Save the nodes to a pkl file: " + self.output_pkl_path)
         
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Quadruped Mesh Loader')
     parser.add_argument('--joint_path', type=str, default='/media/clarence/Clarence/dataset/standford_dogs/images/result/batch_1/n02088364_3752_neutral_joints.npy', help='The path to the joint data')
     parser.add_argument('--stl_path', type=str, default='/media/clarence/Clarence/dataset/standford_dogs/images/result/batch_1/n02088364_3752_neutral_res_e300_smoothed.stl', help='The path to the stl file')
-    parser.add_argument('--output_path', type=str, default='/media/clarence/Clarence/dataset/standford_dogs/images/result/batch_1/n02088364_3752_neutral_joints.pkl', help='The path to the output pkl file')
+    parser.add_argument('--expected_x', type=float, default=60, help='The expected x of the model. Length. Unit: cm')
+    parser.add_argument('--output_name', type=str, default='n02088364_3752_neutral', help='The path to the output pkl file')
     args = parser.parse_args()
 
-    quadruped_mesh_loader = Quadruped_Mesh_Loader(args.stl_path, args.joint_path, args.output_path)
+    quadruped_mesh_loader = Quadruped_Mesh_Loader(args.stl_path, args.joint_path, args.output_name, args.expected_x)
 
     quadruped_mesh_loader.visualize_mesh_with_joints()

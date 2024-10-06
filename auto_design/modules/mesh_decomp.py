@@ -529,7 +529,9 @@ class Mesh_Decomp:
         # Build a data frame associated with the model
         data = model.createData()
         max_torque = np.zeros((model.nv))
-        force = np.array([0, 0, 9.81 * self.ideal_mass / 2])
+
+        # Contact force that will be applied to foot links
+        force = np.array([0, 0, 9.81 * self.ideal_mass / 2])  #CHG.
 
         # Sample a random joint configuration, joint velocities and accelerations
         for i in range(100):
