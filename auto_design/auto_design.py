@@ -18,7 +18,7 @@ if __name__=="__main__":
     parser.add_argument('--model_name', type=str, default='lynel', help='The model name')
     parser.add_argument('--expected_x', type=float, default=50, help='The expected width of the model')
     parser.add_argument('--voxel_size', type=float, default=0.5, help='The size of the voxel')
-    parser.add_argument('--voxel_density', type=float, default=2e-5, help='The density of the voxel')
+    parser.add_argument('--voxel_density', type=float, default=2e-4, help='The density of the voxel')
     args = parser.parse_args()
     mesh_path = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
     joint_path = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '_joints.pkl')
