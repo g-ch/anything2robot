@@ -359,7 +359,7 @@ class LinkTreeGUI:
                 
                 # remove the line made by the joint
                 for line in self.current_link.joint_lines:
-                    if line.start == self.current_link.joints[joint_name] or line.end == self.current_link.joints[joint_name]:
+                    if np.all(line.start == self.current_link.joints[joint_name]) or np.all(line.end == self.current_link.joints[joint_name]):
                         self.current_link.joint_lines.remove(line)
                 
                 # remove the joint
