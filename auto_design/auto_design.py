@@ -24,12 +24,12 @@ if __name__=="__main__":
     mesh_path = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
     joint_path = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '_joints.pkl')
     
-    
     mesh_loader = Custom_Mesh_Loader(args)
     mesh_loader.load_mesh(mesh_path)
     mesh_loader.load_joint_positions(joint_path)
     mesh_loader.scale()
-    
+
+    # mesh_decomp = Mesh_Decomp(args, mesh_loader)
     mesh_decomp = Mesh_Decomp(args, mesh_loader)
     mesh_decomp.decompose()
     mesh_decomp.render()

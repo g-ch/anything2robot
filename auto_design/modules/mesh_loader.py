@@ -17,7 +17,7 @@ import tkinter as tk
 import pickle as pkl
 import threading
 from threading import Thread
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from plotly.subplots import make_subplots
 from dash import Dash, dcc, html, Input, Output
 #import requests
@@ -158,9 +158,13 @@ class LinkTreeGUI:
         self.args = args
         self.root = root
         self.root.title("Link Tree Constructor")
-        
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+
         self.nodes = {}
         self.current_link = None
+
+        self.link_name_set = set()
         
         # Layout configuration
         self.frame = ttk.Frame(self.root, padding="3 3 12 12")
@@ -169,65 +173,29 @@ class LinkTreeGUI:
         self.root.rowconfigure(0, weight=1)
         
         # Tree view
-        self.tree = ttk.Treeview(self.frame)
-        self.tree.grid(column=0, row=0, columnspan=3, sticky='nsew')
-        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+        self.tree_view_frame = self.create_tree_view_frame(self.root)
+        self.tree_view_frame.grid(column=0, row=0, sticky='nsew')
 
         # Joints in current link
-        self.joint_list = tk.Listbox(self.frame)
-        self.joint_list.grid(column=3, row=0, columnspan=4, sticky='nsew')
-        self.joint_list.bind('<<ListboxSelect>>',self.joint_select)
-
-        # Axis of current link
-        self.cur_rotation_axis = tk.StringVar()
-        ttk.Label(self.frame, text="Rotation Axis:").grid(column=5, row=1)
-        # Add text box to display rotation axis
-        ttk.Label(self.frame, textvariable=self.cur_rotation_axis).grid(column=6, row=1)
-        # ttk.Text(self.frame, textvariable=self.cur_rotation_axis, width=30).grid(column=6, row=1, columnspan=2)
-        
+        self.joint_list_frame = self.create_joint_list_frame(self.root)
+        self.joint_list_frame.grid(column=1, row=0, sticky='nsew')
+ 
         # Add link controls
-        ttk.Label(self.frame, text="Link Name:").grid(column=0, row=1)
-        self.link_name = tk.StringVar()
-        ttk.Entry(self.frame, textvariable=self.link_name).grid(column=1, row=1)
-        
-        ttk.Label(self.frame, text="Parent Name:").grid(column=0, row=2)
-        self.parent_name = tk.StringVar()
-        ttk.Entry(self.frame, textvariable=self.parent_name).grid(column=1, row=2)
-        self.rotation_axis = tk.StringVar()
-        ttk.Label(self.frame, text="Axis:").grid(column=0, row=3)
-        ttk.Entry(self.frame, textvariable=self.rotation_axis).grid(column=1, row=3)
-        
-        
-        ttk.Button(self.frame, text="Add Link", command=self.add_link).grid(column=0, row=4, columnspan=2)
-        ttk.Button(self.frame, text="Remove Link", command=self.remove_link).grid(column=0, row=5, columnspan=2)
-        ttk.Button(self.frame, text="Add Axis", command=self.add_axis).grid(column=0, row=6, columnspan=2)
+        self.link_edit_frame = self.create_link_edit_frame(self.root)
+        self.link_edit_frame.grid(column=0, row=1, sticky='nsew')
 
-        
         # Joint controls
-        ttk.Label(self.frame, text="Joint Name:").grid(column=2, row=1)
-        self.joint_name = tk.StringVar()
-        ttk.Entry(self.frame, textvariable=self.joint_name).grid(column=3, row=1)
-        
-        ttk.Label(self.frame, text="X:").grid(column=2, row=2)
-        self.joint_x = tk.DoubleVar()
-        ttk.Entry(self.frame, textvariable=self.joint_x).grid(column=3, row=2)
-        
-        ttk.Label(self.frame, text="Y:").grid(column=2, row=3)
-        self.joint_y = tk.DoubleVar()
-        ttk.Entry(self.frame, textvariable=self.joint_y).grid(column=3, row=3)
-        
-        ttk.Label(self.frame, text="Z:").grid(column=2, row=4)
-        self.joint_z = tk.DoubleVar()
-        ttk.Entry(self.frame, textvariable=self.joint_z).grid(column=3, row=4)
-        
-        ttk.Button(self.frame, text="Add Joint", command=self.add_joint).grid(column=2, row=5, columnspan=2)
-        ttk.Button(self.frame, text="Remove Joint", command=self.remove_joint).grid(column=2, row=6, columnspan=2)
+        self.joint_edit_frame = self.create_joint_edit_frame(self.root)
+        self.joint_edit_frame.grid(column=1, row=1, sticky='nsew')
 
-        # quit button
-        ttk.Button(self.frame, text="Quit", command=self.quit).grid(column=0, row=7, columnspan=4)
+        # Axis controls
+        self.axis_edit_frame = self.create_axis_edit_frame(self.root)
+        self.axis_edit_frame.grid(column=0, row=2, sticky='nsew')
 
-        # save button
-        ttk.Button(self.frame, text="Save", command=self.save).grid(column=0, row=8, columnspan=4)
+        # Save controls
+        self.save_frame = self.create_save_frame(self.root)
+        self.save_frame.grid(column=1, row=2, sticky='nsew')
+
 
         # Plotly visualization
         self.fig = make_subplots(specs=[[{"type": "scene"}]])
@@ -261,6 +229,159 @@ class LinkTreeGUI:
         import webbrowser
         webbrowser.open('http://127.0.0.1:8050/')
 
+
+    def create_tree_view_frame(self, root):
+        frame = ttk.Frame(root, borderwidth=2, relief="groove")
+
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(0, weight=1)
+
+        # Tree view
+        self.tree = ttk.Treeview(frame)
+        self.tree.grid(column=0, row=0, columnspan=3, sticky='nsew')
+        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+
+        return frame
+    
+    def create_joint_list_frame(self, root):
+        frame = ttk.Frame(root, borderwidth=2, relief="groove")
+
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(0, weight=1)
+
+        self.joint_list = tk.Listbox(frame)
+        self.joint_list.grid(column=0, row=0, columnspan=3, sticky='nsew')
+        self.joint_list.bind('<<ListboxSelect>>',self.joint_select)
+
+        return frame
+    
+    
+    def create_link_edit_frame(self, root):
+        frame = ttk.Frame(root, borderwidth=2, relief="groove")
+
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(1, weight=1)
+
+        ttk.Label(frame, text="STEP1: Add Links", font=('Helvetica', 12, 'bold')).grid(column=0, row=0)
+        
+        ttk.Label(frame, text="Enter New Link Name:").grid(column=0, row=1)
+        self.link_name = tk.StringVar()
+        ttk.Entry(frame, textvariable=self.link_name).grid(column=1, row=1)
+        
+        ttk.Label(frame, text="Parent Name:").grid(column=0, row=2)
+        self.parent_name = tk.StringVar()
+        #ttk.Entry(frame, textvariable=self.parent_name).grid(column=1, row=3)
+        self.combo_parent_name = ttk.Combobox(frame, textvariable=self.parent_name, state='readonly')
+        self.combo_parent_name['values'] = ('NONE')
+
+        self.combo_parent_name.grid(column=1, row=2)
+        self.combo_parent_name.current(0)
+        self.rotation_axis = tk.StringVar()
+
+        ttk.Label(frame, text="Use NONE to add root link", font=('Helvetica', 8, 'bold')).grid(column=1, row=3)
+
+        ttk.Button(frame, text="Add new Link", command=self.add_link).grid(column=0, row=4)
+        ttk.Button(frame, text="Remove Link", command=self.remove_link).grid(column=1, row=4)
+
+        for widget in frame.winfo_children():
+            widget.grid(padx=5, pady=5)
+
+        return frame
+    
+    def create_joint_edit_frame(self, root):
+        frame = ttk.Frame(root, borderwidth=2, relief="groove")
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(1, weight=1)
+
+        ttk.Label(frame, text="STEP2: Add Joints", font=('Helvetica', 12, 'bold')).grid(column=0, row=0, sticky='nswe')
+        
+        # Joint name frame
+        joint_name_frame = ttk.Frame(frame)
+        ttk.Label(joint_name_frame, text="Enter a new Joint or Select a Joint:").grid(column=0, row=0)
+        self.joint_name = tk.StringVar()
+
+        self.combo_joint_name = ttk.Combobox(joint_name_frame, textvariable=self.joint_name)
+        self.combo_joint_name['values'] = ('No_name')
+        self.combo_joint_name.bind('<<ComboboxSelected>>', self.joint_combo_select)
+
+        self.combo_joint_name.grid(column=1, row=0)
+        self.combo_joint_name.current(0)
+
+        joint_name_frame.grid(column=0, row=1)
+
+        # Position frame
+        position_frame = ttk.Frame(frame)
+        
+        ttk.Label(position_frame, text="X:").grid(column=0, row=0)
+        self.joint_x = tk.DoubleVar()
+        ttk.Entry(position_frame, textvariable=self.joint_x).grid(column=1, row=0)
+        
+        ttk.Label(position_frame, text="Y:").grid(column=2, row=0)
+        self.joint_y = tk.DoubleVar()
+        ttk.Entry(position_frame, textvariable=self.joint_y).grid(column=3, row=0)
+        
+        ttk.Label(position_frame, text="Z:").grid(column=4, row=0)
+        self.joint_z = tk.DoubleVar()
+        ttk.Entry(position_frame, textvariable=self.joint_z).grid(column=5, row=0)
+
+        position_frame.grid(column=0, row=2)
+
+        # Enter frame
+        enter_frame = ttk.Frame(frame)
+        ttk.Button(enter_frame, text="Add Joint", command=self.add_joint).grid(column=0, row=0)
+        self.selected_link = tk.StringVar()
+        self.selected_link.set("Choose a link")
+        ttk.Label(enter_frame, text="to").grid(column=1, row=0)
+        ttk.Label(enter_frame, textvariable=self.selected_link).grid(column=2, row=0)
+        ttk.Button(enter_frame, text="Remove Joint", command=self.remove_joint).grid(column=3, row=0)
+
+        enter_frame.grid(column=0, row=3)
+
+        for widget in frame.winfo_children():
+            widget.grid(padx=5, pady=5)
+
+        return frame
+    
+
+    def create_axis_edit_frame(self, root):
+        frame = ttk.Frame(root, borderwidth=2, relief="groove")
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(1, weight=1)
+
+        ttk.Label(frame, text="STEP3: Add Axis", font=('Helvetica', 12, 'bold')).grid(column=0, row=0)
+
+        self.cur_rotation_axis = tk.StringVar()
+        ttk.Label(frame, text="Rotation Axis:").grid(column=0, row=1)
+        # Add text box to display rotation axis
+        ttk.Label(frame, textvariable=self.cur_rotation_axis).grid(column=1, row=1)
+
+        # Axis controls
+        ttk.Label(frame, text="Axis:").grid(column=0, row=3)
+        ttk.Entry(frame, textvariable=self.rotation_axis).grid(column=1, row=3)
+        ttk.Button(frame, text="Add Axis", command=self.add_axis).grid(column=1, row=4, columnspan=1)
+
+
+        for widget in frame.winfo_children():
+            widget.grid(padx=5, pady=5)
+
+        return frame
+    
+    def create_save_frame(self, root):
+        frame = ttk.Frame(root, borderwidth=2, relief="groove")
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(1, weight=1)
+
+        # quit button
+        ttk.Button(frame, text="Quit", command=self.quit).grid(column=0, row=1, columnspan=4)
+        # save button
+        ttk.Button(frame, text="Save", command=self.save).grid(column=0, row=3, columnspan=4)
+
+        # Bind the close window event to the quit function
+        self.root.protocol("WM_DELETE_WINDOW", self.quit)
+
+        return frame
+        
+
     def quit(self):
         self.server.shutdown()
         self.server_thread.join()
@@ -269,8 +390,16 @@ class LinkTreeGUI:
 
     def save(self):
         pkl.dump(self.nodes, open('./auto_design/model/given_models/' + self.args.model_name + '_joints.pkl', 'wb'))
-
+        # Use a message box to confirm save and start the design process or not
+        messagebox.showinfo("Save", "Save successful. Start the design process?")
+        if messagebox.askyesno("Design", "Do you want to start the design process?"):
+            self.quit()
+            
     def remove_link(self):
+        if not self.tree.selection():
+            messagebox.showwarning("No link selected", "Please select a link to remove.")
+            return
+        
         selected_item = self.tree.selection()[0]
         if selected_item in self.nodes:
             del self.nodes[selected_item]
@@ -280,10 +409,16 @@ class LinkTreeGUI:
                     if child.val.name == selected_item:
                         node.children.remove(child)
                         break
+            
+            # Remove the name from the combobox
+            self.combo_parent_name['values'] = tuple(filter(lambda x: x != selected_item, self.combo_parent_name['values']))
+
 
     def add_link(self):
         link_name = self.link_name.get()
         parent_name = self.parent_name.get()
+        print("Added link: ", link_name, " with parent: ", parent_name)
+
         if link_name and link_name not in self.nodes:
             link = Link(link_name)
             node = TreeNode(link)
@@ -293,10 +428,17 @@ class LinkTreeGUI:
                 parent_id = self.nodes[parent_name].val.name
                 self.tree.insert(parent_id, 'end', link_name, text=link_name)
             else:
+                print("No parent name. Inserting into the root")
                 self.tree.insert('', 'end', link_name, text=link_name)
             self.link_name.set("")
             self.parent_name.set("")
-    
+        else:
+            messagebox.showwarning("No link name", "Please enter a link name.")
+        
+        # Update the combobox
+        if link_name not in self.combo_parent_name['values']:
+            self.combo_parent_name['values'] = self.combo_parent_name['values'] + (link_name,)
+
     def joint_select(self, event):
         selected_joint = self.joint_list.curselection()
         joint_name = self.joint_list.get(selected_joint[0]).split(":")[0]
@@ -309,16 +451,39 @@ class LinkTreeGUI:
         self.joint_y.set(joint_pos[1])
         self.joint_z.set(joint_pos[2])
 
+    def joint_combo_select(self, event):
+        joint_name = self.joint_name.get()
+        # Get joint position
+        for link in self.nodes.values():
+            if joint_name in link.val.joints:
+                joint_pos = link.val.joints[joint_name]
+                self.joint_x.set(joint_pos[0])
+                self.joint_y.set(joint_pos[1])
+                self.joint_z.set(joint_pos[2])
+                break
+            else:
+                self.joint_x.set(0)
+                self.joint_y.set(0)
+                self.joint_z.set(0)
 
-    def on_tree_select(self, event):
+    def on_tree_select(self, event):        
         selected_item = self.tree.selection()[0]
         self.current_link = self.nodes[selected_item].val if selected_item in self.nodes else None
+
+        # Update selected item in the combobox
+        for i, value in enumerate(self.combo_parent_name['values']):
+            if value == selected_item:
+                self.combo_parent_name.current(i)
+                break
+
+        self.selected_link.set(selected_item)
 
         # Update joint list
         self.joint_list.delete(0, tk.END)
         if self.current_link:
             for joint_name, joint_position in self.current_link.joints.items():
                 self.joint_list.insert(tk.END, f"{joint_name}: {joint_position}")
+
         
         # Update rotation axis
         if self.current_link.axis:
@@ -340,16 +505,22 @@ class LinkTreeGUI:
     def add_joint(self):
         if self.current_link:
             joint_name = self.joint_name.get()
+            
+            if joint_name == "No_name":
+                messagebox.showwarning("No joint name", "Please enter or select a joint name.")
+                return
+            
             x, y, z = self.joint_x.get(), self.joint_y.get(), self.joint_z.get()
+
             self.current_link.add_joint(joint_name, (x, y, z))
             self.update_plot()
-    
-    def add_axis(self):
-        if self.current_link:
-            axis_str = self.rotation_axis.get()
-            axis = tuple(map(float, axis_str.split(",")))
-            self.current_link.add_axis(axis)
-            self.update_plot()
+
+            # Refresh self.joint_list
+            self.joint_list.delete(0, tk.END)
+            for joint_name, joint_position in self.current_link.joints.items():
+                self.joint_list.insert(tk.END, f"{joint_name}: {joint_position}")
+        else:
+            messagebox.showwarning("No link selected", "Please select a link to add the joint to.")
     
     def remove_joint(self):
         if self.current_link:
@@ -366,12 +537,34 @@ class LinkTreeGUI:
                 del self.current_link.joints[joint_name]
                 self.update_plot()
 
+                # Refresh self.joint_list
+                self.joint_list.delete(0, tk.END)
+                for joint_name, joint_position in self.current_link.joints.items():
+                    self.joint_list.insert(tk.END, f"{joint_name}: {joint_position}")
+            else:
+                messagebox.showwarning("No joint selected", "Please select a joint to remove.")
+        else:
+            messagebox.showwarning("No link selected", "Please select a link to remove the joint from.")
+   
+    def add_axis(self):
+        if self.current_link:
+            axis_str = self.rotation_axis.get()
+            axis = tuple(map(float, axis_str.split(",")))
+            self.current_link.add_axis(axis)
+            self.update_plot()
+        else:
+            messagebox.showwarning("No link selected", "Please select a link to add the axis to.")
+    
     def update_plot(self):
         self.fig.data = []  # Clear existing data
         x, y, z = [], [], []
         cone_size = 10
         axis_x, axis_y, axis_z, direct_x, direct_y, direct_z = [], [], [], [], [], []
         for link in self.nodes.values():
+            if link.val is None or link.val.axis is None:
+                print(f"Warning: link {link.val} has no value or axis")
+                continue
+
             if len(link.val.axis) == 2:
                 axis_x.append(link.val.axis[0][0])
                 axis_y.append(link.val.axis[0][1])
@@ -417,6 +610,18 @@ class LinkTreeGUI:
             parent_name = node_name
             for child in node.children:
                 self.tree.insert(parent_name, 'end', child.val.name, text=child.val.name)
+        
+        # Add the names in nodes to the combobox
+        for node in self.nodes.values():
+            self.combo_parent_name['values'] = self.combo_parent_name['values'] + (node.val.name,)
+            print(self.combo_parent_name['values'])
+
+        # Add the links to the combobox
+        for node in self.nodes.values():
+            for joint_name in node.val.joints:
+                if joint_name not in self.combo_joint_name['values']:
+                    self.combo_joint_name['values'] = self.combo_joint_name['values'] + (joint_name,)
+
 class Mesh_Loader:
     def __init__(self, args):
         self.args = args
