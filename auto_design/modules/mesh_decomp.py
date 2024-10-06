@@ -470,6 +470,30 @@ class Mesh_Decomp:
                         "limit": {"lower": "-1.57", "upper": "1.57", "effort": "20", "velocity": "1.5"}
                     }
                     write_joint(urdf_file, **cur_joint)
+        
+        # Writre foot link
+        def contact_link_func(link):
+            for joint_name in link.joints.keys():
+                if 'foot' in joint_name:
+                    return True
+            return False
+        contact_nodes = self.link_tree.find_children(contact_link_func, None)
+        for contact_node in contact_nodes:
+            for joint_name, joint_pos in contact_node.val.joints.items():
+                if 'foot' in joint_name:
+                    write_link(urdf_file=urdf_file, link_name=joint_name)
+                    rel_pos = np.array(np.array(joint_pos) - contact_node.val.axis[0]) / 100.0
+                    foot_joint = {
+                        "joint_name": joint_name + '_joint',
+                        "joint_type": "revolute",
+                        "parent_link": contact_node.val.name,
+                        "child_link": joint_name,
+                        "origin": {"xyz": ' '.join(map(str, rel_pos)), "rpy": "0 0 0"},
+                        "axis": {"xyz": "1 0 0"},
+                        "limit": {"lower": "-1.57", "upper": "1.57", "effort": "0", "velocity": "0"}
+                    }
+                    write_joint(urdf_file=urdf_file, **foot_joint)
+                    break
 
         urdf_file.write('<gazebo>\n')
         urdf_file.write('   <plugin filename="libgazebo_ros_p3d.so" name="p3d_base_controller">\n')
@@ -505,57 +529,30 @@ class Mesh_Decomp:
         # Build a data frame associated with the model
         data = model.createData()
         max_torque = np.zeros((model.nv))
-
-        # Get the support force and related joint and link
-        def contact_link_func(link):
-            for joint_name in link.joints.keys():
-                if 'foot' in joint_name:
-                    return True
-            return False
-        
-        contact_nodes = self.link_tree.find_children(contact_link_func, None)
-        contact_transformations = []
-        contact_links = []
-        for contact_node in contact_nodes:
-            contact_links.append(contact_node.val.name+ '_joint')
-            for joint_name, joint_pos in contact_node.val.joints.items():
-                if 'foot' in joint_name:
-                    contact_transformations.append(np.array(np.array(joint_pos) - contact_node.val.axis[0]) / 100.0)
-                    break
-
-        # Contact force that will be applied to foot links
         force = np.array([0, 0, 9.81 * self.ideal_mass / 2])
 
         # Sample a random joint configuration, joint velocities and accelerations
-        for i in range(10):
+        for i in range(100):
             q = pin.randomConfiguration(model)
-            # q = 1.57 * np.ones((model.nq, 1))  # in rad
-            # q = np.array([0.0, 0.0, 0.0, -1.57, 1.57, 1.57, -1.57, 1.57, -1.57, -1.57, 1.57]).reshape(-1, 1)
             v = np.zeros((model.nv, 1))  # in rad/s 
             a = np.zeros((model.nv, 1))  # in rad/s² 
             
             # Add external forces to the link which contains the joint whose name contains 'foot'    
             fs_ext = [pin.Force(np.array([0,0,0,0,0,0])) for _ in range(len(model.joints))]
-
             for i, joint_name in enumerate(model.names):
-                if joint_name in contact_links:
-                    contact_id = contact_links.index(joint_name)
-                    transformed_torque = np.cross(contact_transformations[contact_id], force)
-                    fs_ext[i] = pin.Force(np.hstack((force, transformed_torque)))
-                    # print(f'External force: {fs_ext[i].vector}')
+                if 'foot' in joint_name:
+                    fs_ext[i] = pin.Force(np.hstack((force, np.zeros(3))))
             tau = pin.rnea(model, data, q, v, a, fs_ext)
-
-            # print(f'Configuration: {np.round(q.flatten(), 2)}')
-            # print(f'Joint torques: {np.round(tau.flatten(), 2)}')
-            
             max_torque = np.maximum(max_torque, np.abs(tau))
 
         # Get joint names
         joint_names = []
-        for joint_name in model.names:
-            if joint_name != 'universe':
+        result_torque = []
+        for i, joint_name in enumerate(model.names):
+            if (joint_name != 'universe') and ('foot' not in joint_name):
                 joint_names.append(joint_name)
-        return joint_names, np.round(max_torque, 2)
+                result_torque.append(np.round(max_torque[i-1], 2))
+        return joint_names, result_torque
 
     def render(self):
         """

@@ -362,20 +362,36 @@ class InterferenceRemoval:
                 self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]] = np.where(np.logical_or(np.isin(values, transformed_link_values), non_removal),
                                                                                                             self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]], 
                                                                                                             0)
-                def condition_remove(pts):
-                    return is_points_in_cylinder(pts, self.motor_param_result[cur_idx-1][:3], self.motor_param_result[cur_idx-1][3:6], self.motor_param_result[cur_idx-1][6], 0, 0)
-                self.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_group.link_value_dict.keys()), "Unoccupied"),
-                                            target_group_name="Unoccupied",
-                                            condition_func=condition_remove)
 
             # Leave place for the second motor
             if len(current_link.axis) == 3:
-                def condition_remove(pts):
-                    return is_points_in_cylinder(pts, self.motor_param_result[cur_idx][:3], self.motor_param_result[cur_idx][3:6], self.motor_param_result[cur_idx][6], 0, 0)
-                self.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_group.link_value_dict.keys()), "Unoccupied"),
-                                            target_group_name="Unoccupied",
-                                            condition_func=condition_remove)
+
+                motor_position = (self.motor_param_result[cur_idx][:3] + self.motor_param_result[cur_idx][3:6]) / 2
+                motor_direct = np.array(current_link.axis[1])
+                motor_radius = self.motor_param_result[cur_idx][6]
+
+                # Sample joint angles and implement the interference removal
+                for joint_angle in np.linspace(self.joint_limits[cur_idx, 0], self.joint_limits[cur_idx, 1], 10):
+                    transformed_voxel_data = self.mesh_group.voxel_data.copy()
+
+                    child_nodes = current_node.get_all_children()[0]
+                    transformed_links = [child.val for child in child_nodes]
+                    transformed_links.append(current_link)
+                    transformed_link_names = [link.name for link in transformed_links]
+                    transformed_link_values = [self.mesh_group.link_value_dict[link_name] for link_name in transformed_link_names]
+                    transformed_indexs = np.vstack([self.mesh_group.get_voxels(link_name, get_index=True) for link_name in transformed_link_names])
+
+                    # The transformation is defined as rotation around the axis of the motor, rotating angle is the joint angle
+                    H_matrix = self.rotate_around_axis(motor_direct, joint_angle, self.mesh_group.position_to_index(motor_position.reshape(-1, 3)))
+                    new_indexs = expand_points(apply_transform(transformed_indexs, H_matrix))
+                    new_indexs = np.clip(new_indexs, 0, self.mesh_group.voxel_data.shape[0]-1)
+                    values = self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]
+                    non_removal = self.mesh_group.voxel_no_removal[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]
+                    self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]] = np.where(np.logical_or(np.isin(values, transformed_link_values), non_removal),
+                                                                                                                self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]], 
+                                                                                                                0)
                 cur_idx += 1
+            
 
     def generate_urdf(self):
         """
