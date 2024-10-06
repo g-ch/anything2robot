@@ -336,7 +336,6 @@ class InterferenceRemoval:
                 continue
 
             # Get the info about current link
-            current_link_name = current_link.name
             motor_position = (self.motor_param_result[cur_idx][:3] + self.motor_param_result[cur_idx][3:6]) / 2
             motor_direct = np.array(current_link.axis[1])
             motor_radius = self.motor_param_result[cur_idx][6]
@@ -344,7 +343,6 @@ class InterferenceRemoval:
 
             # Sample joint angles and implement the interference removal
             for joint_angle in np.linspace(self.joint_limits[cur_idx, 0], self.joint_limits[cur_idx, 1], 10):
-                transformed_voxel_data = self.mesh_group.voxel_data.copy()
 
                 child_nodes = current_node.get_all_children()[0]
                 transformed_links = [child.val for child in child_nodes]
@@ -363,7 +361,7 @@ class InterferenceRemoval:
                                                                                                             self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]], 
                                                                                                             0)
 
-            # Leave place for the second motor
+            # interference removal for the second motor
             if len(current_link.axis) == 3:
 
                 motor_position = (self.motor_param_result[cur_idx][:3] + self.motor_param_result[cur_idx][3:6]) / 2
@@ -372,7 +370,6 @@ class InterferenceRemoval:
 
                 # Sample joint angles and implement the interference removal
                 for joint_angle in np.linspace(self.joint_limits[cur_idx, 0], self.joint_limits[cur_idx, 1], 10):
-                    transformed_voxel_data = self.mesh_group.voxel_data.copy()
 
                     child_nodes = current_node.get_all_children()[0]
                     transformed_links = [child.val for child in child_nodes]
@@ -392,6 +389,13 @@ class InterferenceRemoval:
                                                                                                                 0)
                 cur_idx += 1
             
+        # Remove interference for motors
+        for motor_param in self.motor_param_result:
+            def condition_remove(pts):
+                return is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0, 0.5)
+            self.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_group.link_value_dict.keys()), "Unoccupied"),
+                                        target_group_name="Unoccupied",
+                                        condition_func=condition_remove)
 
     def generate_urdf(self):
         """

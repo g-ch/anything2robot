@@ -572,14 +572,13 @@ class Motor_Opt:
     
     def choose_motor_type(self):
         joint_names, max_torques = self.mesh_decomp.generate_constraints()
-        
+        torque_dict = {}
         for i in range(len(joint_names)):
             print("Joint Name: ", joint_names[i], "Max Torque: ", max_torques[i])
+            torque_dict[joint_names[i]] = max_torques[i]
 
         motor_types = []
         motor_lib = np.array(self.motor_lib)
-
-        cur_idx = 0
         queue = [self.mesh_decomp.link_tree]
         while queue:
             cur_node = queue.pop(0)
@@ -589,16 +588,18 @@ class Motor_Opt:
                 continue
 
             # From the motor list, choose the motor type that satisfies the constraints
-            
-            motor_type = np.where(motor_lib[:, 2] == motor_lib[:, 2][np.where(motor_lib[:, 2] - max_torques[cur_idx] > 0)[0]].min())[0][0]
-            motor_types.append(motor_type)
-            cur_idx += 1
+            if len(cur_node.val.axis) == 2:
+                motor_type = np.where(motor_lib[:, 2] == motor_lib[:, 2][np.where(motor_lib[:, 2] - torque_dict[cur_node.val.name+'_joint'] > 0)[0]].min())[0][0]
+                motor_types.append(motor_type)
 
             # If the joint has 2 axis, choose the motor type that satisfies the torque limit of both motors
             if len(cur_node.val.axis) == 3:
-                motor_type = np.where(motor_lib[:, 2] == motor_lib[:, 2][np.where(motor_lib[:, 2] - max_torques[cur_idx] > 0)[0]].min())[0][0]
-                if motor_lib[motor_type][0] < motor_lib[motor_types[-1]][0]:
-                    motor_types[-1] = motor_type
+                motor_type1 = np.where(motor_lib[:, 2] == motor_lib[:, 2][np.where(motor_lib[:, 2] - torque_dict[cur_node.val.name+'_joint1'] > 0)[0]].min())[0][0]
+                motor_type2 = np.where(motor_lib[:, 2] == motor_lib[:, 2][np.where(motor_lib[:, 2] - torque_dict[cur_node.val.name+'_joint2'] > 0)[0]].min())[0][0]
+                if motor_lib[motor_type1][2] > motor_lib[motor_type2][2]:
+                    motor_types.append(motor_type1)
+                else:
+                    motor_types.append(motor_type2)
 
         return np.array(motor_types)
 
@@ -685,7 +686,7 @@ class Joint_Connect_Opt:
         self.mesh_decomp = mesh_decomp
         self.mesh = mesh_decomp.mesh
         self.motor_params_results = motor_params_results
-        self.motor_shell = 1.3
+        self.motor_shell = 1.5
 
         self.father_dict = self.mesh_decomp.father_link_dict
         for link_name in self.father_dict:

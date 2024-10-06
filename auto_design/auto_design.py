@@ -41,7 +41,7 @@ if __name__=="__main__":
                  [3.42, 2.65, 2.5], # MG4005V2
                  [8.1, 5.3, 20 ]]  # DM8009
     motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib)
-    motor_results = motor_opt.run_opt(generation_num=10)
+    motor_results = motor_opt.run_opt(generation_num=5)
     motor_opt.render()
     joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
     joint_connect_opt.run_opt()
@@ -51,7 +51,7 @@ if __name__=="__main__":
                                                motor_param_result=motor_results, 
                                                link_tree=mesh_decomp.link_tree, 
                                                father_link_dict=mesh_decomp.father_link_dict)
-    joint_limits = np.vstack([np.array([-0.5, 0.5]) for _ in range(2*len(motor_results))])
+    joint_limits = np.vstack([np.array([-1, 1]) for _ in range(2*len(motor_results))])
     interference_removal.set_joint_limit(joint_limits)
     interference_removal.remove_interference()
     interference_removal.mesh_group.render()
