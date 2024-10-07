@@ -433,7 +433,9 @@ class Mesh_Decomp:
             }
             write_link(urdf_file=urdf_file, link_name=cur_link.name, visual=link_visual, collision=link_collision, inertial=link_inertial)
             
-            self.ideal_mass += self.mesh_group.get_voxels(cur_link.name).shape[0] * self.args.voxel_density
+            per_voxel_mass = self.args.voxel_density * (self.args.voxel_size ** 3)
+
+            self.ideal_mass += self.mesh_group.get_voxels(cur_link.name).shape[0] * per_voxel_mass
 
             if cur_link.name != "BODY":
                 # Write a 2DoF joint

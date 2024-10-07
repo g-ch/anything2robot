@@ -126,9 +126,9 @@ class Link:
     
     def add_joint(self, joint_name, joint_position):
         for origin_joints in self.joints.values():
+            #TODO: Consider the case that the joint is already in the joint_lines and removing a line when a joint is removed
             self.joint_lines.append(Line(origin_joints, joint_position))
         self.joints[joint_name] = joint_position
-
 
     def add_joints(self, joint_dict):
         for joint_name, joint_position in joint_dict.items():
@@ -360,7 +360,6 @@ class LinkTreeGUI:
         ttk.Entry(frame, textvariable=self.rotation_axis).grid(column=1, row=3)
         ttk.Button(frame, text="Add Axis", command=self.add_axis).grid(column=1, row=4, columnspan=1)
 
-
         for widget in frame.winfo_children():
             widget.grid(padx=5, pady=5)
 
@@ -511,8 +510,23 @@ class LinkTreeGUI:
                 return
             
             x, y, z = self.joint_x.get(), self.joint_y.get(), self.joint_z.get()
-
+                
             self.current_link.add_joint(joint_name, (x, y, z))
+            
+            # Check if the joint is already in a link and the position is different
+            for link in self.nodes.values():
+                if joint_name in link.val.joints:
+                    if np.all(link.val.joints[joint_name] != (x, y, z)):
+                        print("Joint already exists in another link with different position.")
+                        print("Current joint position: ", (x, y, z))
+                        print("Existing joint position: ", link.val.joints[joint_name])
+                        message_to_print = "Joint " + joint_name + " already exists in " + link.val.name + " with an existing position: " + str(link.val.joints[joint_name]) + ". Do you want to overwrite the position?"
+
+                        if messagebox.askyesno("Overwrite", message_to_print):
+                            self.update_joint(link.val.name, joint_name, (x, y, z))
+                        else:
+                            continue
+            
             self.update_plot()
 
             # Refresh self.joint_list
@@ -521,6 +535,16 @@ class LinkTreeGUI:
                 self.joint_list.insert(tk.END, f"{joint_name}: {joint_position}")
         else:
             messagebox.showwarning("No link selected", "Please select a link to add the joint to.")
+
+    def update_joint(self, link_name, joint_name, joint_position):
+        if joint_name in self.nodes[link_name].val.joints:
+            self.nodes[link_name].val.add_joint(joint_name, joint_position)
+            # Reconstruct the joint lines
+            self.nodes[link_name].val.construct_joint_lines()
+        else:
+            print("Joint not found in the link.")
+
+        print(self.nodes[link_name].val.joints)
     
     def remove_joint(self):
         if self.current_link:
