@@ -23,6 +23,10 @@ from data_struct import TreeNode, Graph
 from scipy.ndimage import binary_dilation
 from os.path import abspath, dirname, join
 from scipy.ndimage import label, find_objects
+from sklearn.cluster import DBSCAN
+from scipy.spatial import ConvexHull
+import tqdm
+
 
 def erode_zeros(arr, structure=None):
     """
@@ -103,7 +107,7 @@ class Mesh_Group:
         self.voxel_no_removal = None
         self.voxel_size = args.voxel_size
         self.color_list = ["#2DB3F0", "#124860", "#8E75AF", "#2b2335", "#C03027", "#4d1310", "#a6caa1", "#748d71", 
-                           "grey", "black", "white", "blue", "green", "red", "yellow", "orange", "purple", "pink", 
+                           "grey", "black", "blue", "green", "red", "yellow", "orange", "purple", "pink", 
                            "brown", "cyan", "magenta", "olive", "teal", "navy", "maroon", "lime", "aqua", "fuchsia", 
                            "silver", "gray"]
         self.link_value_dict = {"Unoccupied": 0}
@@ -243,7 +247,7 @@ class Mesh_Decomp:
         self.link_tree = mesh_loader.link_tree
         self.mesh_group = Mesh_Group(args)
         self.color_list = ["#2DB3F0", "#124860", "#8E75AF", "#2b2335", "#C03027", "#4d1310", "#a6caa1", "#748d71", 
-                           "grey", "black", "white", "blue", "green", "red", "yellow", "orange", "purple", "pink", 
+                           "grey", "black", "blue", "green", "red", "yellow", "orange", "purple", "pink", 
                            "brown", "cyan", "magenta", "olive", "teal", "navy", "maroon", "lime", "aqua", "fuchsia", 
                            "silver", "gray"]
     
@@ -285,6 +289,8 @@ class Mesh_Decomp:
 
         return self.occupied_voxels, self.unoccupied_voxels
     
+
+
     def decompose(self):
         """
         Decompose the mesh data into different parts according to the joints.
@@ -294,87 +300,213 @@ class Mesh_Decomp:
         cur_node = self.link_tree
         self.decompose_result = np.array(['UNCLASSIFIED'] * len(self.occupied_voxels), dtype=object)
 
-        # Implement BFS to decompose the mesh data
+        # Collect all joints and links
+        all_joints = {}
+        all_links = {}
         queue = [cur_node]
         while queue:
-            root_node = queue.pop(0)
-            child_nodes = root_node.children
-            if not child_nodes:
-                continue
+            node = queue.pop(0)
             
-            ## Cluster the voxels according to joint clusters
-            joint_cluster = []
-            name_cluster = []
-            link_dict = {}
-            joint_cluster.append(np.array(list(root_node.val.joints.values())))
-            name_cluster.append(root_node.val.name)
-            link_dict[root_node.val.name] = root_node.val
+            all_links[node.val.name] = node.val
+            for joint_name, joint_pos in node.val.joints.items():
+                if joint_name not in all_joints:
+                    all_joints[joint_name] = []
+                all_joints[joint_name].append((node.val.name, joint_pos))
+            queue.extend(node.children)
+
+            # Fill in father link dict for later use
+            child_nodes = node.children
             for child_node in child_nodes:
-                link_dict[child_node.val.name] = child_node.val
-                self.father_link_dict[child_node.val.name] = root_node.val
-                all_child_nodes, _ = child_node.get_all_children()
-                all_child_nodes.append(child_node)
-                child_joint_cluster = np.vstack([np.array(list(node.val.joints.values())) for node in all_child_nodes])
-                joint_cluster.append(np.array(child_joint_cluster))
-                name_cluster.append(child_node.val.name)
-                queue.append(child_node)
-            
-            ## Cluster the voxels according to joint clusters
-            distances = [np.min(np.linalg.norm(joint_cluster[i] - (np.repeat(self.mesh_group.get_voxels(root_node.val.name), joint_cluster[i].shape[0], axis=0).reshape(-1, joint_cluster[i].shape[0], 3)), axis=-1), axis=1) for i in range(len(joint_cluster))]
-            distances = np.array(distances).T
-            min_indices = [np.argwhere(distances[i] == np.min(distances[i])) for i in range(len(distances))]
+                self.father_link_dict[child_node.val.name] = node.val
+        
 
-            ## If there are multiple minimum values, choose the one with the largest distance to the nearest joint line
-            min_indice = []
-            import tqdm
-            for i in tqdm.tqdm(range(len(min_indices))):
-                if min_indices[i].shape != (1,1):
-                    link1 = name_cluster[min_indices[i][0][0]]
-                    link2 = name_cluster[min_indices[i][1][0]]
-                    voxel_pos = self.mesh_group.get_voxels(root_node.val.name)[i]
-                    if link_dict[link1].get_min_axis_distance(voxel_pos) > link_dict[link2].get_min_axis_distance(voxel_pos):
-                        min_indice.append(min_indices[i][1][0])
-                    else:
-                        min_indice.append(min_indices[i][0][0])
+        # Create line segments for each link
+        link_segments = {}
+        for link_name, link in all_links.items():
+            segments = []
+            joint_positions = list(link.joints.values())
+            for i in range(len(joint_positions)):
+                for j in range(i+1, len(joint_positions)):
+                    segments.append((joint_positions[i], joint_positions[j]))
+            link_segments[link_name] = segments
+
+        # Function to calculate distance from point to line segment
+        def point_to_segment_distance(point, segment):
+            p1, p2 = segment
+            line_vec = p2 - p1
+            point_vec = point - p1
+            line_len = np.linalg.norm(line_vec)
+            if line_len == 0:
+                return np.linalg.norm(point_vec)
+            t = max(0, min(1, np.dot(point_vec, line_vec) / (line_len * line_len)))
+            projection = p1 + t * line_vec
+            return np.linalg.norm(point - projection)
+
+        # Iterate through all voxels
+        import tqdm
+        for i in tqdm.tqdm(range(len(self.occupied_voxels))):
+            voxel = self.occupied_voxels[i]
+            closest_joint = None
+            min_distance = float('inf')
+            
+            # Find the closest joint
+            for joint_name, joint_info in all_joints.items():
+                for link_name, joint_pos in joint_info:
+                    distance = np.linalg.norm(voxel - joint_pos)
+                    if distance < min_distance:
+                        min_distance = distance
+                        closest_joint = joint_name
+
+            # Determine which link the voxel belongs to
+            if len(all_joints[closest_joint]) == 1:
+                # If the joint belongs to only one link, assign the voxel to that link
+                self.decompose_result[i] = all_joints[closest_joint][0][0]
+            else:
+                # If the joint belongs to multiple links, find the closest line segment
+                min_segment_distance = float('inf')
+                closest_link = None
+                for link_name, _ in all_joints[closest_joint]:
+                    for segment in link_segments[link_name]:
+                        segment_distance = point_to_segment_distance(voxel, segment)
+                        if segment_distance < min_segment_distance:
+                            min_segment_distance = segment_distance
+                            closest_link = link_name
+                self.decompose_result[i] = closest_link
+
+        #  Update mesh_group with decomposed voxels and perform clustering for each link
+        for link_name in tqdm.tqdm(np.unique(self.decompose_result)):
+            if link_name != 'UNCLASSIFIED':
+                link_voxels = self.occupied_voxels[self.decompose_result == link_name]
+                
+                # Perform DBSCAN clustering for this link's voxels
+                epsilon = self.args.voxel_size * 1.732
+                min_samples = 5  # Minimum number of samples in a cluster
+                clustering = DBSCAN(eps=epsilon, min_samples=min_samples).fit(link_voxels)
+                
+                # Find the largest cluster for this link
+                labels = clustering.labels_
+
+                if len(np.unique(labels)) > 1:  # If there's more than one cluster (including noise)
+                    unique_labels, label_counts = np.unique(labels[labels != -1], return_counts=True)
+                    largest_cluster = unique_labels[np.argmax(label_counts)]
+                    mask = labels == largest_cluster
+                    largest_cluster_voxels = link_voxels[mask]
+                    
+                    # # Update decompose_result for this link
+                    # link_indices = np.where(self.decompose_result == link_name)[0]
+                    # self.decompose_result[link_indices[~mask]] = "UNCLASSIFIED"
+                    
+                    # Update mesh_group with the largest cluster of voxels for this link
+                    self.mesh_group.set_voxels(link_name, largest_cluster_voxels)
+
+                    # Make the rest of the voxels unoccupied
+                    unoccupied_voxels = link_voxels[~mask]
+                    self.mesh_group.set_voxels("Unoccupied", unoccupied_voxels)
                 else:
-                    min_indice.append(min_indices[i][0][0])
-
-            name_cluster = np.array(name_cluster)
-            self.decompose_result = name_cluster[min_indice]
-
-            clustered_voxels = {}
-            for link_name in np.unique(self.decompose_result):
-                if link_name not in self.mesh_group.link_value_dict.keys():
-                    clustered_voxels[link_name] = self.mesh_group.get_voxels(root_node.val.name)[self.decompose_result == link_name]
-            clustered_voxels[root_node.val.name] = self.mesh_group.get_voxels(root_node.val.name)[self.decompose_result == root_node.val.name]
-
-            for link_name in np.unique(self.decompose_result):
-                if link_name not in self.mesh_group.link_value_dict.keys():
-                    self.mesh_group.set_voxels(link_name, clustered_voxels[link_name])
-            self.mesh_group.set_voxels(root_node.val.name, clustered_voxels[root_node.val.name])
+                    # If there's only one cluster, keep all voxels
+                    self.mesh_group.set_voxels(link_name, link_voxels)
         
-        # Only preserve the largest cluster for each link
-        unique_types = np.unique(self.mesh_group.voxel_data)
-        
-        for voxel_type in unique_types:
-            if voxel_type == 0:  # Assuming 0 might be used for background or empty space
-                continue
-            
-            # Create a binary volume for the current type
-            binary_volume = (self.mesh_group.voxel_data == voxel_type)
-            structure = np.zeros((3, 3, 3))
-            structure[1, 1, :] = 1
-            structure[1, :, 1] = 1
-            structure[:, 1, 1] = 1
-            labeled_volume, _ = label(binary_volume, structure=structure)
-            cluster_sizes = np.bincount(labeled_volume.ravel())[1:] 
-            if cluster_sizes.size == 0:
-                continue  # No clusters of this type
-            largest_cluster_idx = cluster_sizes.argmax() + 1  # +1 because bincount skips the background label 0
-            self.mesh_group.voxel_data[(labeled_volume != largest_cluster_idx) & (labeled_volume != 0)] = 0
-        
+        # Print the number of voxels for each link
+        print("Number of clusters: ", len(self.mesh_group.link_value_dict.keys()))
+        for link_name in self.mesh_group.link_value_dict.keys():
+            print(f"Link {link_name}: {self.mesh_group.get_voxels(link_name).shape[0]} voxels")
 
         return self.mesh_group
+
+
+    # def decompose_old(self):
+    #     """
+    #     Decompose the mesh data into different parts according to the joints.
+    #     """
+    #     self.voxelization()
+    #     self.father_link_dict = {}
+    #     cur_node = self.link_tree
+    #     self.decompose_result = np.array(['UNCLASSIFIED'] * len(self.occupied_voxels), dtype=object)
+
+    #     # Implement BFS to decompose the mesh data
+    #     queue = [cur_node]
+    #     while queue:
+    #         root_node = queue.pop(0)
+    #         child_nodes = root_node.children
+    #         if not child_nodes:
+    #             continue
+            
+    #         ## Cluster the voxels according to joint clusters
+    #         joint_cluster = []
+    #         name_cluster = []
+    #         link_dict = {}
+    #         joint_cluster.append(np.array(list(root_node.val.joints.values())))
+    #         name_cluster.append(root_node.val.name)
+    #         link_dict[root_node.val.name] = root_node.val
+    #         for child_node in child_nodes:
+    #             link_dict[child_node.val.name] = child_node.val
+    #             self.father_link_dict[child_node.val.name] = root_node.val
+    #             all_child_nodes, _ = child_node.get_all_children()
+    #             all_child_nodes.append(child_node)
+    #             child_joint_cluster = np.vstack([np.array(list(node.val.joints.values())) for node in all_child_nodes])
+    #             joint_cluster.append(np.array(child_joint_cluster))
+    #             name_cluster.append(child_node.val.name)
+    #             queue.append(child_node)
+            
+    #         ## Cluster the voxels according to joint clusters
+    #         distances = [np.min(np.linalg.norm(joint_cluster[i] - (np.repeat(self.mesh_group.get_voxels(root_node.val.name), joint_cluster[i].shape[0], axis=0).reshape(-1, joint_cluster[i].shape[0], 3)), axis=-1), axis=1) for i in range(len(joint_cluster))]
+    #         distances = np.array(distances).T
+    #         min_indices = [np.argwhere(distances[i] == np.min(distances[i])) for i in range(len(distances))]
+
+    #         ## If there are multiple minimum values, choose the one with the largest distance to the nearest joint line
+    #         min_indice = []
+    #         for i in tqdm.tqdm(range(len(min_indices))):
+    #             if min_indices[i].shape != (1,1):
+    #                 link1 = name_cluster[min_indices[i][0][0]]
+    #                 link2 = name_cluster[min_indices[i][1][0]]
+    #                 voxel_pos = self.mesh_group.get_voxels(root_node.val.name)[i]
+    #                 if link_dict[link1].get_min_axis_distance(voxel_pos) > link_dict[link2].get_min_axis_distance(voxel_pos):
+    #                     min_indice.append(min_indices[i][1][0])
+    #                 else:
+    #                     min_indice.append(min_indices[i][0][0])
+    #             else:
+    #                 min_indice.append(min_indices[i][0][0])
+
+    #         name_cluster = np.array(name_cluster)
+    #         self.decompose_result = name_cluster[min_indice]
+
+    #         clustered_voxels = {}
+    #         for link_name in np.unique(self.decompose_result):
+    #             if link_name not in self.mesh_group.link_value_dict.keys():
+    #                 clustered_voxels[link_name] = self.mesh_group.get_voxels(root_node.val.name)[self.decompose_result == link_name]
+    #         clustered_voxels[root_node.val.name] = self.mesh_group.get_voxels(root_node.val.name)[self.decompose_result == root_node.val.name]
+
+    #         for link_name in np.unique(self.decompose_result):
+    #             if link_name not in self.mesh_group.link_value_dict.keys():
+    #                 self.mesh_group.set_voxels(link_name, clustered_voxels[link_name])
+    #         self.mesh_group.set_voxels(root_node.val.name, clustered_voxels[root_node.val.name])
+        
+    #     # Only preserve the largest cluster for each link
+    #     unique_types = np.unique(self.mesh_group.voxel_data)
+        
+    #     for voxel_type in unique_types:
+    #         if voxel_type == 0:  # Assuming 0 might be used for background or empty space
+    #             continue
+            
+    #         # Create a binary volume for the current type
+    #         binary_volume = (self.mesh_group.voxel_data == voxel_type)
+    #         structure = np.zeros((3, 3, 3))
+    #         structure[1, 1, :] = 1
+    #         structure[1, :, 1] = 1
+    #         structure[:, 1, 1] = 1
+    #         labeled_volume, _ = label(binary_volume, structure=structure)
+    #         cluster_sizes = np.bincount(labeled_volume.ravel())[1:] 
+    #         if cluster_sizes.size == 0:
+    #             continue  # No clusters of this type
+    #         largest_cluster_idx = cluster_sizes.argmax() + 1  # +1 because bincount skips the background label 0
+    #         self.mesh_group.voxel_data[(labeled_volume != largest_cluster_idx) & (labeled_volume != 0)] = 0
+        
+    #     # Print the number of voxels for each link
+    #     print("Number of clusters: ", len(self.mesh_group.link_value_dict.keys()))
+    #     for link_name in self.mesh_group.link_value_dict.keys():
+    #         print(f"Link {link_name}: {self.mesh_group.get_voxels(link_name).shape[0]} voxels")
+
+    #     return self.mesh_group
 
     def generate_ideal_urdf(self):
         """

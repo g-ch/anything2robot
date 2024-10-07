@@ -8,7 +8,7 @@ __Tested Environment: Ubuntu 20.04__
 ```
 conda create --name anything2robot python=3.8
 conda activate anything2robot
-python3 -m pip install --user open3d
+python3 -m pip install --user open3d scikit-learn
 ```
 
 Please make sure that the version of open3d is 0.18.0.

@@ -18,7 +18,6 @@ if __name__=="__main__":
     parser.add_argument('--model_name', type=str, default='gold_lynel', help='The model name')
     parser.add_argument('--expected_x', type=float, default=50, help='The expected width of the model')
     parser.add_argument('--voxel_size', type=float, default=0.5, help='The size of the voxel')
-    ## TODO: change the voxel density
     parser.add_argument('--voxel_density', type=float, default=1.2e-4, help='The density of the voxel. (kg/cm^3)')
     args = parser.parse_args()
     mesh_path = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
@@ -29,12 +28,16 @@ if __name__=="__main__":
     mesh_loader.load_joint_positions(joint_path)
     mesh_loader.scale()
 
-    # mesh_decomp = Mesh_Decomp(args, mesh_loader)
+    time.sleep(3)
+
+    # mesh_decomp = Mesh_Decomp(args, mesh_loader)\
+    print("Decomposing the mesh...")
     mesh_decomp = Mesh_Decomp(args, mesh_loader)
     mesh_decomp.decompose()
     mesh_decomp.render()
 
-
+    # Do actuator optimization
+    print("Optimizing the actuators...")
     bounds = get_bounds(mesh_decomp.link_tree, threshold=6)
     motor_lib = [[5.6, 4.2, 12],   # DM6006         # Height, Radius, Torque DM6006 [3.6, 3.8, 12]  DM8009 [6.1, 4.9, 20 ]
                 #  [4.5, 2.5, 8 ], # DM4310
@@ -43,9 +46,15 @@ if __name__=="__main__":
     motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib)
     motor_results = motor_opt.run_opt(generation_num=100)
     motor_opt.render()
+
+    # Refine the mesh to connect the joints
+    print("Refining the mesh to connect the actuators...")
     joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
     joint_connect_opt.run_opt()
     mesh_decomp.mesh_group.render()
+
+    # Remove the interference between the links while moving the joints
+    print("Removing the interference between the links...")
     interference_removal = InterferenceRemoval(args=args, 
                                                mesh_group=mesh_decomp.mesh_group, 
                                                motor_param_result=motor_results, 

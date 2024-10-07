@@ -709,7 +709,10 @@ class Joint_Connect_Opt:
 
         all_path = []
 
+        count = 0
         while queue:
+            count += 1
+            print("Joint Connect Opt: ", count)
             cur_node = queue.pop(0)
             for child_node in cur_node.children:
                 queue.append(child_node)

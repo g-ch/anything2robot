@@ -41,7 +41,9 @@ class Line:
         line_len_sq = np.dot(line_vec, line_vec)
         t = max(0, min(1, np.dot(point_vec, line_vec) / line_len_sq))
         closest = self.start + t * line_vec
-        return np.linalg.norm(closest - point)
+        
+        return np.linalg.norm(point - closest)
+        
     
     def __str__(self):
         return f"Line: {self.start} -> {self.end}"
