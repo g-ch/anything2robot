@@ -17,6 +17,16 @@ from itertools import product
 apply_transform = lambda x, T: np.dot(T, np.hstack([x, np.ones((x.shape[0], 1))]).T).T[:, :3]
 get_removed_list = lambda list, remove_value: [value for value in list if value != remove_value]
 
+def get_tenon_idx(motor_result, motor_lib):
+    
+    motor_height = np.linalg.norm(motor_result[:3] - motor_result[3:6])
+    motor_radius = motor_result[6]
+    for i, motor in enumerate(motor_lib):
+        if np.isclose(motor[0], motor_height, atol=0.1) and np.isclose(motor[1], motor_radius, atol=0.1):
+            return i
+    return -1
+
+
 def expand_points(array):
     """
     Expand a given (n, 3) numpy array to include all integer points around each point in the array.
@@ -71,6 +81,7 @@ class LinkResult:
         self.applied_torque = []
         self.tenon_pos = []
         self.tenon_type = []
+        self.tenon_idx = []
 
     def add_force(self, force):
         self.applied_force.append(force)
@@ -78,12 +89,13 @@ class LinkResult:
     def add_torque(self, torque):
         self.applied_torque.append(torque)
     
-    def add_tenon_pos(self, tenon_pos, tenon_type):
+    def add_tenon_pos(self, tenon_pos, tenon_type, tenon_idx):
         self.tenon_pos.append(tenon_pos)
         self.tenon_type.append(tenon_type)
+        self.tenon_idx.append(tenon_idx)
 
 class RobotOptResult:
-    def __init__(self, interference_removal, urdf_dir):
+    def __init__(self, interference_removal, urdf_dir, motor_lib):
         self.motor_results = interference_removal.motor_param_result
         self.link_tree = interference_removal.link_tree
         self.mesh_group = interference_removal.mesh_group
@@ -91,6 +103,7 @@ class RobotOptResult:
         self.link_axis_dict = {}
         self.urdf_dir = urdf_dir
         self.args = interference_removal.args
+        self.motor_lib = motor_lib
         self.foot_force = 40 # N
         self.tenon_height = 0 # cm
         self.link_dict = {}
@@ -112,17 +125,18 @@ class RobotOptResult:
                 motor_direct = np.array(current_link.axis[1])
                 motor_child_side = self.motor_results[cur_idx][3:6]
                 motor_father_side = self.motor_results[cur_idx][:3]
+                motor_idx = get_tenon_idx(self.motor_results[cur_idx], motor_lib)
 
                 self.link_axis_dict[current_link.name+ '_joint'] = np.hstack(((motor_father_side + motor_child_side) / 200.0, motor_direct))
 
                 self.link_dict[current_link.name] = LinkResult()
                 tenon_pos = (motor_child_side + self.tenon_height * motor_direct) / 100.0
                 tenon_direct = -motor_direct
-                self.link_dict[current_link.name].add_tenon_pos(np.hstack((tenon_pos, tenon_direct)), 'child') 
+                self.link_dict[current_link.name].add_tenon_pos(np.hstack((tenon_pos, tenon_direct)), 'child', motor_idx) 
 
                 tenon_pos_father = (motor_father_side - self.tenon_height * motor_direct) / 100.0
                 tenon_direct_father = motor_direct
-                self.link_dict[self.father_link_dict[current_link.name]].add_tenon_pos(np.hstack((tenon_pos_father, tenon_direct_father)), 'father')
+                self.link_dict[self.father_link_dict[current_link.name]].add_tenon_pos(np.hstack((tenon_pos_father, tenon_direct_father)), 'father', motor_idx)
                 cur_idx += 1
             
             elif len(current_link.axis) == 3:
@@ -133,6 +147,8 @@ class RobotOptResult:
                 motor_pos2 = (self.motor_results[cur_idx+1][:3] + self.motor_results[cur_idx+1][3:6]) / 2
                 motor_child_side = self.motor_results[cur_idx][3:6]
                 motor_father_side = self.motor_results[cur_idx+1][3:6]
+                motor_idx1 = get_tenon_idx(self.motor_results[cur_idx], motor_lib)
+                motor_idx2 = get_tenon_idx(self.motor_results[cur_idx+1], motor_lib)
 
                 self.link_axis_dict[current_link.name + '_joint1'] = np.hstack((motor_pos2 / 100, motor_direct2))
                 self.link_axis_dict[current_link.name + '_joint2'] = np.hstack((motor_pos1 / 100, motor_direct1))
@@ -140,11 +156,11 @@ class RobotOptResult:
                 self.link_dict[current_link.name] = LinkResult()
                 tenon_pos = (motor_child_side + self.tenon_height * motor_direct1) / 100.0
                 tenon_direct = -motor_direct1
-                self.link_dict[current_link.name].add_tenon_pos(np.hstack((tenon_pos, tenon_direct)), 'child') 
+                self.link_dict[current_link.name].add_tenon_pos(np.hstack((tenon_pos, tenon_direct)), 'child', motor_idx1) 
 
                 tenon_pos_father = (motor_father_side - self.tenon_height * motor_direct2) / 100.0
                 tenon_direct_father = -motor_direct2
-                self.link_dict[self.father_link_dict[current_link.name]].add_tenon_pos(np.hstack((tenon_pos_father, tenon_direct_father)), 'father')
+                self.link_dict[self.father_link_dict[current_link.name]].add_tenon_pos(np.hstack((tenon_pos_father, tenon_direct_father)), 'father', motor_idx2)
                 cur_idx += 2
         
         #check the tenon position with mesh
@@ -574,7 +590,8 @@ if __name__=="__main__":
     parser.add_argument('--voxel_density', type=float, default=2e-4, help='The density of the voxel')
     args = parser.parse_args()
     save_pre_result = False
-
+    motor_lib = [[3.6, 3.8, 12],  # DM6006         # Height, Radius, Torque
+                 [4.5, 2.5, 7 ]]  # DM4310
     if save_pre_result:
         mesh_loader = Custom_Mesh_Loader(args)
         mesh_dir = os.path.normpath('./model/given_models/' + args.model_name + '.stl')
@@ -586,8 +603,7 @@ if __name__=="__main__":
         mesh_decomp = Mesh_Decomp(args, mesh_loader)
         mesh_decomp.decompose()
         bounds = np.array(get_bounds(mesh_decomp.link_tree, threshold=3)).reshape(-1, 2)
-        motor_lib = [[3.6, 3.8, 12],  # DM6006         # Height, Radius, Torque
-                     [4.5, 2.5, 7 ]]  # DM4310
+        
         
         motor_opt = Motor_Opt(args, mesh_decomp, None, None)
         motor_opt.motor_results = np.load('./results/' + args.model_name + '_motor_results.npy')
@@ -617,4 +633,4 @@ if __name__=="__main__":
         interference_removal.remove_interference()
         interference_removal.mesh_group.render()
         urdf_dir = interference_removal.generate_urdf()
-        robot_result = RobotOptResult(interference_removal, urdf_dir)
+        robot_result = RobotOptResult(interference_removal, urdf_dir, motor_lib)
