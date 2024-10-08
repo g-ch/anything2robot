@@ -17,7 +17,7 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
     parser.add_argument('--model_name', type=str, default='gold_lynel', help='The model name')
     parser.add_argument('--expected_x', type=float, default=50, help='The expected width of the model')
-    parser.add_argument('--voxel_size', type=float, default=1.0, help='The size of the voxel')
+    parser.add_argument('--voxel_size', type=float, default=0.5, help='The size of the voxel')
     parser.add_argument('--voxel_density', type=float, default=1.2e-4, help='The density of the voxel. (kg/cm^3)')
     args = parser.parse_args()
     mesh_path = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
@@ -42,11 +42,13 @@ if __name__=="__main__":
     motor_lib = [[5.6, 4.2, 12],   # DM6006         # Height, Radius, Torque DM6006 [3.6, 3.8, 12]  DM8009 [6.1, 4.9, 20 ]       #  [4.5, 2.5, 8 ], # DM4310
                  [3.42, 2.65, 2.5], # MG4005V2
                  [8.1, 5.3, 20 ]]  # DM8009
+    
     connector_lib = [[6, 6], 
                      [4, 4], 
                      [6, 6]]
+    
     motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib, connector_lib)
-    motor_results = motor_opt.run_opt(generation_num=10)
+    motor_results = motor_opt.run_opt(generation_num=100)
     motor_opt.render()
 
     # Refine the mesh to connect the joints
