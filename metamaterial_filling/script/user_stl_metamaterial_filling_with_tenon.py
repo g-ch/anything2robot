@@ -348,8 +348,8 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         checking_distance = 100
 
     voxels, min_bound, max_bound, voxel_size = voxelize_mesh(mesh, voxel_size)
-    tenon_center_top_bias = 20 # mm
-    checking_angle_interval = np.pi / 12
+    tenon_center_top_bias = 15 # mm
+    checking_angle_interval = np.pi / 24
     safe_angle_range = np.pi # 180 degrees
 
     # Find the best orientation for each tenon
@@ -496,7 +496,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=tenon_best_orientation_vectors[i])
 
         # Use the following to test the tenon without considering the best orientation
-        #transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=None)
+        # transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=None)
 
         transformed_tenon_files.append(file_save_path)
         print(f"Transformed tenon file saved at {file_save_path}")
@@ -625,7 +625,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--input_stl_path', type=str, default='data/../../urdf/gold_lynel20241008-171141/BODY.stl', help='Input STL file path')
+    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/urdf/gold_lynel20241008-182954/BODY.stl', help='Input STL file path')
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--relative_density', type=float, default=0.1, help='Relative density of the metamaterial given by FEA results')
     
@@ -638,7 +638,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_stl_name', type=str, default='20241008-163714_BODY_final_output_with_shell.stl', help='Output STL file path')
     parser.add_argument('--use_existing_shell', type=bool, default=False, help='Whether to use the existing shell file')
     
-    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/auto_design/results/gold_lynel20241008-171142_robot_result.pkl', help='Pickle file path for the tenon position results')
+    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/auto_design/results/gold_lynel20241008-182958_robot_result.pkl', help='Pickle file path for the tenon position results')
     parser.add_argument('--tenon_file_folder', type=str, default=project_dir+'/metamaterial_filling/tenon', help='Folder for the tenon files')
                         
     parser.add_argument('--preview', type=bool, default=True, help='Whether to visualize the transformed tenons and the link')
