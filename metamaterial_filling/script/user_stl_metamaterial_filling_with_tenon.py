@@ -22,7 +22,7 @@ import numpy as np
 import math
 from format_transform.off_to_stl import off_to_stl
 
-from visualization.assemble_vis import get_rotation_matrix, visualize_meshes, transform_trimesh
+from visualization.assemble_vis import get_rotation_matrix, visualize_meshes, transform_trimesh, get_rotation_matrix_from_angle
 
 
 from skimage import measure
@@ -229,14 +229,13 @@ def visualize_mesh_voxels_vectors(mesh, voxels, voxel_size, min_bound, start_poi
 @Output:
     transformed_file_save_path: The path of the saved transformed tenon file
 '''
-def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=None, biased_tenon_length=0):
-    tenon_basic_transformation_matrix = np.array([[1, 0, 0, 0.0],
-                                            [0, 0, -1, 0.0],
-                                            [0, 1, 0, 0.0],
-                                            [0, 0, 0, 1]])
+def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=None, biased_tenon_length=0, tenon_orientation_vector=None):
+    # We suppose the tenon is always along the +z-axis in the stl file and the tenon direction is always pointing to the +x-axis
+    tenon_ori_direction_vector = np.array([0, 0, 1])
+    print(f"tenon_orientation_vector: {tenon_orientation_vector}")
 
-    tenon_ori_direction_vector = np.array([0, -1, 0])
     tenon_direction_vector = np.array([link.tenon_pos[tenon_id][3], link.tenon_pos[tenon_id][4], link.tenon_pos[tenon_id][5]])
+    tenon_direction_vector = tenon_direction_vector / np.linalg.norm(tenon_direction_vector)
 
     rotation_matrix = get_rotation_matrix(tenon_ori_direction_vector, tenon_direction_vector)
 
@@ -244,20 +243,45 @@ def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=N
     biased_tenon_pos = np.array([link.tenon_pos[tenon_id][0], link.tenon_pos[tenon_id][1], link.tenon_pos[tenon_id][2]])
     biased_tenon_pos = biased_tenon_pos + tenon_direction_vector * biased_tenon_length
 
-    transformation = np.array([[rotation_matrix[0, 0], rotation_matrix[0, 1], rotation_matrix[0, 2], biased_tenon_pos[0]],
-                                [rotation_matrix[1, 0], rotation_matrix[1, 1], rotation_matrix[1, 2], biased_tenon_pos[1]],
-                                [rotation_matrix[2, 0], rotation_matrix[2, 1], rotation_matrix[2, 2], biased_tenon_pos[2]],
+    # First transformation for the tenon to rotate to direction aligns with the link
+    transformation1 = np.array([[rotation_matrix[0, 0], rotation_matrix[0, 1], rotation_matrix[0, 2], 0],
+                                [rotation_matrix[1, 0], rotation_matrix[1, 1], rotation_matrix[1, 2], 0],
+                                [rotation_matrix[2, 0], rotation_matrix[2, 1], rotation_matrix[2, 2], 0],
                                 [0, 0, 0, 1]])
+    
+    # Second transformation for the tenon along the tenon_direction_vector by tenon_orientation_angle
+    tenon_orientation_ori_vector = np.array([1, 0, 0, 0])
+    tenon_orientation_ori_vector_transformed1 = transformation1 @ tenon_orientation_ori_vector
+    tenon_orientation_ori_vector_transformed1_cut = tenon_orientation_ori_vector_transformed1[:3]
 
+    # Get transformation matrix for the tenon to rotate 
+    if tenon_orientation_vector is not None:
+        # Get rotation angle from tenon_orientation_ori_vector_transformed1_cut to tenon_orientation_vector
+        angle = np.arccos(np.dot(tenon_orientation_ori_vector_transformed1_cut, tenon_orientation_vector))
+
+        rotation_matrix2 = get_rotation_matrix_from_angle(tenon_direction_vector, angle)
+        transformation2 = np.array([[rotation_matrix2[0, 0], rotation_matrix2[0, 1], rotation_matrix2[0, 2], 0],
+                                    [rotation_matrix2[1, 0], rotation_matrix2[1, 1], rotation_matrix2[1, 2], 0],
+                                    [rotation_matrix2[2, 0], rotation_matrix2[2, 1], rotation_matrix2[2, 2], 0],
+                                    [0, 0, 0, 1]])
+    else:
+        transformation2 = np.eye(4)
+
+    # Third transformation for the tenon to translate to the biased position
+    transformation3 = np.array([[1, 0, 0, biased_tenon_pos[0]],
+                                [0, 1, 0, biased_tenon_pos[1]],
+                                [0, 0, 1, biased_tenon_pos[2]],
+                                [0, 0, 0, 1]])
     if unit == 'm':
         print("Unit is in meter, scale the transformation matrix to mm")
-        transformation[:, 3] = transformation[:, 3] * 1000
-        transformation[3, 3] = 1
+        transformation3[:, 3] = transformation3[:, 3] * 1000
+        transformation3[3, 3] = 1
 
-    tenon_transformation_matrix = np.dot(transformation, tenon_basic_transformation_matrix)
-    
-    transform_trimesh(tenon_mesh, tenon_transformation_matrix, save_path=save_path)
+    transformation = transformation3 @ transformation2 @ transformation1
 
+    # transformation = transformation3 @ transformation1
+
+    tenon_mesh = transform_trimesh(tenon_mesh, transformation, save_path=save_path)
 
 
 '''
@@ -336,6 +360,7 @@ if __name__ == '__main__':
 
     # Find the best orientation for each tenon
     tenon_best_orientation_angles = []
+    tenon_best_orientation_vectors = []
     for i in range(len(link.tenon_pos)): # For each tenon
         tenon_root_point = link.tenon_pos[i][:3]
         tenon_root_direction = link.tenon_pos[i][3:6]
@@ -388,6 +413,7 @@ if __name__ == '__main__':
         best_direction_index = np.argmax(adjacent_free_num_array)
 
         tenon_best_orientation_angles.append(angles[best_direction_index])
+        tenon_best_orientation_vectors.append(vectors[best_direction_index])
 
         # Print the best direction and free adjacent direction number
         print(f"Tenon {i} best direction: {vectors[best_direction_index]}")
@@ -451,22 +477,6 @@ if __name__ == '__main__':
     ##### Transform tenons and save as stl files for later use in openscad #####
     print("Transforming tenons...")
 
-    # Calculate the pre-rotation transformation for the tenons to get the right orientation for inserting motors without interference
-    tenon_pre_transformation_matrix_list = []
-    for i in range(len(tenon_best_orientation_angles)):
-        best_angle = tenon_best_orientation_angles[i]
-        
-        # Rotate the tenon along the z-axis with the best angle
-        rotation_matrix = np.array([[np.cos(best_angle), -np.sin(best_angle), 0],
-                                    [np.sin(best_angle), np.cos(best_angle), 0],
-                                    [0, 0, 1]])
-        
-        tenon_pre_transformation_matrix = np.eye(4)
-        tenon_pre_transformation_matrix[:3, :3] = rotation_matrix
-
-        tenon_pre_transformation_matrix_list.append(tenon_pre_transformation_matrix)
-
-
     # Transform the tenons and save the transformed tenon files
     transformed_tenon_files = []                                        
     for i in range(len(link.tenon_pos)):
@@ -475,7 +485,7 @@ if __name__ == '__main__':
         tenon_mesh = trimesh.load(tenon_file_path)
 
         # Add transformation for tenon pair alignment without interference
-        tenon_mesh = transform_trimesh(tenon_mesh, tenon_pre_transformation_matrix_list[i])
+        #tenon_mesh = transform_trimesh(tenon_mesh, tenon_pre_transformation_matrix_list[i])
 
         # Transform to the right position in the stl file using the "link" result from Pickle file
         tenon_file_name_transformed = tenon_file_name.replace('.stl', '_' + str(i) + '_transformed.stl')
@@ -484,7 +494,12 @@ if __name__ == '__main__':
         biased_tenon_length = args.biased_tenon_length
         if args.unit == 'm':
             biased_tenon_length = biased_tenon_length * 0.001
-        transform_tenon_and_save(link, tenon_mesh, i, unit=args.unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length)
+        
+        # Transform the tenon and save the transformed tenon file considering the best orientation
+        # transform_tenon_and_save(link, tenon_mesh, i, unit=args.unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=tenon_best_orientation_vectors[i])
+
+        # NOTE: The tenon orientation is not considered for now.
+        transform_tenon_and_save(link, tenon_mesh, i, unit=args.unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=None)
 
         transformed_tenon_files.append(file_save_path)
         print(f"Transformed tenon file saved at {file_save_path}")
