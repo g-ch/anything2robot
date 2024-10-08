@@ -229,7 +229,7 @@ def visualize_mesh_voxels_vectors(mesh, voxels, voxel_size, min_bound, start_poi
 @Output:
     transformed_file_save_path: The path of the saved transformed tenon file
 '''
-def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=None):
+def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=None, biased_tenon_length=0):
     tenon_basic_transformation_matrix = np.array([[1, 0, 0, 0.0],
                                             [0, 0, -1, 0.0],
                                             [0, 1, 0, 0.0],
@@ -240,10 +240,14 @@ def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=N
 
     rotation_matrix = get_rotation_matrix(tenon_ori_direction_vector, tenon_direction_vector)
 
-    transformation = np.array([[rotation_matrix[0, 0], rotation_matrix[0, 1], rotation_matrix[0, 2], link.tenon_pos[tenon_id][0]],
-                                            [rotation_matrix[1, 0], rotation_matrix[1, 1], rotation_matrix[1, 2], link.tenon_pos[tenon_id][1]],
-                                            [rotation_matrix[2, 0], rotation_matrix[2, 1], rotation_matrix[2, 2], link.tenon_pos[tenon_id][2]],
-                                            [0, 0, 0, 1]])
+    # Add the biased length to the tenon position in case the tenon is too short for mesh
+    biased_tenon_pos = np.array([link.tenon_pos[tenon_id][0], link.tenon_pos[tenon_id][1], link.tenon_pos[tenon_id][2]])
+    biased_tenon_pos = biased_tenon_pos + tenon_direction_vector * biased_tenon_length
+
+    transformation = np.array([[rotation_matrix[0, 0], rotation_matrix[0, 1], rotation_matrix[0, 2], biased_tenon_pos[0]],
+                                [rotation_matrix[1, 0], rotation_matrix[1, 1], rotation_matrix[1, 2], biased_tenon_pos[1]],
+                                [rotation_matrix[2, 0], rotation_matrix[2, 1], rotation_matrix[2, 2], biased_tenon_pos[2]],
+                                [0, 0, 0, 1]])
 
     if unit == 'm':
         print("Unit is in meter, scale the transformation matrix to mm")
@@ -262,15 +266,20 @@ def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=N
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--input_stl_path', type=str, default='data/../../urdf/lynel20240823-110559/FR_LOW.stl', help='Input STL file path')
+    parser.add_argument('--input_stl_path', type=str, default='data/../../urdf/gold_lynel20241007-214736/BODY.stl', help='Input STL file path')
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--relative_density', type=float, default=0.1, help='Relative density of the metamaterial given by FEA results')
+    
     parser.add_argument('--shell_thickness', type=float, default=1.5, help='Thickness of the shell. mm')
     parser.add_argument('--shell_generation_voxel_resolution', type=float, default=1, help='Voxel resolution for shell generation. mm')
-    parser.add_argument('--output_stl_name', type=str, default='20240823_FR_LOW_final_output_with_shell.stl', help='Output STL file path')
+    
+    parser.add_argument('--plate_interval', type=float, default=8, help='Interval between plates. mm')
+    parser.add_argument('--biased_tenon_length', type=float, default=0, help='Biased length for the tenon. mm')
+
+    parser.add_argument('--output_stl_name', type=str, default='20241007_FL_UP_final_output_with_shell.stl', help='Output STL file path')
     parser.add_argument('--use_existing_shell', type=bool, default=False, help='Whether to use the existing shell file')
     
-    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/../auto_design/results/lynel_robot_result.pkl', help='Pickle file path for the tenon position results')
+    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/../auto_design/results/gold_lynel20241007-214740_robot_result.pkl', help='Pickle file path for the tenon position results')
     parser.add_argument('--tenon_file_folder', type=str, default=project_dir+'/tenon', help='Folder for the tenon files')
                         
     parser.add_argument('--preview', type=bool, default=True, help='Whether to visualize the transformed tenons and the link')
@@ -304,6 +313,7 @@ if __name__ == '__main__':
         print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
         print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
 
+    # Get the link name from the input stl path and get the corresponding link class from the robot result
     link_name = args.input_stl_path.split('/')[-1].split('.')[0]
     link = robot_result.link_dict[link_name]
 
@@ -320,7 +330,7 @@ if __name__ == '__main__':
         checking_distance = 100
 
     voxels, min_bound, max_bound, voxel_size = voxelize_mesh(mesh, voxel_size)
-    tenon_center_top_bias = 20 # mm
+    tenon_center_top_bias = 30 # mm
     checking_angle_interval = np.pi / 12
     safe_angle_range = np.pi # 180 degrees
 
@@ -346,8 +356,8 @@ if __name__ == '__main__':
         if len(hit_results) != len(vectors):
             raise ValueError('Results and vectors have different lengths')
 
-        if args.preview:
-            visualize_mesh_voxels_vectors(mesh, voxels, voxel_size, min_bound, tenon_root_point, vectors, hit_results)
+        # if args.preview:
+        #     visualize_mesh_voxels_vectors(mesh, voxels, voxel_size, min_bound, tenon_root_point, vectors, hit_results)
 
         # Find the best direction. The best direction is the one whose adjacent directions are all free.
         best_direction = None
@@ -438,10 +448,10 @@ if __name__ == '__main__':
         # print(f"applied_rotation: {applied_rotation}")
 
     
-    ##### Transform tenons and save as stl files for later use #####
+    ##### Transform tenons and save as stl files for later use in openscad #####
     print("Transforming tenons...")
 
-    # Calculate the pre-rotation transformation for the tenons to get the right orientation for inserting tenon pairs without interference
+    # Calculate the pre-rotation transformation for the tenons to get the right orientation for inserting motors without interference
     tenon_pre_transformation_matrix_list = []
     for i in range(len(tenon_best_orientation_angles)):
         best_angle = tenon_best_orientation_angles[i]
@@ -467,10 +477,14 @@ if __name__ == '__main__':
         # Add transformation for tenon pair alignment without interference
         tenon_mesh = transform_trimesh(tenon_mesh, tenon_pre_transformation_matrix_list[i])
 
-        # Transform to the right position in the stl file
-        tenon_file_name_transformed = tenon_file_name.replace('.stl', '_transformed.stl')
+        # Transform to the right position in the stl file using the "link" result from Pickle file
+        tenon_file_name_transformed = tenon_file_name.replace('.stl', '_' + str(i) + '_transformed.stl')
         file_save_path = os.path.join(output_folder, tenon_file_name_transformed)
-        transform_tenon_and_save(link, tenon_mesh, i, unit=args.unit, save_path=file_save_path)
+
+        biased_tenon_length = args.biased_tenon_length
+        if args.unit == 'm':
+            biased_tenon_length = biased_tenon_length * 0.001
+        transform_tenon_and_save(link, tenon_mesh, i, unit=args.unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length)
 
         transformed_tenon_files.append(file_save_path)
         print(f"Transformed tenon file saved at {file_save_path}")
@@ -495,6 +509,7 @@ if __name__ == '__main__':
 
         final_transformed_tenon_files.append(transformed_file_save_path)
 
+    print(f"Final transformed tenon files: {final_transformed_tenon_files}")
 
     ##### Preview the transformed tenons and the link  #####
     if args.preview:
@@ -558,7 +573,7 @@ if __name__ == '__main__':
     delf_y = max_y - min_y
     width = max(delf_x, delf_y) * safe_scale
 
-    interval = 8 # mm. The interval between plates
+    interval = args.plate_interval # mm. The interval between plates
     thickness = relative_density / 6.0 * interval
 
     # Check if thickness is smaller than 0.2

@@ -68,6 +68,13 @@ def visualize_meshes(stl_files, transformation_matrices, scales=None):
 
 
 def get_rotation_matrix(v1, v2):
+    # CHECK IF v1 and v2 are parallel
+    if np.allclose(v1, v2):
+        return np.eye(3)
+    
+    if np.allclose(v1, -v2): # Avoid the singularity when v1 and v2 are opposite. Modify the v2 to avoid singularity
+        v2 = np.array([0.001, 1, 0.001])
+
     # Normalize the vectors
     v1 = v1 / np.linalg.norm(v1)
     v2 = v2 / np.linalg.norm(v2)
