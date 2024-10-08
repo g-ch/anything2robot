@@ -382,19 +382,31 @@ class LinkTreeGUI:
 
         return frame
         
-
-    def quit(self):
+    
+    def shutdown(self):
         self.server.shutdown()
         self.server_thread.join()
         self.dash_thread.join()
         self.root.quit()
 
+    def quit(self):
+        if messagebox.askyesno("Quit", "Do you want to quit and start the design process?"):
+            self.shutdown()
+        else:
+            if messagebox.askyesno("Quit", "Do you want exit?"):
+                self.shutdown()
+                exit()
+            else:
+                return
+
     def save(self):
         pkl.dump(self.nodes, open('./auto_design/model/given_models/' + self.args.model_name + '_joints.pkl', 'wb'))
-        # Use a message box to confirm save and start the design process or not
-        messagebox.showinfo("Save", "Save successful. Start the design process?")
-        if messagebox.askyesno("Design", "Do you want to start the design process?"):
-            self.quit()
+        # Use a message box to confirm save and start the design process or not        
+        if messagebox.askyesno("Save", "Save successful. Start the design process. Do you want to start the design process?"):
+            self.shutdown()
+        else:
+            self.shutdown()
+            exit()
             
     def remove_link(self):
         if not self.tree.selection():
