@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
     # Fill in the metamaterial for each stl file
     for stl_file in tqdm.tqdm(stl_files):
-        if "BODY" in stl_file or "ARM" in stl_file:
+        if "BODY" in stl_file or "ARM" in stl_file or "TAIL" in stl_file:
             relative_density = 0.1
             plate_interval = 12
         else:
