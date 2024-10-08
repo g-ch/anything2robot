@@ -315,14 +315,15 @@ class General_GA(Improved_Generic_Algorithm):
                  generation_num, 
                  population_size, 
                  mutation_rate, 
-                 crossover_rate) -> None:
+                 crossover_rate,
+                 connector_lib) -> None:
         super().__init__(bounds, int_bounds, genome_length, generation_num, population_size, mutation_rate, crossover_rate)
         self.joint_tree = joint_tree
         self.mesh = mesh_decomp.mesh
         self.scene = o3d.t.geometry.RaycastingScene()
         _ = self.scene.add_triangles(o3d.t.geometry.TriangleMesh.from_legacy(mesh_decomp.mesh.mesh_o3d))
         self.motor_type_params = motor_type_params
-        self.connector_params = [6, 6]
+        self.connector_lib = connector_lib
         self.father_link_dict = mesh_decomp.father_link_dict
         
         # Get the initial state from bounds
@@ -353,7 +354,8 @@ class General_GA(Improved_Generic_Algorithm):
             motor_directs.append(np.array(cur_node.val.axis[1]))
 
             if len(cur_node.val.axis) == 3:
-                motor2_position = motor_position - self.connector_params[0] * np.array(cur_node.val.axis[1]) + self.connector_params[1] * np.array(cur_node.val.axis[2])
+                motor_idx = int(x[3 * motor_num + link_idx])
+                motor2_position = motor_position - self.connector_lib[motor_idx][0] * np.array(cur_node.val.axis[1]) + self.connector_lib[motor_idx][1] * np.array(cur_node.val.axis[2])
                 motor_positions.append(motor2_position)
                 motor_types.append(x[3 * motor_num + link_idx])
                 motor_directs.append(np.array(cur_node.val.axis[2]))
@@ -506,7 +508,8 @@ class General_GA(Improved_Generic_Algorithm):
 
             # If the joint has 2 axis, then it has 2 motors connected by a fixed-sized connector
             if len(cur_node.val.axis) == 3:
-                motor2_pos = motor_position - self.connector_params[0] * np.array(cur_node.val.axis[1]) + self.connector_params[1] * np.array(cur_node.val.axis[2])
+                motor_idx = motor_type
+                motor2_pos = motor_position - self.connector_lib[motor_idx][0] * np.array(cur_node.val.axis[1]) + self.connector_lib[motor_idx][1] * np.array(cur_node.val.axis[2])
                 motor2_direct = np.array(cur_node.val.axis[2])
                 motor2_type = motor_type
                 # cost += 0.5 * self.get_position_cost(np.linalg.norm(motor2_pos - np.array(cur_node.val.axis[0])), sigmoidal=False)
@@ -562,13 +565,14 @@ class General_GA(Improved_Generic_Algorithm):
         
 
 class Motor_Opt:
-    def __init__(self, args, mesh_decomp : Mesh_Decomp, bounds, motor_lib):
+    def __init__(self, args, mesh_decomp : Mesh_Decomp, bounds, motor_lib, connector_lib):
         self.args = args
         self.ga_runner = None
         self.mesh_decomp = mesh_decomp
         self.mesh = mesh_decomp.mesh
         self.bounds = bounds
         self.motor_lib = motor_lib
+        self.connector_lib = connector_lib
     
     def choose_motor_type(self):
         joint_names, max_torques = self.mesh_decomp.generate_constraints()
@@ -614,7 +618,8 @@ class Motor_Opt:
                                     generation_num=generation_num, 
                                     population_size=100, 
                                     mutation_rate=0.05, 
-                                    crossover_rate=0.3)
+                                    crossover_rate=0.3,
+                                    connector_lib=self.connector_lib)
 
         # Generate initial state where motors are put right at the position of relevant joints
         genome_result, _ = self.ga_runner.run_generic(self.ga_runner.initial_population)

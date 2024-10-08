@@ -43,7 +43,10 @@ if __name__=="__main__":
                 #  [4.5, 2.5, 8 ], # DM4310
                  [3.42, 2.65, 2.5], # MG4005V2
                  [8.1, 5.3, 20 ]]  # DM8009
-    motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib)
+    connector_lib = [[6, 6], 
+                     [4, 4], 
+                     [6, 6]]
+    motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib, connector_lib)
     motor_results = motor_opt.run_opt(generation_num=10)
     motor_opt.render()
 
