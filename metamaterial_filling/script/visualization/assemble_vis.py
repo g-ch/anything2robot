@@ -68,6 +68,13 @@ def visualize_meshes(stl_files, transformation_matrices, scales=None):
 
 
 def get_rotation_matrix(v1, v2):
+    # CHECK IF v1 and v2 are parallel
+    if np.allclose(v1, v2):
+        return np.eye(3)
+    
+    if np.allclose(v1, -v2):
+        v1 = v1 + np.array([0.0001, 0.0001, 0.0001])
+
     # Normalize the vectors
     v1 = v1 / np.linalg.norm(v1)
     v2 = v2 / np.linalg.norm(v2)
@@ -99,7 +106,6 @@ def get_rotation_matrix(v1, v2):
     R = I + K + K @ K * ((1 - dot_prod) / (np.linalg.norm(cross_prod) ** 2))
     
     return R
-
 
 
 def get_rotation_matrix_from_angle(axis, angle):
