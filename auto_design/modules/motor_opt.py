@@ -772,19 +772,21 @@ class Joint_Connect_Opt:
             if len(cur_node.val.axis) == 2:
 
                 # Add voxels to father link     
+                father_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=list(self.mesh_decomp.mesh_group.link_value_dict.keys()),
+                                                                                        target_group_name=self.father_dict[cur_link_name],
+                                                                                        condition_func=condition_father_link_top)
                 father_link_addition_voxels_radical = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), self.father_dict[cur_link_name]),
                                                                                             target_group_name=self.father_dict[cur_link_name],
                                                                                             condition_func=condition_father_link_radical)
-                father_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), self.father_dict[cur_link_name]),
-                                                                                        target_group_name=self.father_dict[cur_link_name],
-                                                                                        condition_func=condition_father_link_top)
+                
                 # Add voxels to child link
+                child_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=list(self.mesh_decomp.mesh_group.link_value_dict.keys()),
+                                                                                        target_group_name=cur_link_name,
+                                                                                        condition_func=condition_child_link_top)
                 child_link_addition_voxels_radical = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), cur_link_name),
                                                                                             target_group_name=cur_link_name,
                                                                                             condition_func=condition_child_link_radical)
-                child_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), cur_link_name),
-                                                                                        target_group_name=cur_link_name,
-                                                                                        condition_func=condition_child_link_top)
+                
                 
                 non_removal_voxels = np.vstack((father_link_addition_voxels_top, child_link_addition_voxels_top))
                 non_removal_voxels = np.unique(non_removal_voxels, axis=0)
