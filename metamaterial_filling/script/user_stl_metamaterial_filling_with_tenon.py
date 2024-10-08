@@ -323,12 +323,12 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     # Check and read pkl file
     robot_result = pkl.load(open(pkl_result_path, 'rb'))
 
-    for link_name in robot_result.link_dict:
-        print("Link name: ", link_name)
-        print("Link Tenon Positions: ", robot_result.link_dict[link_name].tenon_pos)
-        print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
-        print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
-        print("Link tenon_idx: ", robot_result.link_dict[link_name].tenon_idx)
+    # for link_name in robot_result.link_dict:
+    #     print("Link name: ", link_name)
+    #     print("Link Tenon Positions: ", robot_result.link_dict[link_name].tenon_pos)
+    #     print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
+    #     print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
+    #     print("Link tenon_idx: ", robot_result.link_dict[link_name].tenon_idx)
 
 
     # Get the link name from the input stl path and get the corresponding link class from the robot result
