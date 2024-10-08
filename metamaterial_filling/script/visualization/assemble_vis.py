@@ -108,7 +108,6 @@ def get_rotation_matrix(v1, v2):
     return R
 
 
-
 def get_rotation_matrix_from_angle(axis, angle):
     """
     Returns the rotation matrix for a rotation around a given axis by a specified angle.

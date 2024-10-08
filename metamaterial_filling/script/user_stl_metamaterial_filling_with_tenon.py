@@ -290,7 +290,7 @@ def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=N
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--input_stl_path', type=str, default='data/../../urdf/gold_lynel20241007-214736/BODY.stl', help='Input STL file path')
+    parser.add_argument('--input_stl_path', type=str, default='data/../../urdf/gold_lynel20241008-163714/BODY.stl', help='Input STL file path')
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--relative_density', type=float, default=0.1, help='Relative density of the metamaterial given by FEA results')
     
@@ -300,10 +300,10 @@ if __name__ == '__main__':
     parser.add_argument('--plate_interval', type=float, default=8, help='Interval between plates. mm')
     parser.add_argument('--biased_tenon_length', type=float, default=0, help='Biased length for the tenon. mm')
 
-    parser.add_argument('--output_stl_name', type=str, default='20241007_FL_UP_final_output_with_shell.stl', help='Output STL file path')
+    parser.add_argument('--output_stl_name', type=str, default='20241008-163714_BODY_final_output_with_shell.stl', help='Output STL file path')
     parser.add_argument('--use_existing_shell', type=bool, default=False, help='Whether to use the existing shell file')
     
-    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/../auto_design/results/gold_lynel20241007-214740_robot_result.pkl', help='Pickle file path for the tenon position results')
+    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/../auto_design/results/gold_lynel20241008-163716_robot_result.pkl', help='Pickle file path for the tenon position results')
     parser.add_argument('--tenon_file_folder', type=str, default=project_dir+'/tenon', help='Folder for the tenon files')
                         
     parser.add_argument('--preview', type=bool, default=True, help='Whether to visualize the transformed tenons and the link')
@@ -336,6 +336,8 @@ if __name__ == '__main__':
         print("Link Tenon Positions: ", robot_result.link_dict[link_name].tenon_pos)
         print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
         print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
+        print("Link tenon_idx: ", robot_result.link_dict[link_name].tenon_idx)
+
 
     # Get the link name from the input stl path and get the corresponding link class from the robot result
     link_name = args.input_stl_path.split('/')[-1].split('.')[0]
@@ -354,7 +356,7 @@ if __name__ == '__main__':
         checking_distance = 100
 
     voxels, min_bound, max_bound, voxel_size = voxelize_mesh(mesh, voxel_size)
-    tenon_center_top_bias = 30 # mm
+    tenon_center_top_bias = 20 # mm
     checking_angle_interval = np.pi / 12
     safe_angle_range = np.pi # 180 degrees
 
@@ -480,7 +482,10 @@ if __name__ == '__main__':
     # Transform the tenons and save the transformed tenon files
     transformed_tenon_files = []                                        
     for i in range(len(link.tenon_pos)):
-        tenon_file_name = 'connection_' + link.tenon_type[i] + '.stl'
+        #tenon_file_name = 'connection_' + link.tenon_type[i] + '.stl'
+
+        tenon_file_name = 'motor_' + str(link.tenon_idx[i]) + '_' + link.tenon_type[i] + '.stl'
+
         tenon_file_path = os.path.join(args.tenon_file_folder, tenon_file_name)
         tenon_mesh = trimesh.load(tenon_file_path)
 
@@ -496,10 +501,10 @@ if __name__ == '__main__':
             biased_tenon_length = biased_tenon_length * 0.001
         
         # Transform the tenon and save the transformed tenon file considering the best orientation
-        # transform_tenon_and_save(link, tenon_mesh, i, unit=args.unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=tenon_best_orientation_vectors[i])
+        transform_tenon_and_save(link, tenon_mesh, i, unit=args.unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=tenon_best_orientation_vectors[i])
 
         # NOTE: The tenon orientation is not considered for now.
-        transform_tenon_and_save(link, tenon_mesh, i, unit=args.unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=None)
+        #transform_tenon_and_save(link, tenon_mesh, i, unit=args.unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=None)
 
         transformed_tenon_files.append(file_save_path)
         print(f"Transformed tenon file saved at {file_save_path}")
