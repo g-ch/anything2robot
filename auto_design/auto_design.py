@@ -39,9 +39,10 @@ if __name__=="__main__":
     # Do actuator optimization
     print("Optimizing the actuators...")
     bounds = get_bounds(mesh_decomp.link_tree, threshold=6)
-    motor_lib = [[5.6, 4.2, 12],   # DM6006         # Height, Radius, Torque DM6006 [3.6, 3.8, 12]  DM8009 [6.1, 4.9, 20 ]       #  [4.5, 2.5, 8 ], # DM4310
-                 [3.42, 2.65, 2.5], # MG4005V2
-                 [8.1, 5.3, 20 ]]  # DM8009
+    tenon_height = 1.5
+    motor_lib = [[5.6 + tenon_height, 4.2, 12],   # DM6006         # Height, Radius, Torque DM6006 [3.6, 3.8, 12]  DM8009 [6.1, 4.9, 20 ]       #  [4.5, 2.5, 8 ], # DM4310
+                 [3.42 + tenon_height, 2.65, 2.5], # MG4005V2
+                 [8.1 + tenon_height, 5.3, 20 ]]  # DM8009
     
     connector_lib = [[6, 6], 
                      [4, 4], 
