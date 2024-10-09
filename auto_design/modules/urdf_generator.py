@@ -101,13 +101,13 @@ def calculate_rpy(x_axis, y_axis, z_axis):
 
 apply_transform = lambda point, transformation: (np.hstack((np.array(point).reshape(-1, 3), np.ones((np.array(point).reshape(-1, 3).shape[0], 1)))) @ transformation.T)[:,:3]
 
-def calculate_inertia_tensor(voxels, mass, H, voxel_side_length=1):
+def calculate_inertia_tensor(voxels, mass, H):
     """
     Calculate the inertia tensor of a rigid body represented by voxels.
     
     Args:
     - voxels (numpy array): Array of voxel coordinates in shape (n, 3).
-    - mass (float): Mass of each voxel.
+    - mass (float): Mass of the body.
     - H (numpy array): Homogeneous transformation matrix (4x4).
     
     Returns:
@@ -119,7 +119,7 @@ def calculate_inertia_tensor(voxels, mass, H, voxel_side_length=1):
     inertia_tensor = np.zeros((3, 3))
 
     Rs = transformed_voxels - center_of_mass
-    inertia_tensor = np.sum(np.sum(Rs**2, axis=1)[:, np.newaxis, np.newaxis] * np.eye(3) - np.einsum('ij,ik->ijk', Rs, Rs), axis=0) * mass
+    inertia_tensor = np.sum(np.sum(Rs**2, axis=1)[:, np.newaxis, np.newaxis] * np.eye(3) - np.einsum('ij,ik->ijk', Rs, Rs), axis=0) * mass / voxels.shape[0]
 
     return inertia_tensor, center_of_mass
 
@@ -224,38 +224,38 @@ def get_collision(cylinder_top, cylinder_bottom):
 
 
 
-import numpy as np
+# import numpy as np
 
-def calculate_inertia_tensor_cubes(voxels, mass, H, voxel_side_length=1):
-    """
-    Calculate the inertia tensor of a rigid body represented by voxel cubes.
+# def calculate_inertia_tensor_cubes(voxels, mass, H, voxel_side_length=1):
+#     """
+#     Calculate the inertia tensor of a rigid body represented by voxel cubes.
     
-    Args:
-    - voxels (numpy array): Array of voxel coordinates in shape (n, 3).
-    - mass (float): Mass of each voxel.
-    - H (numpy array): Homogeneous transformation matrix (4x4).
-    - voxel_side_length (float): Side length of each voxel cube.
+#     Args:
+#     - voxels (numpy array): Array of voxel coordinates in shape (n, 3).
+#     - mass (float): Mass of each voxel.
+#     - H (numpy array): Homogeneous transformation matrix (4x4).
+#     - voxel_side_length (float): Side length of each voxel cube.
     
-    Returns:
-    - numpy array: Inertia tensor (3x3 matrix).
-    """
-    # Apply the transformation to the voxel coordinates
-    transformed_voxels = (H @ np.hstack((voxels, np.ones((voxels.shape[0], 1)))).T).T[:, :3]
-    center_of_mass = np.mean(transformed_voxels, axis=0)
-    inertia_tensor = np.zeros((3, 3))
+#     Returns:
+#     - numpy array: Inertia tensor (3x3 matrix).
+#     """
+#     # Apply the transformation to the voxel coordinates
+#     transformed_voxels = (H @ np.hstack((voxels, np.ones((voxels.shape[0], 1)))).T).T[:, :3]
+#     center_of_mass = np.mean(transformed_voxels, axis=0)
+#     inertia_tensor = np.zeros((3, 3))
 
-    Rs = transformed_voxels - center_of_mass
+#     Rs = transformed_voxels - center_of_mass
 
-    # Vectorized computation of sum of R^2 * I and outer products
-    R_squares = np.sum(Rs**2, axis=1)
-    outer_Rs = np.einsum('ij,ik->ijk', Rs, Rs)
-    inertia_tensor = mass * (np.sum(R_squares[:, np.newaxis, np.newaxis] * np.eye(3), axis=0) - np.sum(outer_Rs, axis=0))
+#     # Vectorized computation of sum of R^2 * I and outer products
+#     R_squares = np.sum(Rs**2, axis=1)
+#     outer_Rs = np.einsum('ij,ik->ijk', Rs, Rs)
+#     inertia_tensor = mass * (np.sum(R_squares[:, np.newaxis, np.newaxis] * np.eye(3), axis=0) - np.sum(outer_Rs, axis=0))
 
-    # Add the inertia tensor of each cube about its own center (mass moment of inertia of a cube)
-    inertia_contribution_from_self = (mass * voxel_side_length**2) / 6 * np.eye(3) * Rs.shape[0]
-    inertia_tensor += inertia_contribution_from_self
+#     # Add the inertia tensor of each cube about its own center (mass moment of inertia of a cube)
+#     inertia_contribution_from_self = (mass * voxel_side_length**2) / 6 * np.eye(3) * Rs.shape[0]
+#     inertia_tensor += inertia_contribution_from_self
 
-    return inertia_tensor, center_of_mass
+#     return inertia_tensor, center_of_mass
 
 # inertial_matrix, CoM = calculate_inertia_tensor(voxels=np.array([[1,0,0],[1,0,1]]), mass=1, H=np.eye(4))
 # print(inertial_matrix, CoM)

@@ -461,7 +461,9 @@ class InterferenceRemoval:
                     "origin": {"xyz": "0 0 0", "rpy": "0 0 0"},
                     "geometry": {"filename": "package://" + package_name + "/" + dir + "BODY.stl"}
                 }
-                inetial_matrix, CoM = calculate_inertia_tensor(self.mesh_group.get_voxels("BODY") / 100.0, self.args.voxel_density, np.eye(4), self.args.voxel_size)
+                per_voxel_mass = self.args.voxel_density * (self.args.voxel_size ** 3)
+                part_mass = per_voxel_mass * self.mesh_group.get_voxels("BODY").shape[0]
+                inetial_matrix, CoM = calculate_inertia_tensor(self.mesh_group.get_voxels("BODY") / 100.0, part_mass, np.eye(4))
                 link_inertial = {
                     "origin": {"xyz": ' '.join(map(str, CoM)), "rpy": '0 0 0'},
                     "mass": str(self.mesh_group.get_voxels("BODY").shape[0] * self.args.voxel_density),
@@ -491,7 +493,10 @@ class InterferenceRemoval:
                 "origin": {"xyz": ' '.join(map(str, visual_pos)), "rpy": '0 0 0'},
                 "geometry": {"filename": "package://" + package_name + "/" + dir + "" + cur_link.name + ".stl"}
             }
-            inetial_matrix, CoM = calculate_inertia_tensor(self.mesh_group.get_voxels(cur_link.name) / 100.0, self.args.voxel_density, np.eye(4), self.args.voxel_size)
+
+            per_voxel_mass = self.args.voxel_density * (self.args.voxel_size ** 3)
+            part_mass = per_voxel_mass * self.mesh_group.get_voxels(cur_link.name).shape[0]
+            inetial_matrix, CoM = calculate_inertia_tensor(self.mesh_group.get_voxels(cur_link.name) / 100.0, part_mass, np.eye(4))
             link_inertial = {
                 "origin": {"xyz": ' '.join(map(str, CoM + (rel_pos - motor_pos) / 100.0)), "rpy": '0 0 0'},
                 "mass": str(self.mesh_group.get_voxels(cur_link.name).shape[0] * self.args.voxel_density),

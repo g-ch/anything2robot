@@ -557,17 +557,17 @@ class Mesh_Decomp:
                 "origin": {"xyz": ' '.join(map(str, -np.array(cur_link.axis[0]) / 100.0)), "rpy": '0 0 0'},
                 "geometry": {"filename": "package://anything2robot/urdf/" + self.args.model_name + "/tmp/" + cur_link.name + "_ideal.stl"}
             }
-            inetial_matrix, CoM = calculate_inertia_tensor(self.mesh_group.get_voxels(cur_link.name) / 100.0, self.args.voxel_density, np.eye(4), self.args.voxel_size)
+            per_voxel_mass = self.args.voxel_density * (self.args.voxel_size ** 3)
+            part_mass = per_voxel_mass * self.mesh_group.get_voxels(cur_link.name).shape[0]
+            inetial_matrix, CoM = calculate_inertia_tensor(self.mesh_group.get_voxels(cur_link.name) / 100.0, part_mass, np.eye(4))
             link_inertial = {
                 "origin": {"xyz": ' '.join(map(str, CoM + (rel_pos - np.array(cur_link.axis[0])) / 100.0)), "rpy": '0 0 0'},
-                "mass": str(self.mesh_group.get_voxels(cur_link.name).shape[0] * self.args.voxel_density),
+                "mass": str(part_mass),
                 "inertia": {"ixx": inetial_matrix[0, 0], "iyy": inetial_matrix[1, 1], "izz": inetial_matrix[2, 2], "ixy": inetial_matrix[0, 1], "ixz": inetial_matrix[0, 2], "iyz": inetial_matrix[1, 2]}
             }
             write_link(urdf_file=urdf_file, link_name=cur_link.name, visual=link_visual, collision=link_collision, inertial=link_inertial)
             
-            per_voxel_mass = self.args.voxel_density * (self.args.voxel_size ** 3)
-
-            self.ideal_mass += self.mesh_group.get_voxels(cur_link.name).shape[0] * per_voxel_mass
+            self.ideal_mass += part_mass
 
             if cur_link.name != "BODY":
                 # Write a 2DoF joint
