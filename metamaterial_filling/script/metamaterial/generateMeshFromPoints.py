@@ -1,12 +1,19 @@
 
-from readInnerPointsBin import read_inner_points_bin
 import numpy as np
 import argparse
 import os
+import sys
+
+project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.append(project_dir + '/metamaterial_filling/script')
+sys.path.append(project_dir + '/metamaterial_filling/script/metamaterial')
 
 from skimage.measure import marching_cubes
 from math import pi
 import open3d as o3d
+
+from readInnerPointsBin import read_inner_points_bin
+
 
 def voxel_grid_to_mesh(voxel_positions, voxel_size, stl_save_apth, output=True):
     """

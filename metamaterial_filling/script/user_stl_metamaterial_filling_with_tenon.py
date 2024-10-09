@@ -10,10 +10,10 @@ import subprocess
 import sys
 import pickle as pkl
 
-project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(project_dir + '/script/metamaterial')
-sys.path.append(os.path.join(project_dir, '../auto_design/modules'))
-sys.path.append(os.path.join(project_dir, '../auto_design'))
+project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_dir + '/metamaterial_filling/script')
+sys.path.append(os.path.join(project_dir, '/auto_design/modules'))
+sys.path.append(os.path.join(project_dir, '/auto_design'))
 
 from metamaterial.sixFoldPlatesFillingWithShellTenon import SixFoldPlatesFillingWithShellTenon
 from metamaterial.generateMeshFromPoints import generate_mesh_from_points
@@ -285,34 +285,26 @@ def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=N
 
 
 '''
-@Description: Main function to generate the final metamaterial model with shell for the input STL file given the relative density from FEA results.
+@Description: Run the metamaterial filling for a given stl file
+@Input:
+    input_stl_path: The path of the input stl file
+    unit: The unit of the input stl file
+    relative_density: The relative density of the metamaterial
+    shell_thickness: The thickness of the shell
+    shell_generation_voxel_resolution: The voxel resolution for shell generation
+    plate_interval: The interval between the plates
+    biased_tenon_length: The biased length of the tenon
+    output_stl_name: The name of the output stl file
+    use_existing_shell: Whether to use the existing shell
+    pkl_result_path: The path of the pkl result file
+    tenon_file_folder: The folder of the tenon files
+    preview: Whether to preview the result
 '''
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('--input_stl_path', type=str, default='data/../../urdf/gold_lynel20241008-163714/BODY.stl', help='Input STL file path')
-    parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
-    parser.add_argument('--relative_density', type=float, default=0.1, help='Relative density of the metamaterial given by FEA results')
-    
-    parser.add_argument('--shell_thickness', type=float, default=1.5, help='Thickness of the shell. mm')
-    parser.add_argument('--shell_generation_voxel_resolution', type=float, default=1, help='Voxel resolution for shell generation. mm')
-    
-    parser.add_argument('--plate_interval', type=float, default=8, help='Interval between plates. mm')
-    parser.add_argument('--biased_tenon_length', type=float, default=0, help='Biased length for the tenon. mm')
-
-    parser.add_argument('--output_stl_name', type=str, default='20241008-163714_BODY_final_output_with_shell.stl', help='Output STL file path')
-    parser.add_argument('--use_existing_shell', type=bool, default=False, help='Whether to use the existing shell file')
-    
-    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/../auto_design/results/gold_lynel20241008-163716_robot_result.pkl', help='Pickle file path for the tenon position results')
-    parser.add_argument('--tenon_file_folder', type=str, default=project_dir+'/tenon', help='Folder for the tenon files')
-                        
-    parser.add_argument('--preview', type=bool, default=True, help='Whether to visualize the transformed tenons and the link')
-
-    args = parser.parse_args()
+def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density, shell_thickness, shell_generation_voxel_resolution, plate_interval, biased_tenon_length, output_stl_name, use_existing_shell, pkl_result_path, tenon_file_folder, preview):
 
     # Check if the input STL file exists
-    if not os.path.exists(args.input_stl_path):
-        raise FileNotFoundError(f'Input STL file not found at {args.input_stl_path}')
+    if not os.path.exists(input_stl_path):
+        raise FileNotFoundError(f'Input STL file not found at {input_stl_path}')
     
     current_dir = os.path.dirname(os.path.realpath(__file__))
     cmake_build_dir = os.path.join(current_dir, '../build')
@@ -321,7 +313,7 @@ if __name__ == '__main__':
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    relative_density = args.relative_density
+    relative_density = relative_density
     if relative_density < 0.01:
         relative_density = 0.01
         print('Relative density should be larger than 0.01, set to 0.01')
@@ -329,26 +321,26 @@ if __name__ == '__main__':
         raise ValueError('Relative density should be less than 1.0')
     
     # Check and read pkl file
-    robot_result = pkl.load(open(args.pkl_result_path, 'rb'))
+    robot_result = pkl.load(open(pkl_result_path, 'rb'))
 
-    for link_name in robot_result.link_dict:
-        print("Link name: ", link_name)
-        print("Link Tenon Positions: ", robot_result.link_dict[link_name].tenon_pos)
-        print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
-        print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
-        print("Link tenon_idx: ", robot_result.link_dict[link_name].tenon_idx)
+    # for link_name in robot_result.link_dict:
+    #     print("Link name: ", link_name)
+    #     print("Link Tenon Positions: ", robot_result.link_dict[link_name].tenon_pos)
+    #     print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
+    #     print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
+    #     print("Link tenon_idx: ", robot_result.link_dict[link_name].tenon_idx)
 
 
     # Get the link name from the input stl path and get the corresponding link class from the robot result
-    link_name = args.input_stl_path.split('/')[-1].split('.')[0]
+    link_name = input_stl_path.split('/')[-1].split('.')[0]
     link = robot_result.link_dict[link_name]
 
     time_stamp_sec = time.time()
 
     #######  Find good orientation for tenon  ########
     # Load mesh and voxelize
-    mesh = trimesh.load_mesh(args.input_stl_path)
-    if args.unit == 'm':
+    mesh = trimesh.load_mesh(input_stl_path)
+    if unit == 'm':
         voxel_size = 0.005
         checking_distance = 0.1
     else:
@@ -356,8 +348,8 @@ if __name__ == '__main__':
         checking_distance = 100
 
     voxels, min_bound, max_bound, voxel_size = voxelize_mesh(mesh, voxel_size)
-    tenon_center_top_bias = 20 # mm
-    checking_angle_interval = np.pi / 12
+    tenon_center_top_bias = 15 # mm
+    checking_angle_interval = np.pi / 24
     safe_angle_range = np.pi # 180 degrees
 
     # Find the best orientation for each tenon
@@ -371,7 +363,7 @@ if __name__ == '__main__':
         print(f"Tenon {i} root point: {tenon_root_point}")
         print(f"Tenon {i} root direction: {tenon_root_direction}")
 
-        if args.unit == 'm':
+        if unit == 'm':
             tenon_root_point_biased = tenon_root_point + tenon_root_direction_norm * 0.001 * tenon_center_top_bias
         else:
             tenon_root_point_biased = tenon_root_point + tenon_root_direction_norm * tenon_center_top_bias
@@ -383,7 +375,7 @@ if __name__ == '__main__':
         if len(hit_results) != len(vectors):
             raise ValueError('Results and vectors have different lengths')
 
-        # if args.preview:
+        # if preview:
         #     visualize_mesh_voxels_vectors(mesh, voxels, voxel_size, min_bound, tenon_root_point, vectors, hit_results)
 
         # Find the best direction. The best direction is the one whose adjacent directions are all free.
@@ -424,11 +416,11 @@ if __name__ == '__main__':
         
 
     ###### Replace and scale the stl ######
-    replaced_stl_name = args.input_stl_path.split('/')[-1].split('.')[0] + '_replaced.stl'
+    replaced_stl_name = input_stl_path.split('/')[-1].split('.')[0] + '_replaced.stl'
     replaced_stl_save_path = os.path.join(output_folder, replaced_stl_name)
     replaced_stl_size_csv = replaced_stl_save_path.replace('.stl', '.csv')
 
-    input_stl_path_full_path = os.path.join(current_dir, '../', args.input_stl_path)
+    input_stl_path_full_path = os.path.join(current_dir, '../', input_stl_path)
 
     print(f"input_stl_path_full_path: {input_stl_path_full_path}")
     print(f"replaced_stl_save_path: {replaced_stl_save_path}")
@@ -440,7 +432,7 @@ if __name__ == '__main__':
         os.remove(replaced_stl_size_csv)
 
     print("Generating the replaced model...")
-    if args.unit == 'm':
+    if unit == 'm':
         # Scale the model to mm
         subprocess.run(['gnome-terminal', '--', 'bash', '-c', f'cd {cmake_build_dir}; ./replaceMesh {input_stl_path_full_path} {replaced_stl_save_path} 1000']) #; exec bash
     else:
@@ -486,7 +478,7 @@ if __name__ == '__main__':
 
         tenon_file_name = 'motor_' + str(link.tenon_idx[i]) + '_' + link.tenon_type[i] + '.stl'
 
-        tenon_file_path = os.path.join(args.tenon_file_folder, tenon_file_name)
+        tenon_file_path = os.path.join(tenon_file_folder, tenon_file_name)
         tenon_mesh = trimesh.load(tenon_file_path)
 
         # Add transformation for tenon pair alignment without interference
@@ -496,15 +488,15 @@ if __name__ == '__main__':
         tenon_file_name_transformed = tenon_file_name.replace('.stl', '_' + str(i) + '_transformed.stl')
         file_save_path = os.path.join(output_folder, tenon_file_name_transformed)
 
-        biased_tenon_length = args.biased_tenon_length
-        if args.unit == 'm':
+        biased_tenon_length = biased_tenon_length
+        if unit == 'm':
             biased_tenon_length = biased_tenon_length * 0.001
         
         # Transform the tenon and save the transformed tenon file considering the best orientation
-        transform_tenon_and_save(link, tenon_mesh, i, unit=args.unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=tenon_best_orientation_vectors[i])
+        transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=tenon_best_orientation_vectors[i])
 
-        # NOTE: The tenon orientation is not considered for now.
-        #transform_tenon_and_save(link, tenon_mesh, i, unit=args.unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=None)
+        # Use the following to test the tenon without considering the best orientation
+        # transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=None)
 
         transformed_tenon_files.append(file_save_path)
         print(f"Transformed tenon file saved at {file_save_path}")
@@ -532,7 +524,7 @@ if __name__ == '__main__':
     print(f"Final transformed tenon files: {final_transformed_tenon_files}")
 
     ##### Preview the transformed tenons and the link  #####
-    if args.preview:
+    if preview:
         stl_to_visualize = [replaced_stl_save_path] + final_transformed_tenon_files
         eye_transformation_matrix = np.eye(4)
         transformation_matrices_vis = [eye_transformation_matrix]
@@ -544,7 +536,7 @@ if __name__ == '__main__':
         visualize_meshes(stl_to_visualize, transformation_matrices_vis, scales_vis)
 
     ###### Generate the shell ######
-    # smaller_model_stl_name = args.input_stl_path.split('/')[-1].split('.')[0] + '_smaller.stl'
+    # smaller_model_stl_name = input_stl_path.split('/')[-1].split('.')[0] + '_smaller.stl'
     smaller_model_stl_name = replaced_stl_name.replace('.stl', '_smaller.stl')
     smaller_stl_save_path = os.path.join(output_folder, smaller_model_stl_name)
     smaller_stl_points_bin = smaller_stl_save_path.replace('.stl', '_points.bin')
@@ -552,7 +544,7 @@ if __name__ == '__main__':
     # Remove the smaller_model for shell file if it exists and we are not using the existing model. For quick testing.
     do_smaller_generation = True
     if os.path.exists(smaller_stl_save_path):
-        if args.use_existing_shell:
+        if use_existing_shell:
             print(f"Using existing shell file at {smaller_stl_save_path}")
             do_smaller_generation = False
         else:
@@ -562,8 +554,8 @@ if __name__ == '__main__':
     if do_smaller_generation:
         print("Generating the smaller model for shell...")
         # Use gnome-terminal to run the command
-        shell_thickness = args.shell_thickness
-        shell_generation_voxel_resolution = args.shell_generation_voxel_resolution
+        shell_thickness = shell_thickness
+        shell_generation_voxel_resolution = shell_generation_voxel_resolution
         subprocess.run(['gnome-terminal', '--', 'bash', '-c', f'cd {cmake_build_dir}; ./innerPointsCalculation {replaced_stl_save_path} {smaller_stl_points_bin} {shell_thickness} {shell_generation_voxel_resolution}']) #; exec bash
 
         # Wait for the process to finish
@@ -582,7 +574,7 @@ if __name__ == '__main__':
 
     ########## Generate the final model ##########
     tilt_angle = 30 # degrees
-    out_stl_name = args.output_stl_name.split('.')[0] + '_' + str(args.shell_thickness) + 'mm_density_' + str(relative_density) + '' + str(tilt_angle) + '.stl'
+    out_stl_name = output_stl_name.split('.')[0] + '_' + str(shell_thickness) + 'mm_density_' + str(relative_density) + '' + str(tilt_angle) + '.stl'
 
     final_output_stl_path = os.path.join(output_folder, out_stl_name)
 
@@ -593,7 +585,7 @@ if __name__ == '__main__':
     delf_y = max_y - min_y
     width = max(delf_x, delf_y) * safe_scale
 
-    interval = args.plate_interval # mm. The interval between plates
+    interval = plate_interval # mm. The interval between plates
     thickness = relative_density / 6.0 * interval
 
     # Check if thickness is smaller than 0.2
@@ -624,4 +616,34 @@ if __name__ == '__main__':
     time_stamp_sec_end = time.time()
     time_used = time_stamp_sec_end - time_stamp_sec
     print(f"Time used: {time_used} seconds, which is {time_used / 60} minutes.")
+
+
+
+'''
+@Description: Main function to generate the final metamaterial model with shell for the input STL file given the relative density from FEA results.
+'''
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/urdf/gold_lynel20241008-182954/BODY.stl', help='Input STL file path')
+    parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
+    parser.add_argument('--relative_density', type=float, default=0.1, help='Relative density of the metamaterial given by FEA results')
+    
+    parser.add_argument('--shell_thickness', type=float, default=1.5, help='Thickness of the shell. mm')
+    parser.add_argument('--shell_generation_voxel_resolution', type=float, default=0.5, help='Voxel resolution for shell generation. mm')
+    
+    parser.add_argument('--plate_interval', type=float, default=8, help='Interval between plates. mm')
+    parser.add_argument('--biased_tenon_length', type=float, default=0, help='Biased length for the tenon. mm')
+
+    parser.add_argument('--output_stl_name', type=str, default='20241008-163714_BODY_final_output_with_shell.stl', help='Output STL file path')
+    parser.add_argument('--use_existing_shell', type=bool, default=False, help='Whether to use the existing shell file')
+    
+    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/auto_design/results/gold_lynel20241008-182958_robot_result.pkl', help='Pickle file path for the tenon position results')
+    parser.add_argument('--tenon_file_folder', type=str, default=project_dir+'/metamaterial_filling/tenon', help='Folder for the tenon files')
+                        
+    parser.add_argument('--preview', type=bool, default=True, help='Whether to visualize the transformed tenons and the link')
+
+    args = parser.parse_args()
+
+    run_metamaterial_filling_for_stl_file(args.input_stl_path, args.unit, args.relative_density, args.shell_thickness, args.shell_generation_voxel_resolution, args.plate_interval, args.biased_tenon_length, args.output_stl_name, args.use_existing_shell, args.pkl_result_path, args.tenon_file_folder, args.preview)
 
