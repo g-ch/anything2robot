@@ -574,7 +574,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
     ########## Generate the final model ##########
     tilt_angle = 30 # degrees
-    out_stl_name = output_stl_name.split('.')[0] + '_' + str(shell_thickness) + 'mm_density_' + str(relative_density) + '' + str(tilt_angle) + '.stl'
+    out_stl_name = output_stl_name
 
     final_output_stl_path = os.path.join(output_folder, out_stl_name)
 

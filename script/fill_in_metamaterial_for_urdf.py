@@ -41,18 +41,25 @@ if __name__ == '__main__':
             plate_interval = 12
         else:
             relative_density = 0.15
-            plate_interval = 8
+            plate_interval = 10
 
         input_stl_path = urdf_folder + "/" + stl_file
-        output_stl_name = stl_file.split(".")[0] + "_plate" + str(plate_interval) + ".stl"
+
         unit = "m"
         shell_thickness = 1.5
-        shell_generation_voxel_resolution = 0.5
+        shell_generation_voxel_resolution = 1
         biased_tenon_length = 0
         use_existing_shell = False
         pkl_result_path = opt_result_pkl_path
         tenon_file_folder = project_dir + "/metamaterial_filling/tenon"
         preview = False
+
+        output_stl_name = stl_file.split(".")[0] + "_plate" + str(plate_interval) + '_' + str(shell_thickness) + 'mm_density_' + str(relative_density) + '30' + '.stl'
+
+        # Check if the output file already exists
+        if os.path.exists(output_stl_name):
+            print("Output file already exists: ", output_stl_name)
+            continue
 
         run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density, shell_thickness, shell_generation_voxel_resolution, plate_interval, biased_tenon_length, output_stl_name, use_existing_shell, pkl_result_path, tenon_file_folder, preview)
 
