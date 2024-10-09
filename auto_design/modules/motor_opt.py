@@ -593,13 +593,26 @@ class Motor_Opt:
 
             # From the motor list, choose the motor type that satisfies the constraints
             if len(cur_node.val.axis) == 2:
-                motor_type = np.where(motor_lib[:, 2] == motor_lib[:, 2][np.where(motor_lib[:, 2] - torque_dict[cur_node.val.name+'_joint'] > 0)[0]].min())[0][0]
+                suitable_motors = np.where(motor_lib[:, 2] - torque_dict[cur_node.val.name+'_joint'] > 0)[0]
+                if len(suitable_motors) == 0:
+                    raise ValueError(f"No motor in the library meets the torque requirement for {cur_node.val.name+'_joint'}. Required torque: {torque_dict[cur_node.val.name+'_joint']}, Max available torque: {motor_lib[:, 2].max()}")
+                motor_type = np.where(motor_lib[:, 2] == motor_lib[suitable_motors, 2].min())[0][0]
                 motor_types.append(motor_type)
 
             # If the joint has 2 axis, choose the motor type that satisfies the torque limit of both motors
             if len(cur_node.val.axis) == 3:
-                motor_type1 = np.where(motor_lib[:, 2] == motor_lib[:, 2][np.where(motor_lib[:, 2] - torque_dict[cur_node.val.name+'_joint1'] > 0)[0]].min())[0][0]
-                motor_type2 = np.where(motor_lib[:, 2] == motor_lib[:, 2][np.where(motor_lib[:, 2] - torque_dict[cur_node.val.name+'_joint2'] > 0)[0]].min())[0][0]
+                # Find motors that meet the torque requirement
+                suitable_motors = np.where(motor_lib[:, 2] - torque_dict[cur_node.val.name+'_joint1'] > 0)[0]
+                if len(suitable_motors) == 0:
+                    raise ValueError(f"No motor in the library meets the torque requirement for {cur_node.val.name+'_joint1'}. Required torque: {torque_dict[cur_node.val.name+'_joint1']}, Max available torque: {motor_lib[:, 2].max()}")
+                # Select the motor with the lowest sufficient torque
+                motor_type1 = np.where(motor_lib[:, 2] == motor_lib[suitable_motors, 2].min())[0][0]
+
+                suitable_motors = np.where(motor_lib[:, 2] - torque_dict[cur_node.val.name+'_joint2'] > 0)[0]
+                if len(suitable_motors) == 0:
+                    raise ValueError(f"No motor in the library meets the torque requirement for {cur_node.val.name+'_joint2'}. Required torque: {torque_dict[cur_node.val.name+'_joint2']}, Max available torque: {motor_lib[:, 2].max()}")
+                motor_type2 = np.where(motor_lib[:, 2] == motor_lib[suitable_motors, 2].min())[0][0]
+
                 if motor_lib[motor_type1][2] > motor_lib[motor_type2][2]:
                     motor_types.append(motor_type1)
                 else:
