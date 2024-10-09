@@ -17,8 +17,8 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
     parser.add_argument('--model_name', type=str, default='gold_lynel', help='The model name')
     parser.add_argument('--expected_x', type=float, default=50, help='The expected width of the model')
-    parser.add_argument('--voxel_size', type=float, default=0.25, help='The size of the voxel')
-    parser.add_argument('--voxel_density', type=float, default=1.2e-4, help='The density of the voxel. (kg/cm^3)')
+    parser.add_argument('--voxel_size', type=float, default=1, help='The size of the voxel')
+    parser.add_argument('--voxel_density', type=float, default=1.5e-4, help='The density of the voxel. (kg/cm^3)')
     args = parser.parse_args()
     mesh_path = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
     joint_path = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '_joints.pkl')
@@ -49,7 +49,7 @@ if __name__=="__main__":
                      [6, 6]]
     
     motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib, connector_lib)
-    motor_results = motor_opt.run_opt(generation_num=100)
+    motor_results = motor_opt.run_opt(generation_num=10)
     motor_opt.render()
 
     # Refine the mesh to connect the joints
@@ -65,7 +65,10 @@ if __name__=="__main__":
                                                motor_param_result=motor_results, 
                                                link_tree=mesh_decomp.link_tree, 
                                                father_link_dict=mesh_decomp.father_link_dict)
-    joint_limits = np.vstack([np.array([-1, 1]) for _ in range(2*len(motor_results))])
+    
+    # joint_limits = np.vstack([np.array([-1, 1]) for _ in range(2*len(motor_results))])
+    joint_limits = np.vstack([np.array([-0.785, 0.785]) for _ in range(2*len(motor_results))])
+
     interference_removal.set_joint_limit(joint_limits)
     interference_removal.remove_interference()
     interference_removal.mesh_group.render()

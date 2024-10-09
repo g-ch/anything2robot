@@ -39,6 +39,8 @@ def expand_points(array):
     """
     # Define the offsets to generate surrounding points
     offsets = np.array(list(product([-1, 0, 1], repeat=3)))  # Cartesian product to generate combinations
+
+    # CHECK offsets. CHG. 
     
     # Initialize a list to hold all the new points
     new_points = []
@@ -343,22 +345,43 @@ class InterferenceRemoval:
     def remove_interference(self):
         queue = [self.link_tree]
         cur_idx = 0
+
         while queue:
             current_node = queue.pop(0)
             current_link = current_node.val
+
             for child_node in current_node.children:
                 queue.append(child_node)
             if current_link.axis is None or np.linalg.norm(current_link.axis[1]) == 0:
                 continue
 
+            father_link = self.father_link_dict[current_link.name]
+            father_link_value = self.mesh_group.link_value_dict[father_link]
+            current_link_value = self.mesh_group.link_value_dict[current_link.name]
+            rotation_num = 12
+            angle_resolution = abs(self.joint_limits[cur_idx, 0] - self.joint_limits[cur_idx, 1]) / rotation_num
+            negative_num = round(abs(self.joint_limits[cur_idx, 0]) / angle_resolution)
+            positive_num = round(abs(self.joint_limits[cur_idx, 1]) / angle_resolution)
+
+            other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
+
             # Get the info about current link
             motor_position = (self.motor_param_result[cur_idx][:3] + self.motor_param_result[cur_idx][3:6]) / 2
             motor_direct = np.array(current_link.axis[1])
-            motor_radius = self.motor_param_result[cur_idx][6]
+            # motor_radius = self.motor_param_result[cur_idx][6]
             cur_idx += 1
 
             # Sample joint angles and implement the interference removal
-            for joint_angle in np.linspace(self.joint_limits[cur_idx, 0], self.joint_limits[cur_idx, 1], 10):
+            for i in range(rotation_num):  #old: #for joint_angle in np.linspace(self.joint_limits[cur_idx, 0], self.joint_limits[cur_idx, 1], rotation_num):
+                if i < negative_num:
+                    joint_angle = -i * angle_resolution
+                    # Remove from father link
+                    other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
+                else:
+                    joint_angle = (i - negative_num) * angle_resolution
+                    # Remove from current link
+                    other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
+                    
 
                 child_nodes = current_node.get_all_children()[0]
                 transformed_links = [child.val for child in child_nodes]
@@ -366,14 +389,26 @@ class InterferenceRemoval:
                 transformed_link_names = [link.name for link in transformed_links]
                 transformed_link_values = [self.mesh_group.link_value_dict[link_name] for link_name in transformed_link_names]
                 transformed_indexs = np.vstack([self.mesh_group.get_voxels(link_name, get_index=True) for link_name in transformed_link_names])
+                # In self.mesh_group.get_voxels, if we set get_index to False, we can get the real position. 
 
                 # The transformation is defined as rotation around the axis of the motor, rotating angle is the joint angle
                 H_matrix = self.rotate_around_axis(motor_direct, joint_angle, self.mesh_group.position_to_index(motor_position.reshape(-1, 3)))
-                new_indexs = expand_points(apply_transform(transformed_indexs, H_matrix))
+                # CHECK. CHANGE TO REAL POSITION? CHG
+
+                # new_indexs = expand_points(apply_transform(transformed_indexs, H_matrix))   # expand_points chg
+                new_indexs = apply_transform(transformed_indexs, H_matrix)
+                new_indexs = np.round(new_indexs).astype(np.int32)
                 new_indexs = np.clip(new_indexs, 0, self.mesh_group.voxel_data.shape[0]-1)
-                values = self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]
+
+                values = self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]  # Value Point type.
                 non_removal = self.mesh_group.voxel_no_removal[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]
-                self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]] = np.where(np.logical_or(np.isin(values, transformed_link_values), non_removal),
+
+
+                # self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]] = np.where(np.logical_or(np.isin(values, transformed_link_values), non_removal),
+                #                                                                                             self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]], 
+                #                                                                                             0)
+
+                self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]] = np.where(np.logical_or(np.isin(values, other_link_values), non_removal),
                                                                                                             self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]], 
                                                                                                             0)
 
@@ -381,11 +416,19 @@ class InterferenceRemoval:
             if len(current_link.axis) == 3:
 
                 motor_position = (self.motor_param_result[cur_idx][:3] + self.motor_param_result[cur_idx][3:6]) / 2
-                motor_direct = np.array(current_link.axis[1])
-                motor_radius = self.motor_param_result[cur_idx][6]
-
+                motor_direct = np.array(current_link.axis[2]) #CHG
+                
                 # Sample joint angles and implement the interference removal
-                for joint_angle in np.linspace(self.joint_limits[cur_idx, 0], self.joint_limits[cur_idx, 1], 10):
+                for i in range(rotation_num):  #old: #for joint_angle in np.linspace(self.joint_limits[cur_idx, 0], self.joint_limits[cur_idx, 1], rotation_num):
+                    if i < negative_num:
+                        joint_angle = -i * angle_resolution
+                        # Remove from father link
+                        other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
+                    else:
+                        joint_angle = (i - negative_num) * angle_resolution
+                        # Remove from current link
+                        other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
+                    
 
                     child_nodes = current_node.get_all_children()[0]
                     transformed_links = [child.val for child in child_nodes]
@@ -396,15 +439,24 @@ class InterferenceRemoval:
 
                     # The transformation is defined as rotation around the axis of the motor, rotating angle is the joint angle
                     H_matrix = self.rotate_around_axis(motor_direct, joint_angle, self.mesh_group.position_to_index(motor_position.reshape(-1, 3)))
-                    new_indexs = expand_points(apply_transform(transformed_indexs, H_matrix))
+                    # new_indexs = expand_points(apply_transform(transformed_indexs, H_matrix))
+                    
+                    new_indexs = apply_transform(transformed_indexs, H_matrix)
+                    new_indexs = np.round(new_indexs).astype(np.int32)
                     new_indexs = np.clip(new_indexs, 0, self.mesh_group.voxel_data.shape[0]-1)
                     values = self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]
                     non_removal = self.mesh_group.voxel_no_removal[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]
-                    self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]] = np.where(np.logical_or(np.isin(values, transformed_link_values), non_removal),
+                    
+                    # self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]] = np.where(np.logical_or(np.isin(values, transformed_link_values), non_removal),
+                    #                                                                                             self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]], 
+                    #                                                                                             0)
+
+                    self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]] = np.where(np.logical_or(np.isin(values, other_link_values), non_removal),
                                                                                                                 self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]], 
                                                                                                                 0)
+
                 cur_idx += 1
-            
+
         # Remove interference for motors
         for motor_param in self.motor_param_result:
             def condition_remove(pts):
@@ -412,6 +464,8 @@ class InterferenceRemoval:
             self.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_group.link_value_dict.keys()), "Unoccupied"),
                                         target_group_name="Unoccupied",
                                         condition_func=condition_remove)
+
+            
 
     def generate_urdf(self):
         """
