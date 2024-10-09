@@ -38,7 +38,7 @@ if __name__ == '__main__':
     for stl_file in tqdm.tqdm(stl_files):
         if "BODY" in stl_file or "ARM" in stl_file or "TAIL" in stl_file:
             relative_density = 0.1
-            plate_interval = 12
+            plate_interval = 20
         else:
             relative_density = 0.15
             plate_interval = 10

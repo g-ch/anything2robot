@@ -66,8 +66,8 @@ if __name__=="__main__":
                                                link_tree=mesh_decomp.link_tree, 
                                                father_link_dict=mesh_decomp.father_link_dict)
     
-    # joint_limits = np.vstack([np.array([-1, 1]) for _ in range(2*len(motor_results))])
-    joint_limits = np.vstack([np.array([-0.785, 0.785]) for _ in range(2*len(motor_results))])
+    joint_limits = np.vstack([np.array([-1, 1]) for _ in range(2*len(motor_results))])
+    # joint_limits = np.vstack([np.array([-0.785, 0.785]) for _ in range(2*len(motor_results))])
 
     interference_removal.set_joint_limit(joint_limits)
     interference_removal.remove_interference()

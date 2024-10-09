@@ -704,7 +704,7 @@ class Joint_Connect_Opt:
         self.mesh_decomp = mesh_decomp
         self.mesh = mesh_decomp.mesh
         self.motor_params_results = motor_params_results
-        self.motor_shell = 2.0 # 1.5
+        self.motor_shell = 1.5
 
         self.father_dict = self.mesh_decomp.father_link_dict
         for link_name in self.father_dict:
@@ -788,15 +788,20 @@ class Joint_Connect_Opt:
                                       is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 1.0, self.motor_shell))
             
 
-            # Add voxels to father link     
-            father_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=list(self.mesh_decomp.mesh_group.link_value_dict.keys()),
+            
+            
+            if len(cur_node.val.axis) == 2: # Only for one axis joint because 2 axis joint has standardconnector between two motors
+                # Add voxels to father link     
+                father_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=list(self.mesh_decomp.mesh_group.link_value_dict.keys()),
                                                                                     target_group_name=self.father_dict[cur_link_name],
                                                                                     condition_func=condition_father_link_top)
             
-            if len(cur_node.val.axis) == 2:
                 father_link_addition_voxels_radical = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), self.father_dict[cur_link_name]),
                                                                                         target_group_name=self.father_dict[cur_link_name],
                                                                                         condition_func=condition_father_link_radical)
+            else:
+                # 2 axis joint has standardconnector between two motors. No need to add voxels to father link
+                pass
             
             # Add voxels to child link
             child_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=list(self.mesh_decomp.mesh_group.link_value_dict.keys()),
@@ -806,8 +811,11 @@ class Joint_Connect_Opt:
                                                                                         target_group_name=cur_link_name,
                                                                                         condition_func=condition_child_link_radical)
             
-            
-            non_removal_voxels = np.vstack((father_link_addition_voxels_top, child_link_addition_voxels_top))
+            if len(cur_node.val.axis) == 2:
+                non_removal_voxels = np.vstack((father_link_addition_voxels_top, child_link_addition_voxels_top))
+            else:
+                non_removal_voxels = child_link_addition_voxels_top
+                
             non_removal_voxels = np.unique(non_removal_voxels, axis=0)
             non_removal_indices = self.mesh_decomp.mesh_group.position_to_index(non_removal_voxels)
             self.mesh_decomp.mesh_group.voxel_no_removal[non_removal_indices[:,0], non_removal_indices[:,1], non_removal_indices[:,2]] = 1
