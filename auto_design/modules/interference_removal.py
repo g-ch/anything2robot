@@ -391,9 +391,6 @@ class InterferenceRemoval:
                 H_matrix = self.rotate_around_axis(motor_direct, joint_angle, self.mesh_group.position_to_index(motor_position.reshape(-1, 3)))
 
                 new_indexs = expand_points(apply_transform(transformed_indexs, H_matrix))  
-                new_indexs = apply_transform(transformed_indexs, H_matrix)
-                new_indexs = np.round(new_indexs).astype(np.int32)
-
                 new_indexs = np.clip(new_indexs, 0, self.mesh_group.voxel_data.shape[0]-1)
 
                 values = self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]  # Value Point type.
@@ -432,9 +429,6 @@ class InterferenceRemoval:
                     H_matrix = self.rotate_around_axis(motor_direct, joint_angle, self.mesh_group.position_to_index(motor_position.reshape(-1, 3)))
                     
                     new_indexs = expand_points(apply_transform(transformed_indexs, H_matrix))
-                    new_indexs = apply_transform(transformed_indexs, H_matrix)
-                    new_indexs = np.round(new_indexs).astype(np.int32)
-
                     new_indexs = np.clip(new_indexs, 0, self.mesh_group.voxel_data.shape[0]-1)
                     values = self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]
                     non_removal = self.mesh_group.voxel_no_removal[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]

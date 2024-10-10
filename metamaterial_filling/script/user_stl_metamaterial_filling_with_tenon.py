@@ -132,8 +132,8 @@ def generate_perpendicular_vectors(direction, angle_interval):
     for vec in vectors:
         normalized_vectors.append(vec / np.linalg.norm(vec))
 
-    print(f"Direction: {direction}")
-    print(f"Perpendicular vectors: {vectors}")
+    # print(f"Direction: {direction}")
+    # print(f"Perpendicular vectors: {vectors}")
     
     return vectors, angles
 
@@ -571,6 +571,11 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
         print(f"smaller model generated at {smaller_stl_save_path}")
 
+    # Downsample the smaller model to reduce the number of faces. Otherwise the final model will be too dense and hard to do metamaterial filling.
+    mesh_to_downsample = trimesh.load(smaller_stl_save_path)
+    down_sample_ratio = 10
+    down_sampled_mesh = mesh_to_downsample.simplify_quadratic_decimation(int(len(mesh_to_downsample.faces.shape[0]) / down_sample_ratio))
+    down_sampled_mesh.export(smaller_stl_save_path)
 
     ########## Generate the final model ##########
     tilt_angle = 30 # degrees
@@ -597,6 +602,9 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
         print(f"Corrected interval: {interval}")
     
+    # Make thickness a int multiple of 0.1
+    thickness = round(thickness / 0.1) * 0.1
+
     plates_num = int(width / (thickness + interval) / 2)
 
 
