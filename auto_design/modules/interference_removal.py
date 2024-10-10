@@ -356,10 +356,11 @@ class InterferenceRemoval:
             father_link = self.father_link_dict[current_link.name]
             father_link_value = self.mesh_group.link_value_dict[father_link]
             current_link_value = self.mesh_group.link_value_dict[current_link.name]
-            rotation_num = 12
-            angle_resolution = abs(self.joint_limits[cur_idx, 0] - self.joint_limits[cur_idx, 1]) / rotation_num
-            negative_num = round(abs(self.joint_limits[cur_idx, 0]) / angle_resolution)
-            positive_num = round(abs(self.joint_limits[cur_idx, 1]) / angle_resolution)
+            rotation_num = 10
+
+            # angle_resolution = abs(self.joint_limits[cur_idx, 0] - self.joint_limits[cur_idx, 1]) / rotation_num
+            # negative_num = round(abs(self.joint_limits[cur_idx, 0]) / angle_resolution)
+            # positive_num = round(abs(self.joint_limits[cur_idx, 1]) / angle_resolution)
 
             other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
 
@@ -370,15 +371,15 @@ class InterferenceRemoval:
             cur_idx += 1
 
             # Sample joint angles and implement the interference removal
-            for i in range(rotation_num):  #old: #for joint_angle in np.linspace(self.joint_limits[cur_idx, 0], self.joint_limits[cur_idx, 1], rotation_num):
-                if i < negative_num:
-                    joint_angle = -i * angle_resolution
-                    other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
-                else:
-                    joint_angle = (i - negative_num) * angle_resolution
-                    other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
-                    
+            # for i in range(rotation_num):  #old: #
+            #     if i < negative_num:
+            #         joint_angle = -i * angle_resolution
+            #         other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
+            #     else:
+            #         joint_angle = (i - negative_num) * angle_resolution
+            #         other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
 
+            for joint_angle in np.linspace(self.joint_limits[cur_idx, 0], self.joint_limits[cur_idx, 1], rotation_num):
                 child_nodes = current_node.get_all_children()[0]
                 transformed_links = [child.val for child in child_nodes]
                 transformed_links.append(current_link)
@@ -410,15 +411,15 @@ class InterferenceRemoval:
                 motor_direct = np.array(current_link.axis[2]) 
                 
                 # Sample joint angles and implement the interference removal
-                for i in range(rotation_num):  #old: #for joint_angle in np.linspace(self.joint_limits[cur_idx, 0], self.joint_limits[cur_idx, 1], rotation_num):
-                    if i < negative_num:
-                        joint_angle = -i * angle_resolution
-                        other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
-                    else:
-                        joint_angle = (i - negative_num) * angle_resolution
-                        other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
+                # for i in range(rotation_num):  #old: #
+                #     if i < negative_num:
+                #         joint_angle = -i * angle_resolution
+                #         other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
+                #     else:
+                #         joint_angle = (i - negative_num) * angle_resolution
+                #         other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
                     
-
+                for joint_angle in np.linspace(self.joint_limits[cur_idx, 0], self.joint_limits[cur_idx, 1], rotation_num):
                     child_nodes = current_node.get_all_children()[0]
                     transformed_links = [child.val for child in child_nodes]
                     transformed_links.append(current_link)
