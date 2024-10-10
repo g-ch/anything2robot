@@ -572,9 +572,23 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         print(f"smaller model generated at {smaller_stl_save_path}")
 
     # Downsample the smaller model to reduce the number of faces. Otherwise the final model will be too dense and hard to do metamaterial filling.
+    
     mesh_to_downsample = trimesh.load(smaller_stl_save_path)
-    down_sample_ratio = 10
-    down_sampled_mesh = mesh_to_downsample.simplify_quadratic_decimation(int(len(mesh_to_downsample.faces.shape[0]) / down_sample_ratio))
+
+    #### FOR OLD VERSION OF TRIMESH
+    # down_sample_ratio = 10
+    # ori_face_num = len(mesh_to_downsample.faces)
+    # print(f"Original face number: {ori_face_num}")
+    # down_sampled_face_num = int(ori_face_num / down_sample_ratio)
+    # down_sampled_face_num = max(down_sampled_face_num, 1000) # At least 1000 points
+    # print(f"Expected Downsampled point number: {down_sampled_face_num}")
+    # down_sampled_mesh = mesh_to_downsample.simplify_quadratic_decimation(down_sampled_face_num)
+    # down_sampled_mesh.export(smaller_stl_save_path)
+    
+
+    ### FOR NEW VERSION OF TRIMESH
+    down_sample_ratio = 0.1
+    down_sampled_mesh = mesh_to_downsample.simplify_quadric_decimation(down_sample_ratio)
     down_sampled_mesh.export(smaller_stl_save_path)
 
     ########## Generate the final model ##########
