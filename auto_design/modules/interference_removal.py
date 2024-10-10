@@ -458,7 +458,7 @@ class InterferenceRemoval:
         if not os.path.exists(dir):
             os.makedirs(dir)
         urdf_file = open(dir + self.args.model_name + timestr + '.urdf', 'w+')
-        package_name = "anything2robot"
+        package_name = "urdf_description"
 
         self.urdf_dir = dir + self.args.model_name + timestr + '.urdf'
         urdf_file.write('<?xml version="1.0"?>\n')
