@@ -31,6 +31,15 @@ while queue:
     transformed_point = H @ point
     current_link.axis[0] = transformed_point[:3]
 
+    point = np.append(current_link.axis[1], 1)
+    transformed_point = H @ point
+    current_link.axis[1] = transformed_point[:3]
+
+    if len(current_link.axis) == 3:
+        point = np.append(current_link.axis[2], 1)
+        transformed_point = H @ point
+        current_link.axis[2] = transformed_point[:3]
+
     for joint_name in current_link.joints.keys():
         point = np.append(current_link.joints[joint_name], 1)
         transformed_point = H @ point
