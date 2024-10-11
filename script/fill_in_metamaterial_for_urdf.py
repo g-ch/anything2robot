@@ -40,15 +40,17 @@ if __name__ == '__main__':
             relative_density = 0.1
             plate_interval = 20
             shell_generation_voxel_resolution = 0.5
+            shell_thickness = 1
         else:
             relative_density = 0.15
             plate_interval = 10
             shell_generation_voxel_resolution = 1
+            shell_thickness = 1.5
 
         input_stl_path = urdf_folder + "/" + stl_file
 
         unit = "m"
-        shell_thickness = 1.5
+        
         biased_tenon_length = 0
         use_existing_shell = False
         pkl_result_path = opt_result_pkl_path

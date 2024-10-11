@@ -51,12 +51,13 @@ if __name__=="__main__":
     motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib, connector_lib)
     motor_results = motor_opt.run_opt(generation_num=60)
     motor_opt.render()
-
+    time.sleep(3)
     # Refine the mesh to connect the joints
     print("Refining the mesh to connect the actuators...")
     joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
     joint_connect_opt.run_opt()
     mesh_decomp.mesh_group.render()
+    time.sleep(3)
 
     # Remove the interference between the links while moving the joints
     print("Removing the interference between the links...")
@@ -72,6 +73,7 @@ if __name__=="__main__":
     interference_removal.set_joint_limit(joint_limits)
     interference_removal.remove_interference()
     interference_removal.mesh_group.render()
+    time.sleep(3)
     urdf_dir = interference_removal.generate_urdf()
 
     # Save results
