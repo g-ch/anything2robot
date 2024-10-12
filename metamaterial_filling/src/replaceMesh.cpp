@@ -37,27 +37,27 @@ void processMesh(const std::string& inputFilename, const std::string& outputFile
     // Calculate bounding box dimensions
     Eigen::RowVector3d dimensions = maxCoords - minCoords;
 
-    // Determine the axis of the largest dimension
-    int largestAxis = 0;
-    if (dimensions[1] > dimensions[0] && dimensions[1] > dimensions[2]) {
-        largestAxis = 1;
-    } else if (dimensions[2] > dimensions[0]) {
-        largestAxis = 2;
-    }
+    // Determine the largest face of the bounding box, and align the normal of the largest face to the z-axis
+    float xy_area = dimensions[0] * dimensions[1];
+    float xz_area = dimensions[0] * dimensions[2];
+    float yz_area = dimensions[1] * dimensions[2];
 
-    // Rotation matrix to align the largest side to the bottom (z = 0)
     Eigen::Matrix3d rotationMatrix = Eigen::Matrix3d::Identity();
-    if (largestAxis == 1) {
-        // Rotate around x-axis to bring y to z
+    if(xy_area > xz_area && xy_area > yz_area){
+        // Align the normal of the xy plane to the z-axis, which means do nothing
+
+    }else if(xz_area > xy_area && xz_area > yz_area){
+        // Align the normal of the xz plane, namely y to the z axis
         rotationMatrix << 1, 0, 0,
                           0, 0, -1,
                           0, 1, 0;
-    } else if (largestAxis == 2) {
-        // Rotate around x-axis to bring z to y
-        rotationMatrix << 1, 0, 0,
-                          0, 0, 1,
-                          0, -1, 0;
+    }else{
+        // Align the normal of the yz plane, namely x to the z axis
+        rotationMatrix << 0, 0, 1,
+                          0, 1, 0,
+                          -1, 0, 0;
     }
+
 
     // Apply rotation
     V = (rotationMatrix * V.transpose()).transpose();
