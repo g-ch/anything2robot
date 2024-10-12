@@ -244,29 +244,29 @@ def add_inner_cubes(stl_file, resolution, n, s, new_mesh_save_path):
     # original_points = shift_voxel_back(voxel_grid, shift_vector, density, resolution)
     # display_voxel_grid(original_points, title="Initial Voxel Grid")
     
-    count = 0
-    max_candidate_size = n * 2
-    min_candidate_size = n
+    # count = 0
+    # max_candidate_size = n * 2
+    # min_candidate_size = n
 
-    for candidate_size in range(max_candidate_size, min_candidate_size, -4):
-        print(f"Candidate size: {candidate_size}")
-        while True:
-            count += 1
-            print(f"Iteration {count}")
-            candidate_cube = find_candidate_cube(voxel_grid, candidate_size)
-            if not candidate_cube:
-                break
-            print(f"Candidate cube: {candidate_cube}")
-            x, y, z = candidate_cube
-            voxel_grid = find_max_dimensions_and_remove_voxels(voxel_grid, x, y, z, candidate_size, s)
+    # for candidate_size in range(max_candidate_size, min_candidate_size, -4):
+    #     print(f"Candidate size: {candidate_size}")
+    #     while True:
+    #         count += 1
+    #         print(f"Iteration {count}")
+    #         candidate_cube = find_candidate_cube(voxel_grid, candidate_size)
+    #         if not candidate_cube:
+    #             break
+    #         print(f"Candidate cube: {candidate_cube}")
+    #         x, y, z = candidate_cube
+    #         voxel_grid = find_max_dimensions_and_remove_voxels(voxel_grid, x, y, z, candidate_size, s)
 
-            # Find the center of the cube after hollowing
-            cx, cy, cz = x + candidate_size//2, y + candidate_size//2, z + candidate_size//2
-            voxel_grid = remove_voxels_in_direction(voxel_grid, (cx, cy, cz), s)
+            # Find the center of the cube after hollowing and make a corridor from cube to the surface
+            # cx, cy, cz = x + candidate_size//2, y + candidate_size//2, z + candidate_size//2
+            # voxel_grid = remove_voxels_in_direction(voxel_grid, (cx, cy, cz), s)
     
     # Display the voxel grid after processing
-    # processed_points = shift_voxel_back(voxel_grid, shift_vector, density, resolution)
-    # display_voxel_grid(processed_points, title="Voxel Grid After Processing")
+    processed_points = shift_voxel_back(voxel_grid, shift_vector, density, resolution)
+    display_voxel_grid(processed_points, title="Voxel Grid After Processing")
 
     # Generate mesh from voxel grid using marching cubes and save as STL
     mesh = voxel_grid_to_mesh_marching_cubes(voxel_grid, shift_vector, density)
