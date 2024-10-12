@@ -72,7 +72,7 @@ class SixFoldPlatesFillingWithShellTenon:
             stl_import = import_stl(self.input_stl_path)
             stl_smaller_model_import = import_stl(self.input_smaller_model_stl_path)
             shell_model = difference()(stl_import, stl_smaller_model_import)
-            print("Use real shell model")
+            print("Use shell model")
 
         # Add tenons to the shell model if input_tenon_stl_list_path is not None
         if self.input_tenon_stl_list_path is not None:

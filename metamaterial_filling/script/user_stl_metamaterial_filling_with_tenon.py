@@ -340,12 +340,19 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     #######  Find good orientation for tenon  ########
     # Load mesh and voxelize
     mesh = trimesh.load_mesh(input_stl_path)
-    if unit == 'm':
-        voxel_size = 0.005
-        checking_distance = 0.1
+
+    # CHECK if mesh is water tight
+    if not mesh.is_watertight:
+        raise ValueError('Input mesh is not watertight')
     else:
-        voxel_size = 5
-        checking_distance = 100
+        print("Input mesh is watertight. Conitnue...")
+
+    if unit == 'm':
+        voxel_size = 0.01
+        checking_distance = 0.2
+    else:
+        voxel_size = 10
+        checking_distance = 200
 
     voxels, min_bound, max_bound, voxel_size = voxelize_mesh(mesh, voxel_size)
     tenon_center_top_bias = 15 # mm
@@ -414,6 +421,8 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         print(f"Tenon {i} best direction angle: {angles[best_direction_index]}")
         print(f"Tenon {i} free adjacent direction number: {adjacent_free_num_array[best_direction_index]}")
         
+    # Free the memory for the voxels
+    voxels = None #CHG
 
     ###### Replace and scale the stl ######
     replaced_stl_name = input_stl_path.split('/')[-1].split('.')[0] + '_replaced.stl'
@@ -461,12 +470,6 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         applied_placement = np.array([float(x) for x in lines[3].split(',')])
         applied_rotation = np.array([[float(x) for x in line.split(',')] for line in lines[4:7]])
 
-        # print(f"min_x: {min_x} mm, min_y: {min_y} mm, min_z: {min_z} mm")
-        # print(f"max_x: {max_x} mm, max_y: {max_y} mm, max_z: {max_z} mm")
-        # print(f"applied_scale: {applied_scale}")
-        # print(f"applied_placement: {applied_placement}")
-        # print(f"applied_rotation: {applied_rotation}")
-
     
     ##### Transform tenons and save as stl files for later use in openscad #####
     print("Transforming tenons...")
@@ -493,10 +496,10 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
             biased_tenon_length = biased_tenon_length * 0.001
         
         # Transform the tenon and save the transformed tenon file considering the best orientation
-        transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=tenon_best_orientation_vectors[i])
+        # transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=tenon_best_orientation_vectors[i])
 
         # Use the following to test the tenon without considering the best orientation
-        # transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=None)
+        transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_length=biased_tenon_length, tenon_orientation_vector=None)
 
         transformed_tenon_files.append(file_save_path)
         print(f"Transformed tenon file saved at {file_save_path}")
@@ -535,7 +538,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
         visualize_meshes(stl_to_visualize, transformation_matrices_vis, scales_vis)
 
-    ###### Generate the shell ######
+    ###### Generate a smaller model for the shell ######
     # smaller_model_stl_name = input_stl_path.split('/')[-1].split('.')[0] + '_smaller.stl'
     smaller_model_stl_name = replaced_stl_name.replace('.stl', '_smaller.stl')
     smaller_stl_save_path = os.path.join(output_folder, smaller_model_stl_name)
@@ -571,9 +574,40 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
         print(f"smaller model generated at {smaller_stl_save_path}")
 
+    # Check if the smaller model has only one piece and is water-tight using open3d
+    mesh_to_check = trimesh.load(smaller_stl_save_path)
+    
+    # Check if the mesh is watertight
+    is_watertight = mesh_to_check.is_watertight
+    print(f"Is the smaller model watertight: {is_watertight}")
+
+    # Check if the mesh has only one piece
+    mesh_pieces = mesh_to_check.split()
+    print(f"Number of pieces in the smaller model: {len(mesh_pieces)}")
+
+    # If not watertight or has more than one piece, do the following to fix the mesh
+    if not is_watertight or len(mesh_pieces) > 1:
+        print("Fixing the mesh...")
+        trimesh.repair.fill_holes(mesh_to_check)
+        trimesh.repair.fix_inversion(mesh_to_check)
+        trimesh.repair.fix_winding(mesh_to_check)
+        trimesh.repair.fix_normals(mesh_to_check)
+
+        # Check if the mesh is watertight
+        is_watertight = mesh_to_check.is_watertight
+        print(f"Is the smaller model watertight after fixing: {is_watertight}")
+
+        # Check if the mesh has only one piece
+        mesh_pieces = mesh_to_check.split()
+        print(f"Number of pieces in the smaller model after fixing: {len(mesh_pieces)}")
+
+        if not is_watertight or len(mesh_pieces) > 1:
+            raise ValueError('The smaller model is not watertight or has more than one piece after fixing')
+        
+
     # Downsample the smaller model to reduce the number of faces. Otherwise the final model will be too dense and hard to do metamaterial filling.
     
-    mesh_to_downsample = trimesh.load(smaller_stl_save_path)
+    # mesh_to_downsample = trimesh.load(smaller_stl_save_path)
 
     #### FOR OLD VERSION OF TRIMESH
     # down_sample_ratio = 10
@@ -587,9 +621,21 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     
 
     ### FOR NEW VERSION OF TRIMESH
-    down_sample_ratio = 0.1
-    down_sampled_mesh = mesh_to_downsample.simplify_quadric_decimation(down_sample_ratio)
-    down_sampled_mesh.export(smaller_stl_save_path)
+    # down_sample_ratio = 0.1
+    # mesh_to_downsample = mesh_to_downsample.simplify_quadric_decimation(down_sample_ratio)
+    # # Smooth the mesh
+    # mesh_to_downsample = trimesh.smoothing.filter_mut_dif_laplacian(mesh_to_downsample, iterations=3)
+    # # Downsample the mesh again
+    # mesh_to_downsample = mesh_to_downsample.simplify_quadric_decimation(down_sample_ratio)
+    # # Smooth the mesh
+    # mesh_to_downsample = trimesh.smoothing.filter_mut_dif_laplacian(mesh_to_downsample, iterations=3)
+    # # Downsample the mesh again
+    # mesh_to_downsample = mesh_to_downsample.simplify_quadric_decimation(down_sample_ratio)
+    # # Smooth the mesh
+    # mesh_to_downsample = trimesh.smoothing.filter_mut_dif_laplacian(mesh_to_downsample, iterations=3)
+    # # Downsample the mesh again
+    # mesh_to_downsample = mesh_to_downsample.simplify_quadric_decimation(down_sample_ratio)
+    # mesh_to_downsample.export(smaller_stl_save_path)
 
     ########## Generate the final model ##########
     tilt_angle = 30 # degrees
@@ -598,10 +644,10 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     final_output_stl_path = os.path.join(output_folder, out_stl_name)
 
     # Define the dimensions of the board
-    safe_scale = 1.5 # Safe scale to ensure the rotated plates can cover the whole model
+    safe_scale = 2.0
     height = (max_z - min_z) * safe_scale
     delf_x = max_x - min_x
-    delf_y = max_y - min_y
+    delf_y = max_y - min_y 
     width = max(delf_x, delf_y) * safe_scale
 
     interval = plate_interval # mm. The interval between plates

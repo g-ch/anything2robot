@@ -19,8 +19,8 @@ from metamaterial_filling.script.user_stl_metamaterial_filling_with_tenon import
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Fill in the metamaterial for every stl file in the given urdf file folder.')
-    parser.add_argument('--urdf_folder_name', type=str, default='gold_lynel20241008-182954', help='The folder of the urdf file.')
-    parser.add_argument('--opt_result_pkl_name', type=str, default='gold_lynel20241008-182958_robot_result.pkl', help='The pickle file name for the optimization result.')
+    parser.add_argument('--urdf_folder_name', type=str, default='gold_lynel20241010-134328_good', help='The folder of the urdf file.')
+    parser.add_argument('--opt_result_pkl_name', type=str, default='gold_lynel20241010-134332_robot_result.pkl', help='The pickle file name for the optimization result.')
 
     args = parser.parse_args()
 
@@ -36,19 +36,24 @@ if __name__ == '__main__':
 
     # Fill in the metamaterial for each stl file
     for stl_file in tqdm.tqdm(stl_files):
-        if "BODY" in stl_file or "ARM" in stl_file or "TAIL" in stl_file:
+        if "BODY" in stl_file:
+            relative_density = 0.05
+            plate_interval = 20
+            shell_generation_voxel_resolution = 1
+            shell_thickness = 1
+        elif "ARM" in stl_file or "TAIL" in stl_file:
             relative_density = 0.1
             plate_interval = 20
-            shell_generation_voxel_resolution = 0.5
+            shell_generation_voxel_resolution = 1
+            shell_thickness = 1
         else:
             relative_density = 0.15
-            plate_interval = 10
+            plate_interval = 8
             shell_generation_voxel_resolution = 1
+            shell_thickness = 1.5
 
         input_stl_path = urdf_folder + "/" + stl_file
-
         unit = "m"
-        shell_thickness = 1.5
         biased_tenon_length = 0
         use_existing_shell = False
         pkl_result_path = opt_result_pkl_path
@@ -58,7 +63,8 @@ if __name__ == '__main__':
         output_stl_name = stl_file.split(".")[0] + "_plate" + str(plate_interval) + '_' + str(shell_thickness) + 'mm_density_' + str(relative_density) + '30' + '.stl'
 
         # Check if the output file already exists
-        if os.path.exists(output_stl_name):
+        output_stl_path = project_dir + "/metamaterial_filling/data/output/" + output_stl_name
+        if os.path.exists(output_stl_path):
             print("Output file already exists: ", output_stl_name)
             continue
 
