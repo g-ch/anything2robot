@@ -458,7 +458,7 @@ class InterferenceRemoval:
         if not os.path.exists(dir):
             os.makedirs(dir)
         urdf_file = open(dir + self.args.model_name + timestr + '.urdf', 'w+')
-        package_name = "anything2robot"
+        package_name = "urdf_description"
 
         self.urdf_dir = dir + self.args.model_name + timestr + '.urdf'
         urdf_file.write('<?xml version="1.0"?>\n')
@@ -487,7 +487,7 @@ class InterferenceRemoval:
             if root_node.val.axis is None or np.linalg.norm(root_node.val.axis[1]) == 0:
                 
                 # Write BODY link
-                voxel_grid_to_mesh(voxel_positions=self.mesh_group.get_voxels("BODY"), dir=dir + 'BODY.stl', voxel_size=self.args.voxel_size)
+                voxel_grid_to_mesh(voxel_positions=self.mesh_group.get_voxels("BODY")-np.array([[10,0,25]]), dir=dir + 'BODY.stl', voxel_size=self.args.voxel_size)
                 link_visual = {
                     "origin": {"xyz": "0 0 0", "rpy": "0 0 0"},
                     "geometry": {"filename": "package://" + package_name + "/" + dir + "BODY.stl"},
@@ -512,7 +512,8 @@ class InterferenceRemoval:
             # Write current link
             cur_link = root_node.val
             motor_pos, motor_direct, motor_radius = self.link_motor_dict[cur_link.name][-1]
-            father_motor_pos = self.link_motor_dict[self.father_link_dict[cur_link.name]][0][0] if self.father_link_dict[cur_link.name] != "BODY" else np.zeros(3)
+            # Hard code to make body frame up
+            father_motor_pos = self.link_motor_dict[self.father_link_dict[cur_link.name]][0][0] if self.father_link_dict[cur_link.name] != "BODY" else np.array([10, 0, 25])
 
             link_dir = dir + cur_link.name + '' + '.stl'
             voxel_grid_to_mesh(voxel_positions=self.mesh_group.get_voxels(cur_link.name), dir=link_dir, voxel_size=self.args.voxel_size)
