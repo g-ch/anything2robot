@@ -46,7 +46,10 @@ def voxel_grid_to_mesh(voxel_positions, dir, voxel_size, output=True):
     # Find the index of the largest cluster
     triangles_to_remove = cluster_n_triangles[triangle_clusters] < np.max(cluster_n_triangles)
     mesh.remove_triangles_by_mask(triangles_to_remove)
-    
+
+    # Print the ratio of the largest cluster to the total number of triangles
+    #print(f'Largest cluster: {np.max(cluster_n_triangles)} triangles ({np.max(cluster_n_triangles) / len(faces) * 100:.2f}%)')
+
     # Translate the mesh to the origin
     mesh = mesh.translate(min_bounds)
     mesh = mesh.filter_smooth_laplacian(3)

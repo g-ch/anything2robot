@@ -455,6 +455,7 @@ class InterferenceRemoval:
         """
         timestr = time.strftime("%Y%m%d-%H%M%S")
         dir = './urdf/' + self.args.model_name + timestr + '/'
+        
         if not os.path.exists(dir):
             os.makedirs(dir)
         urdf_file = open(dir + self.args.model_name + timestr + '.urdf', 'w+')
