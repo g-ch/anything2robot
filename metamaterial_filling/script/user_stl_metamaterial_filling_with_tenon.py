@@ -644,7 +644,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     final_output_stl_path = os.path.join(output_folder, out_stl_name)
 
     # Define the dimensions of the board
-    safe_scale = 2.0
+    safe_scale = 1.5
     height = (max_z - min_z) * safe_scale
     delf_x = max_x - min_x
     delf_y = max_y - min_y 
@@ -666,6 +666,12 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     thickness = round(thickness / 0.1) * 0.1
 
     plates_num = int(width / (thickness + interval) / 2)
+
+
+
+    # TEST CODE to getsolid model with tenon. No shell or filling
+    # thickness = None
+    # interval = None
 
 
     # Generate the final model

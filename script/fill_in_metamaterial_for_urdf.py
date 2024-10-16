@@ -39,7 +39,7 @@ if __name__ == '__main__':
         if "BODY" in stl_file or "FOREARM" in stl_file:
             relative_density = 0.05
             plate_interval = 20
-            shell_generation_voxel_resolution = 1
+            shell_generation_voxel_resolution = 1.5
             shell_thickness = 1
         elif "ARM" in stl_file or "TAIL" in stl_file:
             relative_density = 0.1
@@ -48,7 +48,7 @@ if __name__ == '__main__':
             shell_thickness = 1
         else:
             relative_density = 0.15
-            plate_interval = 8
+            plate_interval = 10
             shell_generation_voxel_resolution = 1
             shell_thickness = 1.5
 
