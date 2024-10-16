@@ -150,7 +150,7 @@ def auto_design(args):
         print("Checking the mesh destruction...")
 
         urdf_folder = os.path.dirname(urdf_path)
-        destruction_check_pass = destruction_check_urdf_folder(urdf_folder, pkl_file_path, plotting=True)
+        destruction_check_pass = destruction_check_urdf_folder(urdf_folder, pkl_file_path, plotting=False)
         
         if not destruction_check_pass:
             print("Failure Code 2. The mesh is destroyed. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)

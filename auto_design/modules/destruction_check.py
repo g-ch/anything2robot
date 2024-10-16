@@ -42,8 +42,8 @@ def destruction_check(stl_path, result_pkl_path, voxel_size=0.005, plotting=True
     
     link_dict = robot_result.link_dict[input_stl_name_no_ext]
 
-    print("Link name: ", input_stl_name_no_ext)
-    print("Link Tenon Positions: ", link_dict.tenon_pos)
+    # print("Link name: ", input_stl_name_no_ext)
+    # print("Link Tenon Positions: ", link_dict.tenon_pos)
 
     # Iterate through the tenon positions and check if a voxel is close to the tenon position
     distance_threshold = voxel_size * 1.732 * 2 # Use 2 as a safety factor to eliminate the voxel resolution error
