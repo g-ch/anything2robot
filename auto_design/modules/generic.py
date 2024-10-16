@@ -28,6 +28,9 @@ class Generic_Algorithm():
     def fitness_function(self, genome) -> float:
         pass
 
+    def get_costs(self, genome):
+        pass
+
     def generate_individual(self):
         """Generate a random individual."""
         return [random.randint(0, 1) for _ in range(self.genome_length)]
@@ -136,6 +139,7 @@ class Generic_Algorithm():
         # Store log result
         log_result = []
         best_individuals = []
+        cost_log = []
 
         # Run GA
         for generation in range(self.generation_num):
@@ -163,10 +167,14 @@ class Generic_Algorithm():
             # 打印一下variance
             print(f"Generation {generation}, Best Fitness {self.fitness_function(fittest_individual)}")
 
+            cost_log.append(self.get_costs(fittest_individual))
+
         # Results
         best_individual = min(best_individuals, key=lambda genome : self.fitness_function(genome))
-        print(f"Best Fitness: {self.fitness_function(best_individual)}")
-        return best_individual, log_result
+        best_fitness = self.fitness_function(best_individual)
+        print(f"Best Fitness: {best_fitness}")
+
+        return best_individual, cost_log, best_fitness
     
 class Improved_Generic_Algorithm(Generic_Algorithm):
 

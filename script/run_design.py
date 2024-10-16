@@ -14,3 +14,7 @@ import tqdm
 project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_dir)
 
+from auto_design.auto_design import auto_design
+
+def run_design(args):
+    auto_design(args)

@@ -181,7 +181,7 @@ class LinkTreeGUI:
         # Joints in current link
         self.joint_list_frame = self.create_joint_list_frame(self.root)
         self.joint_list_frame.grid(column=1, row=0, sticky='nsew')
- 
+
         # Add link controls
         self.link_edit_frame = self.create_link_edit_frame(self.root)
         self.link_edit_frame.grid(column=0, row=1, sticky='nsew')
@@ -198,7 +198,6 @@ class LinkTreeGUI:
         self.save_frame = self.create_save_frame(self.root)
         self.save_frame.grid(column=1, row=2, sticky='nsew')
 
-
         # Plotly visualization
         self.fig = make_subplots(specs=[[{"type": "scene"}]])
         self.fig.add_trace(mesh.mesh_plotly)
@@ -206,6 +205,7 @@ class LinkTreeGUI:
 
         self.server = Flask(__name__)
         self.app = Dash(__name__, server=self.server)
+
         self.server = make_server("localhost", 8050, self.server)
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         self.server_thread.start()
@@ -225,6 +225,7 @@ class LinkTreeGUI:
 
         def run_dash():
             self.app.run_server(debug=True)
+
         # Create a thread to run the Dash app
         self.dash_thread = Thread(target=run_dash)
         self.dash_thread.start()
@@ -387,7 +388,7 @@ class LinkTreeGUI:
         self.server.shutdown()
         self.server_thread.join()
         self.dash_thread.join()
-        self.root.quit()
+        self.root.destroy()
 
     def quit(self):
         if messagebox.askyesno("Quit", "Do you want to quit and start the design process?"):
@@ -688,14 +689,14 @@ class Mesh_Loader:
         pass
 
     
-    def scale(self):
+    def scale(self, expected_x):
         """
         Scale the mesh, joint data, and link tree according to the expected x-axis length.
         """
 
         # Get the scale factor
         vertices = np.asarray(self.mesh.mesh_o3d.vertices)
-        self.scale_factor = self.args.expected_x / 2 / (np.max(vertices[:,0]))
+        self.scale_factor = expected_x / 2 / (np.max(vertices[:,0]))
 
         # Scale the mesh
         self.scaled_mesh = self.mesh

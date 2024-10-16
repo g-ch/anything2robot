@@ -478,11 +478,14 @@ class General_GA(Improved_Generic_Algorithm):
         # 2. Check the motor torque
         return False
     
-    def fitness_function(self, genome) -> float:    
+
+    def get_costs(self, genome):
         motor_positions, motor_directs, motor_types = self.get_motor_params(genome)
         if self.check_constraint(motor_positions, motor_directs, motor_types):
-            return 1000000
-        cost = 0
+            return 500000, 500000
+        
+        cost_motor_position = 0
+        cost_motor_occupancy = 0
 
         # Conduct BFS for cost
         queue = [self.joint_tree]
@@ -501,9 +504,9 @@ class General_GA(Improved_Generic_Algorithm):
 
             # Positional Cost
             ## Linear Positional Cost
-            cost += 10 * np.linalg.norm(motor_position - np.array(cur_node.val.axis[0]))
+            cost_motor_position += 10 * np.linalg.norm(motor_position - np.array(cur_node.val.axis[0]))
             ## Sigmoidal Positional Cost
-            # cost += 10 * self.get_position_cost(np.linalg.norm(motor_position - np.array(cur_node.val.axis[0])), sigmoidal=False)
+            # cost_motor_position += 10 * self.get_position_cost(np.linalg.norm(motor_position - np.array(cur_node.val.axis[0])), sigmoidal=False)
 
 
             # If the joint has 2 axis, then it has 2 motors connected by a fixed-sized connector
@@ -512,14 +515,23 @@ class General_GA(Improved_Generic_Algorithm):
                 motor2_pos = motor_position - self.connector_lib[motor_idx][0] * np.array(cur_node.val.axis[1]) + self.connector_lib[motor_idx][1] * np.array(cur_node.val.axis[2])
                 motor2_direct = np.array(cur_node.val.axis[2])
                 motor2_type = motor_type
-                # cost += 0.5 * self.get_position_cost(np.linalg.norm(motor2_pos - np.array(cur_node.val.axis[0])), sigmoidal=False)
+                # cost_motor_position += 0.5 * self.get_position_cost(np.linalg.norm(motor2_pos - np.array(cur_node.val.axis[0])), sigmoidal=False)
                 cur_idx += 1
         
         # Occupancy Cost
-        cost += 10 * self.get_occupancy_cost(motor_positions, 
+        cost_motor_occupancy += 10 * self.get_occupancy_cost(motor_positions, 
                                              motor_directs, 
                                              motor_types)
         
+        return cost_motor_position, cost_motor_occupancy
+
+
+
+    def fitness_function(self, genome) -> float:
+        
+        cost_motor_position, cost_motor_occupancy = self.get_costs(genome) 
+        cost = cost_motor_position + cost_motor_occupancy
+
         return cost
 
     def from_genome_to_motor_results(self, genome):
@@ -635,9 +647,9 @@ class Motor_Opt:
                                     connector_lib=self.connector_lib)
 
         # Generate initial state where motors are put right at the position of relevant joints
-        genome_result, _ = self.ga_runner.run_generic(self.ga_runner.initial_population)
+        genome_result, cost_log, best_fitness = self.ga_runner.run_generic(self.ga_runner.initial_population)
         self.motor_results = self.ga_runner.from_genome_to_motor_results(genome_result)
-        return self.motor_results
+        return self.motor_results, cost_log, best_fitness
 
     def create_motors(self, 
                       motor_params_results,
@@ -979,7 +991,7 @@ if __name__=="__main__":
                 #  [4.5, 2.5, 8 ],  # DM4310
                  [3.75, 4.8, 20 ]]  # DM4310
     motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib)
-    motor_results = motor_opt.run_opt()
+    motor_results, __, __ = motor_opt.run_opt()
     # np.save('./results/' + args.model_name + '_motor_results1.npy', motor_results)
     motor_opt.render()
     

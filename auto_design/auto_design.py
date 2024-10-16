@@ -24,7 +24,7 @@ class MotorParameterLib:
         # Height (cm), Radius (cm), Max Torque (N*M) 
         self.motor_lib = [[5.6 + self.tenon_height, 4.2, 12],   # DM6006. DAMIAO Tech         
                           [3.42 + self.tenon_height, 2.65, 2.5], # MG4005V2. K-Tech
-                          [8.1 + self.tenon_height, 5.3, 20 ]]  # DM8009. DAMIAO Tech
+                          [8.1 + self.tenon_height, 5.3, 20]]  # DM8009. DAMIAO Tech
         
         # This is the connector length between two motors in a 2 DOF joint. L shape. Unit: cm
         self.connector_lib = [[6, 6], 
@@ -43,39 +43,66 @@ Auto design process
 Check main function below to know how to use the function
 '''
 def auto_design(args):
+    show_render_result = args.visualize
+
+    # Load the mesh
     mesh_path = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '.stl')
     joint_path = os.path.normpath('./auto_design/model/given_models/' + args.model_name + '_joints.pkl')
     
     mesh_loader = Custom_Mesh_Loader(args)
     mesh_loader.load_mesh(mesh_path)
     mesh_loader.load_joint_positions(joint_path)
-    mesh_loader.scale()
+    expected_x = args.expected_x
+    mesh_loader.scale(expected_x)
 
-    time.sleep(3)
+    motor_cost_this = 1e6
+    counter = 0
 
-    # mesh_decomp = Mesh_Decomp(args, mesh_loader)\
-    print("Decomposing the mesh...")
-    mesh_decomp = Mesh_Decomp(args, mesh_loader)
-    mesh_decomp.decompose()
-    mesh_decomp.render()
+    # The motor cost should be less than the threshold
+    while motor_cost_this > args.motor_cost_threshold and counter < 2:
+        counter += 1
+        print("Decomposing and motor optimization process: ", counter)    
 
-    # Do actuator optimization
-    print("Optimizing the actuators...")
-    bounds = get_bounds(mesh_decomp.link_tree, threshold=6)
+        # Do mesh decomposition
+        print("Decomposing the mesh...")
+        mesh_decomp = Mesh_Decomp(args, mesh_loader)
+        mesh_decomp.decompose()
+        if show_render_result:
+            mesh_decomp.render()
 
-    motor_param_lib = MotorParameterLib()
-    motor_lib = motor_param_lib.get_motor_lib()
-    connector_lib = motor_param_lib.get_connector_lib()
-    
-    motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib, connector_lib)
-    motor_results = motor_opt.run_opt(generation_num=args.genetic_generation)
-    motor_opt.render()
-    time.sleep(3)
+        # Do actuator optimization. The first step in Motor_Opt will use pinocchio to calculate the torque and choose the motor.
+        print("Optimizing the actuators...")
+        bounds = get_bounds(mesh_decomp.link_tree, threshold=6)
+
+        motor_param_lib = MotorParameterLib()
+        motor_lib = motor_param_lib.get_motor_lib()
+        connector_lib = motor_param_lib.get_connector_lib()
+        
+        motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib, connector_lib)
+        motor_results, cost_log, best_fitness = motor_opt.run_opt(generation_num=args.genetic_generation)
+
+        print("cost_log: ", cost_log)  #cost_log:  [(Motor_position_cost, Occupancy_cost), ...]
+        print("Auto design best fitness: ", best_fitness)
+
+        motor_cost_this = best_fitness
+
+        if show_render_result:
+            motor_opt.render()
+        time.sleep(3)
+
+        # Up scale the mesh if the motor cost is too high
+        if motor_cost_this > args.motor_cost_threshold:
+            print("The motor cost is too high. Re-optimizing the motors...")
+            expected_x = expected_x * 1.2
+            mesh_loader.scale(expected_x)
+
+
     # Refine the mesh to connect the joints
     print("Refining the mesh to connect the actuators...")
     joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
     joint_connect_opt.run_opt()
-    mesh_decomp.mesh_group.render()
+    if show_render_result:
+        mesh_decomp.mesh_group.render()
     time.sleep(3)
 
     # Remove the interference between the links while moving the joints
@@ -91,7 +118,10 @@ def auto_design(args):
 
     interference_removal.set_joint_limit(joint_limits)
     interference_removal.remove_interference()
-    interference_removal.mesh_group.render()
+
+    if show_render_result:
+        interference_removal.mesh_group.render()
+
     time.sleep(3)
     urdf_dir = interference_removal.generate_urdf()
 
@@ -111,6 +141,9 @@ if __name__=="__main__":
     parser.add_argument('--voxel_density', type=float, default=1.5e-4, help='The estimated density of the voxel. (kg/cm^3)')
     parser.add_argument('--genetic_generation', type=int, default=5, help='The number of generations for the genetic algorithm')
     parser.add_argument('--joint_limitation', type=float, default=1, help='The limitation of the joint. +-joint_limitation. (rad)')
+
+    parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not')
+    parser.add_argument('--motor_cost_threshold', type=float, default=200, help='The threshold of the motor cost. If the cost is larger than this threshold, the motor will be considered as invalid.')
     args = parser.parse_args()
 
     auto_design(args)
