@@ -173,6 +173,8 @@ def do_static_fea(args):
     # Start the optimization
     relative_density = args.initial_relative_density
     young_modulus = get_equivalent_young_modulus(args.material_young_modulus, relative_density, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)
+    print(f'Equivalant young modulus: {young_modulus}')
+    
     max_stress, max_displacement, von_mises, displacement_magnitude, nodes  = static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
     
     stress_to_allowed_value =  max_stress - args.max_allowd_stress

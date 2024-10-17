@@ -21,6 +21,7 @@ sys.path.append(project_dir + '/auto_design')
 from interference_removal import RobotOptResult, LinkResult
 from stl_relative_density_fea_opt import do_static_fea
 from io_interface.fea_result_class import FEA_Opt_Result
+from simple_force_calculator import calculate_forces_from_nodes_and_torques
 
 
 # Function to calculate the Euclidean distance between two points
@@ -85,7 +86,7 @@ def create_sphere(center, radius=1.0, color=[1, 0, 0]):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Static FEA Analysis for STL with given forces and fixed nodes")
     
-    parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/FL_UP.stl', help="Path to the mesh .stl file")
+    parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/FL_LOW.stl', help="Path to the mesh .stl file")
     parser.add_argument("--robot_result_file", type=str, default='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241010-134332_robot_result.pkl', help="Path to the robot result including applied torques")
 
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. Note FEA uses mm as the unit. If the unit is in meter, we will scale the model to mm.')
@@ -114,7 +115,7 @@ if __name__ == "__main__":
 
     ### Optimization parameters
     parser.add_argument("--max_allowd_stress", type=float, default=108, help="Maximum allowed von Mises stress. MPa")
-    parser.add_argument("--max_allowd_displacement", type=float, default=5, help="Maximum allowed displacement. mm")
+    parser.add_argument("--max_allowd_displacement", type=float, default=3, help="Maximum allowed displacement. mm")
     parser.add_argument("--max_iteration", type=int, default=1, help="Maximum number of iterations")
     parser.add_argument("--initial_relative_density", type=float, default=0.2, help="Initial relative density of the metamaterial structure")
     parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate for the gradient descent")
@@ -150,7 +151,7 @@ if __name__ == "__main__":
         print("Farthest vertex: ", farthest_vertex)
 
         # Add the farthest vertex as the first element
-        link_dict.tenon_pos.insert(0, np.array([farthest_vertex[0], farthest_vertex[1], farthest_vertex[2]]))
+        link_dict.tenon_pos.insert(0, np.array([farthest_vertex[0], farthest_vertex[1], farthest_vertex[2], 0, 0, 0]))
         link_dict.applied_torque.insert(0, np.array([farthest_vertex[0], farthest_vertex[1], farthest_vertex[2], 0, 0, 0]))
         use_farthest_vertex_as_fixed_node = True
 
@@ -162,9 +163,14 @@ if __name__ == "__main__":
         link_dict.applied_torque = np.array(link_dict.applied_torque) * 1000 #mm, Nmm
 
 
-    # Get equivalent forces
-    force_nodes_pos = []
-    forces = []
+    forces = calculate_forces_from_nodes_and_torques(link_dict.tenon_pos, link_dict.applied_torque)
+    # Suppose forces direction is +y
+    forces_vector = []
+    for force in forces:
+        forces_vector.append([0, force, 0])
+
+    force_nodes_pos_list = []
+    forces_list = []
     original_torque_node_list = []
     rotation_vector_list = []
     motor_radius = 30 # mm
@@ -183,10 +189,20 @@ if __name__ == "__main__":
                 fixed_node_index = i
 
     non_fixed_nodes_indices = [i for i in range(len(link_dict.applied_torque)) if i != fixed_node_index]
+
     
     print("Fixed node: ", fixed_nodes)
     print("Non fixed nodes: ", non_fixed_nodes_indices)
 
+
+    # Add forces
+    for i in non_fixed_nodes_indices:
+        force_node = [link_dict.tenon_pos[i][0], link_dict.tenon_pos[i][1], link_dict.tenon_pos[i][2]]
+        force_nodes_pos_list.append(force_node)
+        forces_list.append(forces_vector[i])
+
+    
+    # Get equivalent forces from the applied torques and add them
     for i in non_fixed_nodes_indices:
         # Set the force node and force vector. Start from the second tenon_pos position. The first applied_torque position is the fixed node
         original_torque_node_vector = [link_dict.tenon_pos[i][0], link_dict.tenon_pos[i][1], link_dict.tenon_pos[i][2]]
@@ -209,8 +225,8 @@ if __name__ == "__main__":
         force_vector_unit = np.cross(rotation_vector, cross_vector_unit)
         force_vector_unit = force_vector_unit / np.linalg.norm(force_vector_unit)
 
-        force_nodes_pos.append(force_node)
-        forces.append(force_vector_unit * each_force_length)
+        force_nodes_pos_list.append(force_node)
+        forces_list.append(force_vector_unit * each_force_length)
         
 
         # Get the rest of the forces
@@ -225,10 +241,10 @@ if __name__ == "__main__":
                                          [rotation_vector[2] * rotation_vector[0] * (1 - np.cos(rotation_angle)) - rotation_vector[1] * np.sin(rotation_angle), rotation_vector[2] * rotation_vector[1] * (1 - np.cos(rotation_angle)) + rotation_vector[0] * np.sin(rotation_angle), np.cos(rotation_angle) + rotation_vector[2]**2 * (1 - np.cos(rotation_angle))]])
             
             force_node_rotated = np.dot(rotation_matrix, force_node_to_rotation_center) + original_torque_node_vector
-            force_nodes_pos.append(force_node_rotated)
+            force_nodes_pos_list.append(force_node_rotated)
 
             force_vector_unit_rotated = np.dot(rotation_matrix, force_vector_unit)
-            forces.append(force_vector_unit_rotated * each_force_length)
+            forces_list.append(force_vector_unit_rotated * each_force_length)
         
 
     # VISUALIZATION
@@ -236,13 +252,13 @@ if __name__ == "__main__":
         vis = o3d.visualization.Visualizer()
         vis.create_window()
 
-        arrow = [None] * len(forces)
-        for i in range(len(force_nodes_pos)):
-            arrow[i] = create_arrow(force_nodes_pos[i], forces[i], length=each_force_length, radius=0.5, resolution=20, color=[1, 0, 0])
+        arrow = [None] * len(forces_list)
+        for i in range(len(force_nodes_pos_list)):
+            arrow[i] = create_arrow(force_nodes_pos_list[i], forces_list[i], length=each_force_length, radius=0.5, resolution=20, color=[1, 0, 0])
             vis.add_geometry(arrow[i])
 
-            print("Force node: ", force_nodes_pos[i])
-            print("Force: ", forces[i])
+            print("Force node: ", force_nodes_pos_list[i])
+            print("Force: ", forces_list[i])
         
 
         for i in range(len(original_torque_node_list)):
@@ -259,8 +275,8 @@ if __name__ == "__main__":
     
     # Do FEA analysis
     args.fixed_nodes = fixed_nodes
-    args.forces_nodes = force_nodes_pos
-    args.forces = forces
+    args.forces_nodes = force_nodes_pos_list
+    args.forces = forces_list
 
     success_flag, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes = do_static_fea(args)
 
