@@ -83,11 +83,15 @@ def create_sphere(center, radius=1.0, color=[1, 0, 0]):
     return sphere
 
 
-if __name__ == "__main__":
+def stl_force_relative_density_fea_opt():
     parser = argparse.ArgumentParser(description="Static FEA Analysis for STL with given forces and fixed nodes")
     
-    parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/FL_LOW.stl', help="Path to the mesh .stl file")
-    parser.add_argument("--robot_result_file", type=str, default='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241010-134332_robot_result.pkl', help="Path to the robot result including applied torques")
+    # parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/FL_LOW.stl', help="Path to the mesh .stl file")
+    # parser.add_argument("--robot_result_file", type=str, default='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241010-134332_robot_result.pkl', help="Path to the robot result including applied torques")
+
+    parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241016-212518_bad_example/RL_LOW.stl', help="Path to the mesh .stl file")
+    parser.add_argument("--robot_result_file", type=str, default='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241016-212518_robot_result.pkl', help="Path to the robot result including applied torques")
+
 
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. Note FEA uses mm as the unit. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--output_folder', type=str, default='data/output', help='Output folder path')
@@ -114,7 +118,7 @@ if __name__ == "__main__":
     parser.add_argument("--display_force_result", type=bool, default=True, help="Display the forces")
 
     ### Optimization parameters
-    parser.add_argument("--max_allowd_stress", type=float, default=108, help="Maximum allowed von Mises stress. MPa")
+    parser.add_argument("--max_allowd_stress", type=float, default=2, help="Maximum allowed von Mises stress. MPa")
     parser.add_argument("--max_allowd_displacement", type=float, default=3, help="Maximum allowed displacement. mm")
     parser.add_argument("--max_iteration", type=int, default=1, help="Maximum number of iterations")
     parser.add_argument("--initial_relative_density", type=float, default=0.2, help="Initial relative density of the metamaterial structure")
@@ -254,7 +258,7 @@ if __name__ == "__main__":
 
         arrow = [None] * len(forces_list)
         for i in range(len(force_nodes_pos_list)):
-            arrow[i] = create_arrow(force_nodes_pos_list[i], forces_list[i], length=each_force_length, radius=0.5, resolution=20, color=[1, 0, 0])
+            arrow[i] = create_arrow(force_nodes_pos_list[i], forces_list[i], length=np.linalg.norm(forces_list[i]), radius=0.5, resolution=20, color=[1, 0, 0])
             vis.add_geometry(arrow[i])
 
             print("Force node: ", force_nodes_pos_list[i])
@@ -296,3 +300,6 @@ if __name__ == "__main__":
     
     print("FEA result is saved to ", pkl_file_path)
 
+
+if __name__ == "__main__":
+    stl_force_relative_density_fea_opt()

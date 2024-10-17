@@ -14,10 +14,15 @@ def calculate_forces_from_nodes_and_torques(tenon_positions, applied_torque):
     #print("center: ", center)
 
     forces=[]
+    avg_toque = 0
+    for i in range(len(applied_torque)):
+        avg_toque += np.linalg.norm(applied_torque[i][3:])
+    avg_toque /= len(applied_torque)
+
     for i in range(len(applied_torque)):
         pos = tenon_positions[i][:3]
         distance = np.linalg.norm(pos - center)
-        torque = np.linalg.norm(applied_torque[i][3:])
+        torque = avg_toque #np.linalg.norm(applied_torque[i][3:])
         if distance == 0:
             force = 0
         else:
