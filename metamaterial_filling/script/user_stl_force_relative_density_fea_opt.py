@@ -83,14 +83,14 @@ def create_sphere(center, radius=1.0, color=[1, 0, 0]):
     return sphere
 
 
-def stl_force_relative_density_fea_opt():
+def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=None, output_folder=None, max_iteration=None, max_allowd_stress=None, max_allowd_displacement=None, display_fea_result=None, display_force_result=None):
     parser = argparse.ArgumentParser(description="Static FEA Analysis for STL with given forces and fixed nodes")
     
-    # parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/FL_LOW.stl', help="Path to the mesh .stl file")
-    # parser.add_argument("--robot_result_file", type=str, default='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241010-134332_robot_result.pkl', help="Path to the robot result including applied torques")
+    parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/BODY_UP.stl', help="Path to the mesh .stl file")
+    parser.add_argument("--robot_result_file", type=str, default='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241010-134332_robot_result.pkl', help="Path to the robot result including applied torques")
 
-    parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241016-212518_bad_example/RL_LOW.stl', help="Path to the mesh .stl file")
-    parser.add_argument("--robot_result_file", type=str, default='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241016-212518_robot_result.pkl', help="Path to the robot result including applied torques")
+    # parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241016-212518_bad_example/BODY_UP.stl', help="Path to the mesh .stl file")
+    # parser.add_argument("--robot_result_file", type=str, default='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241016-212518_robot_result.pkl', help="Path to the robot result including applied torques")
 
 
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. Note FEA uses mm as the unit. If the unit is in meter, we will scale the model to mm.')
@@ -131,6 +131,25 @@ def stl_force_relative_density_fea_opt():
     
     args = parser.parse_args()
 
+
+    # Use function input if provided
+    if stl_path_input is not None:
+        args.input_stl_path = stl_path_input
+    if robot_result_file is not None:
+        args.robot_result_file = robot_result_file
+    if output_folder is not None:
+        args.output_folder = output_folder
+    if max_iteration is not None:
+        args.max_iteration = max_iteration
+    if max_allowd_stress is not None:
+        args.max_allowd_stress = max_allowd_stress
+    if max_allowd_displacement is not None:
+        args.max_allowd_displacement = max_allowd_displacement
+    if display_fea_result is not None:
+        args.display_fea_result = display_fea_result
+    if display_force_result is not None:
+        args.display_force_result = display_force_result
+
     # Load robot result
     robot_result = pkl.load(open(args.robot_result_file, 'rb'))
     input_stl_name_no_ext = args.input_stl_path.replace(".stl", "").split("/")[-1]
@@ -168,10 +187,10 @@ def stl_force_relative_density_fea_opt():
 
 
     forces = calculate_forces_from_nodes_and_torques(link_dict.tenon_pos, link_dict.applied_torque)
-    # Suppose forces direction is +y
+    # Suppose forces direction is +z, to resist the gravity
     forces_vector = []
     for force in forces:
-        forces_vector.append([0, force, 0])
+        forces_vector.append([0, 0, force])
 
     force_nodes_pos_list = []
     forces_list = []
@@ -300,6 +319,8 @@ def stl_force_relative_density_fea_opt():
     
     print("FEA result is saved to ", pkl_file_path)
 
+    return success_flag, best_relative_density
+
 
 if __name__ == "__main__":
-    stl_force_relative_density_fea_opt()
+    stl_force_relative_density_fea_opt(stl_path_input='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/FR_UP.stl')

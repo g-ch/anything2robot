@@ -9,6 +9,7 @@ project_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_path)
 sys.path.append(os.path.normpath(os.path.join(project_path, 'auto_design')))
 sys.path.append(os.path.normpath(os.path.join(project_path, 'auto_design/modules')))
+sys.path.append(os.path.normpath(os.path.join(project_path, 'metamaterial_filling/script')))
 
 #sys.path.append(os.path.normpath('../auto_design/modules'))
 
@@ -18,6 +19,7 @@ from modules.mesh_decomp import Mesh_Decomp
 from modules.motor_opt import Motor_Opt, Joint_Connect_Opt, get_bounds
 from modules.interference_removal import InterferenceRemoval, RobotOptResult
 from modules.destruction_check import destruction_check, destruction_check_urdf_folder
+from metamaterial_filling.script.user_stl_force_relative_density_fea_opt import stl_force_relative_density_fea_opt
 
 '''
 Motor parameter library. This is used to store the motor parameters that is used in the optimization process.
@@ -71,6 +73,8 @@ def auto_design(args):
     # The motor cost should be less than the threshold
     while exit_code != 0 and counter < 5:
         counter += 1
+        exit_code = 0
+
         print("Decomposing and motor optimization process: ", counter)    
 
         # Do mesh decomposition
@@ -107,8 +111,6 @@ def auto_design(args):
             mesh_loader.scale(expected_x)
             exit_code = 1
             continue
-        else:
-            exit_code = 0
 
         # Refine the mesh to connect the joints
         print("Refining the mesh to connect the actuators...")
@@ -150,19 +152,42 @@ def auto_design(args):
         print("Checking the mesh destruction...")
 
         urdf_folder = os.path.dirname(urdf_path)
+        print("urdf_folder: ", urdf_folder)
+
         destruction_check_pass = destruction_check_urdf_folder(urdf_folder, pkl_file_path, plotting=False)
         
         if not destruction_check_pass:
             print("Failure Code 2. The mesh is destroyed. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
             exit_code = 2
             continue
-        else:
-            exit_code = 0
         
         
-        #TODO: Do FEA analysis for each link
-        # if args.do_fea_analysis:
+        # Do FEA analysis for each link if the flag is set
+        if args.do_fea_analysis:
+            print("Do FEA analysis...")
+            max_iteration = 1
 
+            # Search the urdf folder to find all the stl files
+            stl_files = []
+            for root, dirs, files in os.walk(urdf_folder):
+                for file in files:
+                    if file.endswith(".stl"):
+                        stl_files.append(os.path.join(root, file))
+            
+            for stl_file in stl_files:
+                print("stl_file: ", stl_file)
+                success_flag, best_relative_density = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, max_iteration=max_iteration, display_fea_result=True, display_force_result=True)
+                if not success_flag:
+                    print("Failure Code 3. The mesh is not feasible in FEA. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
+                    exit_code = 3
+                    break
+                
+                time.sleep(3)
+            
+            if exit_code == 3:
+                continue
+            else:
+                print("Success!!!!!!!!!!! The model is feasible in FEA.")
 
     return exit_code
 
@@ -176,7 +201,7 @@ if __name__=="__main__":
     parser.add_argument('--joint_limitation', type=float, default=1, help='The limitation of the joint. +-joint_limitation. (rad)')
 
     parser.add_argument('--genetic_generation', type=int, default=5, help='The number of generations for the genetic algorithm')
-    parser.add_argument('--do_fea_analysis', type=bool, default=False, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
+    parser.add_argument('--do_fea_analysis', type=bool, default=True, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
     parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not')
     args = parser.parse_args()
 
