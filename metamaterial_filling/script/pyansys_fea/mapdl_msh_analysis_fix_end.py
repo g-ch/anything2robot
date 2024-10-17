@@ -147,7 +147,7 @@ def static_fea_analysis(msh_file, elastic=210e3, poisson_ratio=0.3, fixed_end=4,
     for i in range(len(forces_nodes)):
         nearest_n_indices = find_nearest_n_nodes(nodes, forces_nodes[i], closest_node_num_per_force)
 
-        print(f"Nearest node to the point {forces_nodes[i]} is {nearest_n_indices}")
+        # print(f"Nearest node to the point {forces_nodes[i]} is {nearest_n_indices}")
         
         # Convert to one-based indexing for MAPDL
         nearest_n_indices_from_1 = nearest_n_indices + 1

@@ -11,7 +11,7 @@ from format_transform.stl_to_off import stlToOff
 from format_transform.vtu_to_ansys_msh import write_msh_file
 from pyansys_fea.mapdl_msh_analysis import static_fea_analysis
 import time
-
+import trimesh
 
 '''
 @breif: Do meshing using tetrahedralMeshing
@@ -126,8 +126,17 @@ def do_static_fea(args):
     #################  Scale if the mesh is in m rather than mm  ########################
     if args.unit == 'm':
         # Use gnome-terminal to run the command
-        subprocess.run(['gnome-terminal', '--', 'bash', '-c', f'cd {cmake_build_dir}; ./scaleMesh {ori_stl_file_path} {scaled_file_path} 1000'])
+        # print(f'Scaling the model to mm... ori_stl_file_path: {ori_stl_file_path}, scaled_file_path: {scaled_file_path}')
+        # subprocess.run(['gnome-terminal', '--', 'bash', '-c', f'cd {cmake_build_dir}; ./scaleMesh {ori_stl_file_path} {scaled_file_path} 1000'])
+        print(f'Scaling the model to mm...')
+
+        # Use triMesh to scale the model
+        mesh = trimesh.load(ori_stl_file_path)
+        mesh.apply_scale(1000)
+        mesh.export(scaled_file_path)
+
     else:
+        print(f'Copying the model to the output folder...')
         os.system(f'cp {args.input_stl_path} {scaled_file_path}')
     
     # Check if the scaled file exists. If not wait for 1 second and check again.
@@ -174,7 +183,7 @@ def do_static_fea(args):
     relative_density = args.initial_relative_density
     young_modulus = get_equivalent_young_modulus(args.material_young_modulus, relative_density, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)
     print(f'Equivalant young modulus: {young_modulus}')
-    
+
     max_stress, max_displacement, von_mises, displacement_magnitude, nodes  = static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
     
     stress_to_allowed_value =  max_stress - args.max_allowd_stress

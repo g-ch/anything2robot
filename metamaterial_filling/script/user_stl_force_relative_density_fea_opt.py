@@ -118,8 +118,8 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
     parser.add_argument("--display_force_result", type=bool, default=True, help="Display the forces")
 
     ### Optimization parameters
-    parser.add_argument("--max_allowd_stress", type=float, default=2, help="Maximum allowed von Mises stress. MPa")
-    parser.add_argument("--max_allowd_displacement", type=float, default=3, help="Maximum allowed displacement. mm")
+    parser.add_argument("--max_allowd_stress", type=float, default=3, help="Maximum allowed von Mises stress. MPa")
+    parser.add_argument("--max_allowd_displacement", type=float, default=5, help="Maximum allowed displacement. mm")
     parser.add_argument("--max_iteration", type=int, default=1, help="Maximum number of iterations")
     parser.add_argument("--initial_relative_density", type=float, default=0.2, help="Initial relative density of the metamaterial structure")
     parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate for the gradient descent")
@@ -150,6 +150,12 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
     if display_force_result is not None:
         args.display_force_result = display_force_result
 
+    # Clean the output folder
+    if not os.path.exists(args.output_folder):
+        os.makedirs(args.output_folder)
+    else:
+        os.system("rm -r " + args.output_folder + "/*")
+
     # Load robot result
     robot_result = pkl.load(open(args.robot_result_file, 'rb'))
     input_stl_name_no_ext = args.input_stl_path.replace(".stl", "").split("/")[-1]
@@ -173,9 +179,12 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
         farthest_vertex, distance = find_farthest_vertex(stl_mesh, torque_node_point)
         print("Farthest vertex: ", farthest_vertex)
 
+        # Use the point between the farthest vertex and the torque node as the fixed node
+        fixed_node = farthest_vertex * 0.8 + torque_node_point * 0.2
+
         # Add the farthest vertex as the first element
-        link_dict.tenon_pos.insert(0, np.array([farthest_vertex[0], farthest_vertex[1], farthest_vertex[2], 0, 0, 0]))
-        link_dict.applied_torque.insert(0, np.array([farthest_vertex[0], farthest_vertex[1], farthest_vertex[2], 0, 0, 0]))
+        link_dict.tenon_pos.insert(0, np.array([fixed_node[0], fixed_node[1], fixed_node[2], 0, 0, 0]))
+        link_dict.applied_torque.insert(0, np.array([fixed_node[0], fixed_node[1], fixed_node[2], 0, 0, 0]))
         use_farthest_vertex_as_fixed_node = True
 
         print("Link Torques: ", link_dict.applied_torque)

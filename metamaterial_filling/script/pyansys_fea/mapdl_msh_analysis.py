@@ -108,7 +108,7 @@ def static_fea_analysis(msh_file, elastic=210e3, poisson_ratio=0.3, fixed_nodes=
         
         # Convert to one-based indexing for MAPDL
         nearest_n_indices_from_1 = nearest_n_indices + 1
-        print(f"FIXED END: Nearest node to the point {fixed_nodes[i]} is {nearest_n_indices_from_1}")
+        # print(f"FIXED END: Nearest node to the point {fixed_nodes[i]} is {nearest_n_indices_from_1}")
 
         # Select nodes
         mapdl.nsel('S', 'NODE', vmin=nearest_n_indices_from_1[0], vmax=nearest_n_indices_from_1[0])
@@ -147,7 +147,7 @@ def static_fea_analysis(msh_file, elastic=210e3, poisson_ratio=0.3, fixed_nodes=
 
         # Convert to one-based indexing for MAPDL
         nearest_n_indices_from_1 = nearest_n_indices + 1
-        print(f"Nearest node to the point {forces_nodes[i]} is {nearest_n_indices_from_1}")
+        # print(f"Nearest node to the point {forces_nodes[i]} is {nearest_n_indices_from_1}")
 
         # Select nodes
         mapdl.nsel('S', 'NODE', vmin=nearest_n_indices_from_1[0], vmax=nearest_n_indices_from_1[0])

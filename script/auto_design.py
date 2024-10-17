@@ -5,6 +5,8 @@ import pickle as pkl
 import time
 # Add dependencies path
 import sys
+import trimesh
+
 project_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_path)
 sys.path.append(os.path.normpath(os.path.join(project_path, 'auto_design')))
@@ -160,31 +162,43 @@ def auto_design(args):
             print("Failure Code 2. The mesh is destroyed. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
             exit_code = 2
             continue
+
+        # Check if the meshes are watertight use trimesh
+        stl_files = []
+        for root, dirs, files in os.walk(urdf_folder):  # Search the urdf folder to find all the stl files
+            for file in files:
+                if file.endswith(".stl"):
+                    stl_files.append(os.path.join(root, file))
         
+        for stl_file in stl_files:
+            mesh = trimesh.load(stl_file)
+            if not mesh.is_watertight:
+                print("Failure Code 3. The mesh is not watertight. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
+                exit_code = 3
+                break
+        
+        if exit_code == 3:
+            print("The mesh is not watertight. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
+            exit()
+
         
         # Do FEA analysis for each link if the flag is set
         if args.do_fea_analysis:
             print("Do FEA analysis...")
             max_iteration = 1
 
-            # Search the urdf folder to find all the stl files
-            stl_files = []
-            for root, dirs, files in os.walk(urdf_folder):
-                for file in files:
-                    if file.endswith(".stl"):
-                        stl_files.append(os.path.join(root, file))
-            
             for stl_file in stl_files:
-                print("stl_file: ", stl_file)
-                success_flag, best_relative_density = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, max_iteration=max_iteration, display_fea_result=True, display_force_result=True)
+                print("************************stl_file: ", stl_file)
+                success_flag, best_relative_density = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, max_iteration=max_iteration, display_fea_result=False, display_force_result=False)
                 if not success_flag:
                     print("Failure Code 3. The mesh is not feasible in FEA. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
-                    exit_code = 3
+                    exit_code = 4
                     break
                 
                 time.sleep(3)
             
-            if exit_code == 3:
+            if exit_code == 4:
+                print("The mesh is not feasible in FEA. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
                 continue
             else:
                 print("Success!!!!!!!!!!! The model is feasible in FEA.")
