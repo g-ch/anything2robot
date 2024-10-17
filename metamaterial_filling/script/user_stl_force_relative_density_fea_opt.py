@@ -85,7 +85,7 @@ def create_sphere(center, radius=1.0, color=[1, 0, 0]):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Static FEA Analysis for STL with given forces and fixed nodes")
     
-    parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/BODY.stl', help="Path to the mesh .stl file")
+    parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/FL_UP.stl', help="Path to the mesh .stl file")
     parser.add_argument("--robot_result_file", type=str, default='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241010-134332_robot_result.pkl', help="Path to the robot result including applied torques")
 
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. Note FEA uses mm as the unit. If the unit is in meter, we will scale the model to mm.')
@@ -114,8 +114,8 @@ if __name__ == "__main__":
 
     ### Optimization parameters
     parser.add_argument("--max_allowd_stress", type=float, default=108, help="Maximum allowed von Mises stress. MPa")
-    parser.add_argument("--max_allowd_displacement", type=float, default=3, help="Maximum allowed displacement. mm")
-    parser.add_argument("--max_iteration", type=int, default=2, help="Maximum number of iterations")
+    parser.add_argument("--max_allowd_displacement", type=float, default=5, help="Maximum allowed displacement. mm")
+    parser.add_argument("--max_iteration", type=int, default=1, help="Maximum number of iterations")
     parser.add_argument("--initial_relative_density", type=float, default=0.2, help="Initial relative density of the metamaterial structure")
     parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate for the gradient descent")
 
@@ -133,27 +133,32 @@ if __name__ == "__main__":
     link_dict = robot_result.link_dict[input_stl_name_no_ext]
 
     print("Link name: ", input_stl_name_no_ext)
+    print("Link tenons: ", link_dict.tenon_pos)
     print("Link Torques: ", link_dict.applied_torque)
     #print("Joint type: ", link_dict.joint_type)
 
 
     # For the links with only one node. We need to add a fixed end.
-    if len(link_dict.applied_torque) < 2:
+    use_farthest_vertex_as_fixed_node = False
+    if len(link_dict.tenon_pos) < 2:
         print("At least two applied_torque positions are required for FEA analysis. The first applied_torque position is used as the fixed node. Will use the fartherst vertex as the fixed node.")
-        # Load the STL file
+        # Load the STL file. Later in FEA the stl will be scaled to mm.
         stl_mesh = load_stl(args.input_stl_path)
-        torque_node_point = link_dict.applied_torque[0][:3]
+        torque_node_point = link_dict.tenon_pos[0][:3]
         print("Torque node point: ", torque_node_point)
         farthest_vertex, distance = find_farthest_vertex(stl_mesh, torque_node_point)
         print("Farthest vertex: ", farthest_vertex)
 
         # Add the farthest vertex as the first element
-        link_dict.applied_torque.insert(0, np.array([0, 0, 0, 0, 0, 0]))
+        link_dict.tenon_pos.insert(0, np.array([farthest_vertex[0], farthest_vertex[1], farthest_vertex[2]]))
+        link_dict.applied_torque.insert(0, np.array([farthest_vertex[0], farthest_vertex[1], farthest_vertex[2], 0, 0, 0]))
+        use_farthest_vertex_as_fixed_node = True
 
         print("Link Torques: ", link_dict.applied_torque)
 
 
     if args.unit == 'm':
+        link_dict.tenon_pos = np.array(link_dict.tenon_pos) * 1000 #mm
         link_dict.applied_torque = np.array(link_dict.applied_torque) * 1000 #mm, Nmm
 
 
@@ -164,15 +169,18 @@ if __name__ == "__main__":
     rotation_vector_list = []
     motor_radius = 30 # mm
 
-    # Get the fixed nodes. Find the index of the fixed node in the link_dict.applied_torque
-    fixed_nodes = []
+    # Get the fixed nodes. Use the farthest point or find the index of the fixed node in the link_dict.applied_torque
     fixed_node_index = 0
     biggest_torque = 0
-    for i in range(len(link_dict.applied_torque)):
-        if np.linalg.norm(link_dict.applied_torque[i][3:]) > biggest_torque:
-            biggest_torque = np.linalg.norm(link_dict.applied_torque[i][3:])
-            fixed_nodes = [[link_dict.applied_torque[i][0], link_dict.applied_torque[i][1], link_dict.applied_torque[i][2]]]
-            fixed_node_index = i
+    if use_farthest_vertex_as_fixed_node:
+        fixed_node_index = 0
+        fixed_nodes = [[link_dict.tenon_pos[0][0], link_dict.tenon_pos[0][1], link_dict.tenon_pos[0][2]]]
+    else:
+        for i in range(len(link_dict.applied_torque)):
+            if np.linalg.norm(link_dict.applied_torque[i][3:]) > biggest_torque:
+                biggest_torque = np.linalg.norm(link_dict.applied_torque[i][3:])
+                fixed_nodes = [[link_dict.tenon_pos[i][0], link_dict.tenon_pos[i][1], link_dict.tenon_pos[i][2]]]
+                fixed_node_index = i
 
     non_fixed_nodes_indices = [i for i in range(len(link_dict.applied_torque)) if i != fixed_node_index]
     
@@ -180,8 +188,8 @@ if __name__ == "__main__":
     print("Non fixed nodes: ", non_fixed_nodes_indices)
 
     for i in non_fixed_nodes_indices:
-        # Set the force node and force vector. Start from the second applied_torque position. The first applied_torque position is the fixed node
-        original_torque_node_vector = [link_dict.applied_torque[i][0], link_dict.applied_torque[i][1], link_dict.applied_torque[i][2]]
+        # Set the force node and force vector. Start from the second tenon_pos position. The first applied_torque position is the fixed node
+        original_torque_node_vector = [link_dict.tenon_pos[i][0], link_dict.tenon_pos[i][1], link_dict.tenon_pos[i][2]]
         original_torque_vector = [link_dict.applied_torque[i][3], link_dict.applied_torque[i][4], link_dict.applied_torque[i][5]]
         original_torque_length = np.linalg.norm(original_torque_vector)
         each_force_length = original_torque_length / motor_radius / args.torque2force_num
@@ -243,7 +251,7 @@ if __name__ == "__main__":
 
         # Add the fixed nodes
         for i in range(len(fixed_nodes)):
-            sphere = create_sphere(fixed_nodes[i], radius=2, color=[0, 0, 1])
+            sphere = create_sphere(fixed_nodes[i], radius=10, color=[0, 0, 1])
             vis.add_geometry(sphere)
 
         vis.run()
