@@ -30,10 +30,16 @@ def meshing(stl_file: str, output_folder: str, cmake_build_dir: str, mesh_desire
 
     # Convert the stl file to off file
     off_file_path = os.path.join(output_folder, off_file_name)
-    stlToOff(stl_file, off_file_path)
-
     off_file_path = cmake_build_dir + "/../" + off_file_path
     vtu_file_path = cmake_build_dir + "/../" + os.path.join(output_folder, mesh_vtu_file_name)
+    msh_file_path = cmake_build_dir + "/../" + os.path.join(output_folder, mesh_msh_file_name)
+
+    stlToOff(stl_file, off_file_path)
+
+    print(f'STL file path: {stl_file}')
+    print(f'Off file path: {off_file_path}')
+    print(f'VTU file path: {vtu_file_path}')
+
 
     # Do Meshing using tetrahedralMeshing
     time.sleep(1)
@@ -42,7 +48,7 @@ def meshing(stl_file: str, output_folder: str, cmake_build_dir: str, mesh_desire
     
     # Check if the vtu file exists. If not wait for 1 second and check again.
     print(f'Waiting for the mesh vtu file to be generated in a seperate thread. Do not close the terminal!!!!!')
-    while not os.path.exists(os.path.join(output_folder, mesh_vtu_file_name)):
+    while not os.path.exists(vtu_file_path):
         time.sleep(1)
 
     # Wait for 3 seconds to make sure the vtu file is generated. Big models may take longer time.
@@ -50,13 +56,14 @@ def meshing(stl_file: str, output_folder: str, cmake_build_dir: str, mesh_desire
 
     # Convert the vtu file to msh file
     print(f'Converting the vtu file to msh file...')
-    write_msh_file(os.path.join(output_folder, mesh_vtu_file_name), os.path.join(output_folder, mesh_msh_file_name))
+    #write_msh_file(os.path.join(output_folder, mesh_vtu_file_name), os.path.join(output_folder, mesh_msh_file_name))
+    write_msh_file(vtu_file_path, msh_file_path)
 
     # Wait for 3 seconds to make sure the msh file is generated. Big models may take longer time.
     time.sleep(5)
 
-    print(f'Meshing completed! The msh file is saved at {os.path.join(output_folder, mesh_msh_file_name)}')
-    return os.path.join(output_folder, mesh_msh_file_name)
+    print(f'Meshing completed! The msh file is saved at {msh_file_path}')
+    return msh_file_path
 
 
 
@@ -108,10 +115,13 @@ def do_static_fea(args):
     stl_file_name = os.path.basename(args.input_stl_path)
     scaled_file_name = stl_file_name.replace('.stl', '_scaled.stl')
 
-    ori_stl_file_path = current_dir + "/../" + args.input_stl_path
+    #ori_stl_file_path = current_dir + "/../" + args.input_stl_path
+
+    ori_stl_file_path = args.input_stl_path
     scaled_file_path = current_dir + "/../" + args.output_folder + "/" + scaled_file_name
 
-    print(f'Original STL file path: {ori_stl_file_path}')
+    # print(f'Original STL file path: {ori_stl_file_path}')
+    # print(f'Scaled STL file path: {scaled_file_path}')
 
     #################  Scale if the mesh is in m rather than mm  ########################
     if args.unit == 'm':
@@ -132,7 +142,7 @@ def do_static_fea(args):
     print(f'Meshing the model...')
     mesh_file_path = meshing(scaled_file_path, args.output_folder, cmake_build_dir, args.mesh_desired_element_number, args.mesh_surface_accuracy)
     
-    mesh_file_path = current_dir + "/../" + mesh_file_path
+    # mesh_file_path = current_dir + "/../" + mesh_file_path
 
 
     #################  Do FEA optimization using searching by Computational Gradient Descent  ########################

@@ -13,7 +13,11 @@ import argparse
 import trimesh
 import open3d as o3d
 
-sys.path.append('/home/clarence/ros_ws/metamaterial_ws/src/auto_design/modules')
+project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_dir + '/metamaterial_filling/script')
+sys.path.append(project_dir + '/auto_design/modules')
+sys.path.append(project_dir + '/auto_design')
+
 from interference_removal import RobotOptResult, LinkResult
 from stl_relative_density_fea_opt import do_static_fea
 from io_interface.fea_result_class import FEA_Opt_Result
@@ -81,8 +85,8 @@ def create_sphere(center, radius=1.0, color=[1, 0, 0]):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Static FEA Analysis for STL with given forces and fixed nodes")
     
-    parser.add_argument("--input_stl_path", type=str, default='data/lynel/20240721/tmp/FL_LOW.stl', help="Path to the mesh .stl file")
-    parser.add_argument("--robot_result_file", type=str, default='/home/clarence/ros_ws/metamaterial_ws/src/auto_design/results/lynel_robot_result.pkl', help="Path to the robot result including applied torques")
+    parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/FR_LOW.stl', help="Path to the mesh .stl file")
+    parser.add_argument("--robot_result_file", type=str, default='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241010-134332_robot_result.pkl', help="Path to the robot result including applied torques")
 
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. Note FEA uses mm as the unit. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--output_folder', type=str, default='data/output', help='Output folder path')
@@ -105,7 +109,7 @@ if __name__ == "__main__":
     parser.add_argument("--closest_node_num_per_force", type=int, default=20, help="Number of closest nodes to the forces_nodes to apply the forces")
 
     ### Display parameters
-    parser.add_argument("--display_fea_result", type=bool, default=False, help="Display the models")
+    parser.add_argument("--display_fea_result", type=bool, default=True, help="Display the models")
     parser.add_argument("--display_force_result", type=bool, default=True, help="Display the forces")
 
     ### Optimization parameters
@@ -115,11 +119,10 @@ if __name__ == "__main__":
     parser.add_argument("--initial_relative_density", type=float, default=0.2, help="Initial relative density of the metamaterial structure")
     parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate for the gradient descent")
 
-    #### Forces and fixed nodes. NOTE: No need to set!! Will be calculated from the Pkl file.
+    #### Forces and fixed nodes. NOTE: No need to set!! Will be calculated from the Pkl file. But the following shouldn't be commented out.
     parser.add_argument("--fixed_nodes", type=float, nargs='+', default=[[0, 0, -100]], help="List of nodes where the fixed end is. Will read from pkl file. The format is [node1_x, node1_y, node1_z, node2_x, node2_y, node2_z, ...]. Unit: mm")
     parser.add_argument("--forces_nodes", type=float, nargs='+', default=[[50, 50, 150], [0, 0, 200]], help="List of nodes where the forces are applied. Will read from pkl file. The format is [node1_x, node1_y, node1_z, node2_x, node2_y, node2_z, ...]. Unit: mm")
     parser.add_argument("--forces", type=float, nargs='+', default=[[0, 100, 0], [0, 0, -100]], help="List of forces applied at the nodes. Will read from pkl file. The format is [F1_x, F1_y, F1_z, F2_x, F2_y, F2_z, ...]. Unit: N")
-    
     
     args = parser.parse_args()
 
@@ -253,7 +256,9 @@ if __name__ == "__main__":
     fea_result.set_result(success_flag, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes, args.max_allowd_stress, args.max_allowd_displacement, nodes_seq_stress_exceeded)
             
     # Serialize the object to a pkl file
-    pkl_file_path = os.path.join(args.output_folder, input_stl_name_no_ext + "_fea_result.pkl")
+    pkl_file_path = os.path.dirname(os.path.abspath(__file__)) + "/../" + args.output_folder + "/" + input_stl_name_no_ext + "_fea_result.pkl"
+    #pkl_file_path = os.path.join(args.output_folder, input_stl_name_no_ext + "_fea_result.pkl")
+    
     with open(pkl_file_path, 'wb') as f:
         pkl.dump(fea_result, f)
     

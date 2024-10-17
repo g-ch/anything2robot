@@ -142,7 +142,9 @@ if __name__ == '__main__':
     stl_file_name = os.path.basename(args.input_stl_path)
     scaled_file_name = stl_file_name.replace('.stl', '_scaled.stl')
 
-    ori_stl_file_path = current_dir + "/../" + args.input_stl_path
+    #ori_stl_file_path = current_dir + "/../" + args.input_stl_path
+
+    ori_stl_file_path = args.input_stl_path
     scaled_file_path = current_dir + "/../" + args.output_folder + "/" + scaled_file_name
 
     print(f'Original STL file path: {ori_stl_file_path}')

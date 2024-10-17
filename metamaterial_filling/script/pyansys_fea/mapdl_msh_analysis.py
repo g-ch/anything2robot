@@ -132,8 +132,8 @@ def static_fea_analysis(msh_file, elastic=210e3, poisson_ratio=0.3, fixed_nodes=
             mapdl.cp(f"NEXT", "UY", component_name)
             mapdl.cp(f"NEXT", "UZ", component_name)
 
-            if display:
-                mapdl.nplot(1) # Plot the selected nodes
+            # if display:
+            #     mapdl.nplot(1) # Plot the selected nodes
 
             mapdl.d('ALL', 'UX')
             mapdl.d('ALL', 'UY')
@@ -178,8 +178,8 @@ def static_fea_analysis(msh_file, elastic=210e3, poisson_ratio=0.3, fixed_nodes=
         mapdl.f(nearest_n_indices_from_1[0], 'FZ', force_value[2])
 
 
-        if display:
-            mapdl.nplot(1) # Plot the selected nodes
+        # if display:
+        #     mapdl.nplot(1) # Plot the selected nodes
         
         # Clear the selection
         mapdl.allsel()

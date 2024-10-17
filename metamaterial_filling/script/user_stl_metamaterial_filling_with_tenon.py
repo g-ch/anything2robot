@@ -12,8 +12,9 @@ import pickle as pkl
 
 project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_dir + '/metamaterial_filling/script')
-sys.path.append(os.path.join(project_dir, '/auto_design/modules'))
-sys.path.append(os.path.join(project_dir, '/auto_design'))
+sys.path.append(project_dir + '/auto_design/modules')
+sys.path.append(project_dir + '/auto_design')
+
 
 from metamaterial.sixFoldPlatesFillingWithShellTenon import SixFoldPlatesFillingWithShellTenon
 from metamaterial.generateMeshFromPoints import generate_mesh_from_points
