@@ -8,7 +8,6 @@ import pickle as pkl
 import numpy as np
 import sys
 import os
-from stl_relative_density_fea_opt import static_fea_analysis
 import argparse
 import trimesh
 import open3d as o3d
@@ -83,7 +82,7 @@ def create_sphere(center, radius=1.0, color=[1, 0, 0]):
     return sphere
 
 
-def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=None, output_folder=None, max_iteration=None, max_allowd_stress=None, max_allowd_displacement=None, display_fea_result=None, display_force_result=None):
+def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=None, output_folder=None, max_iteration=None, max_allowd_stress=None, max_allowd_displacement=None, display_fea_result=None, display_force_result=None, mapdl_object=None):
     parser = argparse.ArgumentParser(description="Static FEA Analysis for STL with given forces and fixed nodes")
     
     parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/BODY_UP.stl', help="Path to the mesh .stl file")
@@ -310,7 +309,7 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
     args.forces_nodes = force_nodes_pos_list
     args.forces = forces_list
 
-    success_flag, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes = do_static_fea(args)
+    success_flag, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes = do_static_fea(args, mapdl_object)
 
     # Store the FEA result
     fea_result = FEA_Opt_Result(input_stl_name_no_ext)
@@ -332,4 +331,4 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
 
 
 if __name__ == "__main__":
-    stl_force_relative_density_fea_opt(stl_path_input='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/FR_UP.stl')
+    stl_force_relative_density_fea_opt(stl_path_input='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/FR_UP.stl', robot_result_file='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241010-134332_robot_result.pkl')

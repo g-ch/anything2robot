@@ -9,7 +9,7 @@ import argparse
 import subprocess
 from format_transform.stl_to_off import stlToOff
 from format_transform.vtu_to_ansys_msh import write_msh_file
-from pyansys_fea.mapdl_msh_analysis import static_fea_analysis
+from pyansys_fea.mapdl_msh_analysis import MapdlFea
 import time
 import trimesh
 
@@ -88,18 +88,19 @@ def get_equivalent_young_modulus(material_young_modulus, relative_density, young
         We use CGAL to do the meshing and pyansys to do the FEA analysis. The optimization is realized by computational gradient descent.
         
 '''
-def do_static_fea(args):
+def do_static_fea(args, mapdl_object=None):
     #################  Run checking  ########################
     # Check if the input STL file exists
     if not os.path.exists(args.input_stl_path):
         raise FileNotFoundError(f'Input STL file not found at {args.input_stl_path}')
 
     # Check if the output folder exists. If not, create it
-    if not os.path.exists(args.output_folder):
-        os.makedirs(args.output_folder)
+    output_folder_global_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../', args.output_folder)
+    if not os.path.exists(output_folder_global_path):
+        os.makedirs(output_folder_global_path)
 
     # Clear the output folder
-    os.system(f'rm -rf {args.output_folder}/*')
+    os.system(f'rm -rf {output_folder_global_path}/*')
     
     # Check if young_modulus_curve_points_x and young_modulus_curve_points_y have the same length > 2
     if len(args.young_modulus_curve_points_x) != len(args.young_modulus_curve_points_y):
@@ -161,7 +162,13 @@ def do_static_fea(args):
 
     # Check if using fully filled structure (relative_density=1) can meet the target
     relative_density = 1.0
-    max_stress, max_displacement,von_mises, displacement_magnitude, nodes  = static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=args.material_young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
+
+    mapdl_created_in_this_function = False  # Flag to check if the mapdl object is created in this function
+    if mapdl_object is None:
+        mapdl_object = MapdlFea() # Create the mapdl object if not created
+        mapdl_created_in_this_function = True
+
+    max_stress, max_displacement,von_mises, displacement_magnitude, nodes  = mapdl_object.static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=args.material_young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
     
     stress_to_allowed_value =  max_stress - args.max_allowd_stress
     displacement_to_allowed_value = max_displacement- args.max_allowd_displacement
@@ -184,7 +191,7 @@ def do_static_fea(args):
     young_modulus = get_equivalent_young_modulus(args.material_young_modulus, relative_density, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)
     print(f'Equivalant young modulus: {young_modulus}')
 
-    max_stress, max_displacement, von_mises, displacement_magnitude, nodes  = static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
+    max_stress, max_displacement, von_mises, displacement_magnitude, nodes  = mapdl_object.static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
     
     stress_to_allowed_value =  max_stress - args.max_allowd_stress
     displacement_to_allowed_value = max_displacement- args.max_allowd_displacement 
@@ -202,7 +209,7 @@ def do_static_fea(args):
         print(f'Iteration {i+1}:')
         
         young_modulus = get_equivalent_young_modulus(args.material_young_modulus, relative_density_new, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)        
-        max_stress_new, max_displacement_new, von_mises, displacement_magnitude, nodes  = static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
+        max_stress_new, max_displacement_new, von_mises, displacement_magnitude, nodes  = mapdl_object.static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
 
         stress_to_allowed_value_new = max_stress_new - args.max_allowd_stress
         displacement_to_allowed_value_new = max_displacement_new - args.max_allowd_displacement
@@ -259,6 +266,10 @@ def do_static_fea(args):
     print(f"Max displacement: {displacement_of_best_relative_density}")
     young_modulus = get_equivalent_young_modulus(args.material_young_modulus, best_relative_density, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)
     print(f'The equivalent young modulus is {young_modulus}')
+
+    # Check if the mapdl object is created in this function. If yes, shutdown the mapdl object
+    if mapdl_created_in_this_function:
+        mapdl_object.shutdown()
 
     return True, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes
 

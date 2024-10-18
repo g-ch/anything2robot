@@ -22,6 +22,7 @@ from modules.motor_opt import Motor_Opt, Joint_Connect_Opt, get_bounds
 from modules.interference_removal import InterferenceRemoval, RobotOptResult
 from modules.destruction_check import destruction_check, destruction_check_urdf_folder
 from metamaterial_filling.script.user_stl_force_relative_density_fea_opt import stl_force_relative_density_fea_opt
+from metamaterial_filling.script.pyansys_fea.mapdl_msh_analysis import MapdlFea
 
 '''
 Motor parameter library. This is used to store the motor parameters that is used in the optimization process.
@@ -67,6 +68,10 @@ def auto_design(args):
     avg_motor_cost_this = 1e6
     avg_motor_cost_threshold = 50  # A big number to filter out the insane results. No need to do mesh optimization if the motor cost is too high.
     enlarge_scale = 1.1
+
+    mapdl_object = None
+    if args.do_fea_analysis:
+        mapdl_object = MapdlFea() # Start the Ansys Mapdl object if the FEA analysis is turned on
     
     counter = 0
 
@@ -189,7 +194,8 @@ def auto_design(args):
 
             for stl_file in stl_files:
                 print("************************stl_file: ", stl_file)
-                success_flag, best_relative_density = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, max_iteration=max_iteration, display_fea_result=False, display_force_result=False)
+                success_flag, best_relative_density = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, max_iteration=max_iteration, display_fea_result=False, display_force_result=False, mapdl_object=mapdl_object)
+                # exit()
                 if not success_flag:
                     print("Failure Code 3. The mesh is not feasible in FEA. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
                     exit_code = 4
@@ -203,6 +209,10 @@ def auto_design(args):
             else:
                 print("Success!!!!!!!!!!! The model is feasible in FEA.")
 
+
+    if args.do_fea_analysis:
+        mapdl_object.shutdown()
+
     return exit_code
 
 
@@ -210,11 +220,11 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
     parser.add_argument('--model_name', type=str, default='gold_lynel', help='The model name. The model is expected to be placed in the model/given_models folder. (e.g. gold_lynel). The model should be in STL format.')
     parser.add_argument('--expected_x', type=float, default=50, help='The expected x-axis length of the model. (cm)')
-    parser.add_argument('--voxel_size', type=float, default=1, help='The size of the voxel. (cm)')
+    parser.add_argument('--voxel_size', type=float, default=0.5, help='The size of the voxel. (cm)')
     parser.add_argument('--voxel_density', type=float, default=1.5e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
     parser.add_argument('--joint_limitation', type=float, default=1, help='The limitation of the joint. +-joint_limitation. (rad)')
 
-    parser.add_argument('--genetic_generation', type=int, default=5, help='The number of generations for the genetic algorithm')
+    parser.add_argument('--genetic_generation', type=int, default=20, help='The number of generations for the genetic algorithm')
     parser.add_argument('--do_fea_analysis', type=bool, default=True, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
     parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not')
     args = parser.parse_args()
