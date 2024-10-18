@@ -48,48 +48,77 @@ class MotorParameterLib:
         return self.connector_lib
 
 
+
 '''
 Auto design process
-Check main function below to know how to use the function
+@args: Check main function below to know what to pass in.
+@mapdl_object: If the FEA analysis is turned on, an mapdl_object can be passed in to opening and turning off the Ansys Mapdl object outside the function. This is to avoid frequent opening and closing of the Ansys Mapdl object.
+@return: The exit code. 0: Success. 1: The motor cost is too high. 2: The mesh is destroyed. 3: The mesh is not watertight. 4: The mesh is not feasible in FEA.
 '''
-def auto_design(args):
-    show_render_result = args.visualize
+def auto_design(args, mapdl_object=None):
+    mesh_path = args.stl_mesh_path
+    joint_path = args.joint_pkl_path
 
-    # Load the mesh
-    mesh_path = os.path.normpath(project_path + '/auto_design/model/given_models/' + args.model_name + '.stl')
-    joint_path = os.path.normpath(project_path + '/auto_design/model/given_models/' + args.model_name + '_joints.pkl')
-    
+    model_name = os.path.basename(mesh_path).split('.')[0]
+    args.model_name = model_name # To be used in other functions
+
+    args.result_folder = args.result_folder + '/' + model_name + '_' + time.strftime("%Y%m%d-%H%M%S")
+    os.makedirs(args.result_folder, exist_ok=True)
+
+    # Check if the joint path exists. If not, the UI shouldn't be disabled.
+    if not os.path.exists(joint_path):
+        print("Warning: The joint path doesn't exist. The joint setting UI will be enabled.")
+        args.disable_joint_setting_ui = False
+
+    # Load the mesh and joint positions
     mesh_loader = Custom_Mesh_Loader(args)
     mesh_loader.load_mesh(mesh_path)
-    mesh_loader.load_joint_positions(joint_path)
+    mesh_loader.load_joint_positions(joint_path, figure_save_path=args.result_folder + '/joint_positions.png')
     expected_x = args.expected_x
-    mesh_loader.scale(expected_x)
-
-    avg_motor_cost_this = 1e6
-    avg_motor_cost_threshold = 50  # A big number to filter out the insane results. No need to do mesh optimization if the motor cost is too high.
-    enlarge_scale = 1.1
-
-    mapdl_object = None
-    if args.do_fea_analysis:
-        mapdl_object = MapdlFea() # Start the Ansys Mapdl object if the FEA analysis is turned on
     
-    counter = 0
+    # Set the motor cost threshold
+    avg_motor_cost_this = 1e6 # This is a big number to start with
+    avg_motor_cost_threshold = 50  # A big number to filter out the insane results. No need to do mesh optimization if the motor cost is too high.
+    enlarge_scale = 1.1 # This could also be a parameter to be set by the user.
 
+    external_mapdl_object = False
+    if args.do_fea_analysis:
+        if mapdl_object is None:
+            mapdl_object = MapdlFea() # Start the Ansys Mapdl object if the FEA analysis is turned on
+        else:
+            external_mapdl_object = True
+    
+    round = 0
     exit_code = -1
 
+    save_only = True
+    if args.visualize:
+        save_only = False
+    
     # The motor cost should be less than the threshold
-    while exit_code != 0 and counter < 5:
-        counter += 1
+    while exit_code != 0 and round < args.max_trial_round:
+        round += 1
         exit_code = 0
 
-        print("Decomposing and motor optimization process: ", counter)    
+        # Make a subfolder to save the results of each round
+        round_result_saving_folder = args.result_folder + '/result_round' + str(round)
+        os.makedirs(round_result_saving_folder, exist_ok=True)
+
+        # Scale the model. If it is not the first round, the model will be scaled further by enlarge_scale.
+        if round > 1:
+            expected_x = expected_x * enlarge_scale
+        
+        mesh_loader.scale(expected_x, save_path=round_result_saving_folder + '/scaled_model_expected_x_' + str(expected_x) + '.stl')
+
+        print("Decomposing and motor optimization process: ", round)    
 
         # Do mesh decomposition
         print("Decomposing the mesh...")
         mesh_decomp = Mesh_Decomp(args, mesh_loader)
         mesh_decomp.decompose()
-        if show_render_result:
-            mesh_decomp.render()
+
+        decompose_result_image_path = round_result_saving_folder + '/decompose_result.png'
+        mesh_decomp.render(save_only=save_only, save_path=decompose_result_image_path)
 
         # Do actuator optimization. The first step in Motor_Opt will use pinocchio to calculate the torque and choose the motor.
         print("Optimizing the actuators...")
@@ -105,8 +134,8 @@ def auto_design(args):
         print("cost_log: ", cost_log)  #cost_log:  [(Motor_position_cost, Occupancy_cost), ...]
         print("Auto design best fitness: ", best_fitness)
 
-        if show_render_result:
-            motor_opt.render()
+        motor_opt_image_path = round_result_saving_folder + '/motor_opt_result.png'
+        motor_opt.render(save_only=save_only, save_path=motor_opt_image_path)
         time.sleep(1)
 
         # Up scale the mesh if the avg motor cost is too high
@@ -114,8 +143,6 @@ def auto_design(args):
         print("Average motor cost: ", avg_motor_cost_this)
         if avg_motor_cost_this > avg_motor_cost_threshold:
             print("Failure Code 1. The motor cost is too high. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
-            expected_x = expected_x * enlarge_scale
-            mesh_loader.scale(expected_x)
             exit_code = 1
             continue
 
@@ -123,8 +150,9 @@ def auto_design(args):
         print("Refining the mesh to connect the actuators...")
         joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
         joint_connect_opt.run_opt()
-        if show_render_result:
-            mesh_decomp.mesh_group.render()
+        
+        joint_connect_opt_image_path = round_result_saving_folder + '/joint_connect_opt_result.png'
+        mesh_decomp.mesh_group.render(save_only=save_only, save_path=joint_connect_opt_image_path)
         time.sleep(3)
 
         # Remove the interference between the links while moving the joints
@@ -141,18 +169,18 @@ def auto_design(args):
         interference_removal.set_joint_limit(joint_limits)
         interference_removal.remove_interference()
 
-        if show_render_result:
-            interference_removal.mesh_group.render()
+        interference_removal_image_path = round_result_saving_folder + '/interference_removal_result.png'
+        interference_removal.mesh_group.render(save_only=save_only, save_path=interference_removal_image_path)
 
         time.sleep(1)
-        urdf_path = interference_removal.generate_urdf()
-        print("Saving the results... URDF file is saved at: ", urdf_path)
 
         # Save results
+        urdf_path = interference_removal.generate_urdf(result_saving_folder=round_result_saving_folder)
+        print("Saving the results... URDF file is saved at: ", urdf_path)
+        
         robot_result = RobotOptResult(interference_removal, urdf_path, motor_lib)
-        results_dir = './auto_design/results'
-        os.makedirs(results_dir, exist_ok=True)
-        pkl_file_path = os.path.normpath(results_dir + '/' + args.model_name + time.strftime("%Y%m%d-%H%M%S") + '_robot_result.pkl')
+        
+        pkl_file_path = os.path.normpath(round_result_saving_folder + '/robot_result.pkl')
         pkl.dump(robot_result, open(pkl_file_path, 'wb'))
 
         # Run mesh destruction checking
@@ -194,6 +222,8 @@ def auto_design(args):
 
             for stl_file in stl_files:
                 print("************************stl_file: ", stl_file)
+                
+                # More parameters can be set in the function stl_force_relative_density_fea_opt
                 success_flag, best_relative_density = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, max_iteration=max_iteration, display_fea_result=False, display_force_result=False, mapdl_object=mapdl_object)
                 # exit()
                 if not success_flag:
@@ -210,7 +240,8 @@ def auto_design(args):
                 print("Success!!!!!!!!!!! The model is feasible in FEA.")
 
 
-    if args.do_fea_analysis:
+    if args.do_fea_analysis and not external_mapdl_object: 
+        # If the mapdl_object is created in this function, then we need to shut it down. Otherwise, we need to keep it alive.
         mapdl_object.shutdown()
 
     return exit_code
@@ -218,15 +249,25 @@ def auto_design(args):
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
-    parser.add_argument('--model_name', type=str, default='gold_lynel', help='The model name. The model is expected to be placed in the model/given_models folder. (e.g. gold_lynel). The model should be in STL format.')
+
+    parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel.stl'), help='The path to the stl mesh file.')
+    parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
+    
+    parser.add_argument('--result_folder', type=str, default=os.path.normpath(project_path + '/result'), help='The folder to save the results.')
+
     parser.add_argument('--expected_x', type=float, default=50, help='The expected x-axis length of the model. (cm)')
-    parser.add_argument('--voxel_size', type=float, default=0.5, help='The size of the voxel. (cm)')
+    parser.add_argument('--voxel_size', type=float, default=1, help='The size of the voxel. (cm)')
     parser.add_argument('--voxel_density', type=float, default=1.5e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
     parser.add_argument('--joint_limitation', type=float, default=1, help='The limitation of the joint. +-joint_limitation. (rad)')
 
-    parser.add_argument('--genetic_generation', type=int, default=20, help='The number of generations for the genetic algorithm')
-    parser.add_argument('--do_fea_analysis', type=bool, default=True, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
-    parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not')
+    parser.add_argument('--max_trial_round', type=int, default=5, help='The maximum number of trial rounds.')
+    parser.add_argument('--genetic_generation', type=int, default=5, help='The number of generations for the genetic algorithm')
+    parser.add_argument('--do_fea_analysis', type=bool, default=False, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
+    parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not. Need to close the windows to continue the process if turned on.')
+    parser.add_argument('--disable_joint_setting_ui', type=bool, default=False, help='Disable the joint setting UI or not')
+
+    parser.add_argument('--model_name', type=str, default='None', help='Temporary value. No need to set this value.')
+
     args = parser.parse_args()
 
     auto_design(args)

@@ -23,6 +23,7 @@ from dash import Dash, dcc, html, Input, Output
 #import requests
 from wsgiref.simple_server import make_server
 from flask import Flask
+import time
 
 class Line:
     def __init__(self, start, end):
@@ -96,12 +97,17 @@ class Mesh:
         )
 
     
-    def render(self):
+    def render(self, save_only=False, save_path=None):
         """
         Render the mesh data.
         """
         fig = go.Figure(data=[self.mesh_plotly])
-        fig.show()
+        #fig.show()
+        if not save_only:
+            fig.show()
+        if save_path is not None:
+            fig.write_image(save_path)
+
 class Link:
     def __init__(self, name):
         self.name = name
@@ -155,6 +161,8 @@ class Link:
 
     def __str__(self):
         return self.name
+    
+
 class LinkTreeGUI:
     def __init__(self, root, mesh, args):
         self.args = args
@@ -229,8 +237,15 @@ class LinkTreeGUI:
         # Create a thread to run the Dash app
         self.dash_thread = Thread(target=run_dash)
         self.dash_thread.start()
-        import webbrowser
-        webbrowser.open('http://127.0.0.1:8050/')
+
+        # If not the disable_joint_setting_ui flag is not set, open the UI in the browser
+        if not args.disable_joint_setting_ui:
+            import webbrowser
+            webbrowser.open('http://127.0.0.1:8050/')
+
+    
+    def save_fig(self, save_path):
+        self.fig.write_image(save_path)
 
 
     def create_tree_view_frame(self, root):
@@ -402,6 +417,10 @@ class LinkTreeGUI:
 
     def save(self):
         pkl.dump(self.nodes, open('./auto_design/model/given_models/' + self.args.model_name + '_joints.pkl', 'wb'))
+
+        # Save a copy of the pkl file in args.result_folder
+        pkl.dump(self.nodes, open(self.args.result_folder + '/' + self.args.model_name + '_joints.pkl', 'wb'))
+
         # Use a message box to confirm save and start the design process or not        
         if messagebox.askyesno("Save", "Save successful. Start the design process. Do you want to start the design process?"):
             self.shutdown()
@@ -689,7 +708,7 @@ class Mesh_Loader:
         pass
 
     
-    def scale(self, expected_x):
+    def scale(self, expected_x, save_path=None):
         """
         Scale the mesh, joint data, and link tree according to the expected x-axis length.
         """
@@ -701,6 +720,11 @@ class Mesh_Loader:
         # Scale the mesh
         self.scaled_mesh = self.mesh
         self.scaled_mesh.scale(self.scale_factor)
+
+        # save the scaled mesh if save_path is provided
+        if save_path is not None:
+            self.scaled_mesh.mesh_o3d.compute_vertex_normals()  # Compute normals
+            o3d.io.write_triangle_mesh(save_path, self.scaled_mesh.mesh_o3d)
 
         # Scale the joint data
         for joint_name in self.joint_dict:
@@ -729,8 +753,7 @@ class Mesh_Loader:
         pass
         
 
-
-    def render(self):
+    def render(self, save_only=False, save_path=None):
         """
         Render the scaled mesh and joint data.
         """
@@ -760,7 +783,11 @@ class Mesh_Loader:
             width=740,
             height=600
         )
-        fig.show()
+        #fig.show()
+        if not save_only:
+            fig.show()
+        if save_path is not None:
+            fig.write_image(save_path)
         print("scale factor:", self.scale_factor)
 
     def run(self, render=True):
@@ -782,7 +809,7 @@ class Custom_Mesh_Loader(Mesh_Loader):
     def __init__(self, args):
         super().__init__(args)
 
-    def load_joint_positions(self, joint_path: str):
+    def load_joint_positions(self, joint_path: str, figure_save_path=None):
         
         if os.path.exists(joint_path):
             print("Loading joint data from file...")
@@ -792,6 +819,11 @@ class Custom_Mesh_Loader(Mesh_Loader):
                 linkLoader.load_tree(linkLoader.nodes)
                 linkLoader.update_plot()
                 print(linkLoader.nodes)
+                
+                # Shutdown the GUI immediately if the joint data is already provided and the joint setting UI is disabled
+                if self.args.disable_joint_setting_ui:
+                    time.sleep(1)
+                    linkLoader.shutdown()
                 
         else:
             print("No joint data found. Please construct the link tree.")
@@ -811,8 +843,13 @@ class Custom_Mesh_Loader(Mesh_Loader):
             link.val.construct_joint_lines()
             for joint_name, joint_position in link.val.joints.items():
                 self.joint_dict[joint_name] = joint_position
+        
+        # Save the joint data if the figure_save_path is provided
+        if figure_save_path is not None:
+            linkLoader.save_fig(figure_save_path)
+            
 
-    def render(self):
+    def render(self, save_only=False, save_path=None):
         fig = go.Figure()
 
         x, y, z = [], [], []
@@ -824,7 +861,12 @@ class Custom_Mesh_Loader(Mesh_Loader):
         # Add joint markers
         fig.add_trace(self.scaled_mesh.mesh_plotly)
         fig.add_trace(go.Scatter3d(x=x, y=y, z=z, mode='markers'))
-        fig.show(renderer="browser")  # Refresh the plot in the browser window
+
+        if not save_only:
+            fig.show(renderer="browser")
+        if save_path is not None:
+            fig.write_image(save_path)
+        #fig.show(renderer="browser")  # Refresh the plot in the browser window
 
 class Quadruped_Mesh_Loader(Mesh_Loader):
     def __init__(self, args):

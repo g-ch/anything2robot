@@ -331,4 +331,4 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
 
 
 if __name__ == "__main__":
-    stl_force_relative_density_fea_opt(stl_path_input='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/FR_UP.stl', robot_result_file='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241010-134332_robot_result.pkl')
+    stl_force_relative_density_fea_opt(stl_path_input='/media/clarence/Clarence/anything2robot/urdf/gold_lynel20241018-110051/BODY_UP.stl', robot_result_file='/media/clarence/Clarence/anything2robot/auto_design/results/gold_lynel20241018-110054_robot_result.pkl')

@@ -15,7 +15,7 @@ import argparse
 class MapdlFea:
     def __init__(self):
         # Launch MAPDL
-        exec_loc = '/root/ansys_inc/v232/ansys/bin/ansys232'
+        exec_loc = '/root/ansys_inc/v232/ansys/bin/ansys232' # Change to the path of the Ansys executable in your system
         self.mapdl = launch_mapdl(exec_loc)
         print(self.mapdl)
 

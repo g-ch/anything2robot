@@ -131,7 +131,7 @@ class Contact_Calculator():
         self.render(transformed_points, [CoM])
         return [point_a, point_b, point_c]
     
-    def render(self, points, contact_points=[]):
+    def render(self, points, contact_points=[], save_path=None, save_only=False):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.scatter(points[:, 0], points[:, 1], points[:, 2], c='r', marker='o')
@@ -146,7 +146,13 @@ class Contact_Calculator():
         ax.set_zlim3d(0, 2)                    # viewrange for z-axis should be [-4,4] 
         ax.set_ylim3d(0, 2)                    # viewrange for y-axis should be [-2,2] 
         ax.set_xlim3d(0, 2)                    # viewrange for x-axis should be [-2,2] 
-        plt.show()
+        
+        #plt.show()
+        if not save_only:
+            plt.show()
+        if save_path is not None:
+            plt.savefig(save_path, dpi=300)
+            plt.close()
 
 
 # Example usage with an example set of points

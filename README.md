@@ -62,3 +62,8 @@ make
 cd metamaterial_filling
 mkdir data
 ```
+
+- Others
+```
+pip install -U kaleido
+```

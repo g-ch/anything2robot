@@ -37,7 +37,7 @@ def visualize_animal3d(mesh_path, keypoint_3d):
     return quit_requested
 
 
-class Quadruped_Mesh_Loader():
+class Quadruped_Mesh_Transformer():
 
     def __init__(self, stl_path : str, joint_path : str, output_name : str, expected_x : float):
         self.stl_path = stl_path
@@ -92,7 +92,7 @@ class Quadruped_Mesh_Loader():
 
     def load_joint_positions(self, joint_path : str):
         """
-        Load the joint data from the file system.
+        Load the joint data from the file system. The file is supposed to be a numpy file.
         """
 
         joint_data = np.load(joint_path)
@@ -254,6 +254,7 @@ if __name__ == "__main__":
     parser.add_argument('--output_name', type=str, default='n02088364_3752_neutral', help='The path to the output pkl file')
     args = parser.parse_args()
 
-    quadruped_mesh_loader = Quadruped_Mesh_Loader(args.stl_path, args.joint_path, args.output_name, args.expected_x)
+    quadruped_mesh_transformer = Quadruped_Mesh_Transformer(args.stl_path, args.joint_path, args.output_name, args.expected_x)
 
-    quadruped_mesh_loader.visualize_mesh_with_joints()
+    quadruped_mesh_transformer.visualize_mesh_with_joints()
+    

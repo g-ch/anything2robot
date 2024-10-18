@@ -6,3 +6,4 @@ urdf
 **/docs/
 **/__pycache__/
 results/
+result/

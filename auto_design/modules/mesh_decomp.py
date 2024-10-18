@@ -193,7 +193,7 @@ class Mesh_Group:
         indices = self.position_to_index(positions)
         return self.voxel_data[indices[:, 0], indices[:, 1], indices[:, 2]]
 
-    def render(self, mesh_plotly=None):
+    def render(self, mesh_plotly=None, save_only=False, save_path=None):
         """
         Render the decomposed voxels.
         """
@@ -237,7 +237,12 @@ class Mesh_Group:
             width=740,
             height=600
         )
-        fig.show()
+
+        if not save_only:
+            fig.show()
+        if save_path is not None:
+            fig.write_image(save_path)
+            
 
 class Mesh_Decomp:
     def __init__(self, args, mesh_loader: Mesh_Loader):
@@ -690,11 +695,11 @@ class Mesh_Decomp:
                 result_torque.append(np.round(max_torque[i-1], 2))
         return joint_names, result_torque
 
-    def render(self):
+    def render(self, save_only=False, save_path=None):
         """
         Render the decomposed voxels.
         """
-        self.mesh_group.render(self.mesh.mesh_plotly)
+        self.mesh_group.render(self.mesh.mesh_plotly, save_only=save_only, save_path=save_path)
 
 
 if __name__ == "__main__":

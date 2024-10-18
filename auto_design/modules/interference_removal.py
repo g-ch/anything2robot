@@ -449,15 +449,19 @@ class InterferenceRemoval:
 
             
 
-    def generate_urdf(self):
+    def generate_urdf(self, result_saving_folder=None):
         """
         Generate the URDF file.
         """
         timestr = time.strftime("%Y%m%d-%H%M%S")
         dir = './urdf/' + self.args.model_name + timestr + '/'
 
+        if result_saving_folder is not None:
+            dir = result_saving_folder + '/urdf/'
+
         if not os.path.exists(dir):
             os.makedirs(dir)
+
         urdf_file = open(dir + self.args.model_name + timestr + '.urdf', 'w+')
         package_name = "anything2robot"
 

@@ -686,7 +686,7 @@ class Motor_Opt:
                 objs.append(cylinder_surface)
         return objs
 
-    def render(self):
+    def render(self, save_only=False, save_path=None):
         fig = go.Figure(data=[self.mesh.mesh_plotly, *self.create_motors(self.motor_results)])
         # fig.update_layout(
         #     autosize=False,
@@ -708,7 +708,11 @@ class Motor_Opt:
         #     width=740,
         #     height=600
         # )
-        fig.show()
+
+        if not save_only:
+            fig.show()
+        if save_path is not None:
+            fig.write_image(save_path)
 
 class Joint_Connect_Opt:
     def __init__(self, args, mesh_decomp : Mesh_Decomp, motor_params_results: np.ndarray):
