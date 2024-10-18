@@ -9,226 +9,39 @@ import trimesh
 
 project_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_path)
+sys.path.append(os.path.normpath(os.path.join(project_path, 'script')))
 sys.path.append(os.path.normpath(os.path.join(project_path, 'auto_design')))
 sys.path.append(os.path.normpath(os.path.join(project_path, 'auto_design/modules')))
 sys.path.append(os.path.normpath(os.path.join(project_path, 'metamaterial_filling/script')))
 
-#sys.path.append(os.path.normpath('../auto_design/modules'))
-
-from modules.data_struct import *
-from modules.mesh_loader import Custom_Mesh_Loader
-from modules.mesh_decomp import Mesh_Decomp
-from modules.motor_opt import Motor_Opt, Joint_Connect_Opt, get_bounds
-from modules.interference_removal import InterferenceRemoval, RobotOptResult
-from modules.destruction_check import destruction_check, destruction_check_urdf_folder
-from metamaterial_filling.script.user_stl_force_relative_density_fea_opt import stl_force_relative_density_fea_opt
-from metamaterial_filling.script.pyansys_fea.mapdl_msh_analysis import MapdlFea
-
-'''
-Motor parameter library. This is used to store the motor parameters that is used in the optimization process.
-'''
-class MotorParameterLib:
-    def __init__(self):
-        self.tenon_height = 1.5 # cm. Tenon is the connection part between the motor and the link.
-
-        # Height (cm), Radius (cm), Max Torque (N*M) 
-        self.motor_lib = [[5.6 + self.tenon_height, 4.2, 12],   # DM6006. DAMIAO Tech         
-                          [3.42 + self.tenon_height, 2.65, 2.5], # MG4005V2. K-Tech
-                          [8.1 + self.tenon_height, 5.3, 20]]  # DM8009. DAMIAO Tech
-        
-        # This is the connector length between two motors in a 2 DOF joint. L shape. Unit: cm
-        self.connector_lib = [[6, 6], 
-                              [4, 4], 
-                              [6, 6]]
-    
-    def get_motor_lib(self):
-        return self.motor_lib
-    
-    def get_connector_lib(self):
-        return self.connector_lib
-
-
-'''
-Auto design process
-Check main function below to know how to use the function
-'''
-def auto_design(args):
-    show_render_result = args.visualize
-
-    # Load the mesh
-    mesh_path = os.path.normpath(project_path + '/auto_design/model/given_models/' + args.model_name + '.stl')
-    joint_path = os.path.normpath(project_path + '/auto_design/model/given_models/' + args.model_name + '_joints.pkl')
-    
-    mesh_loader = Custom_Mesh_Loader(args)
-    mesh_loader.load_mesh(mesh_path)
-    mesh_loader.load_joint_positions(joint_path)
-    expected_x = args.expected_x
-    mesh_loader.scale(expected_x)
-
-    avg_motor_cost_this = 1e6
-    avg_motor_cost_threshold = 50  # A big number to filter out the insane results. No need to do mesh optimization if the motor cost is too high.
-    enlarge_scale = 1.1
-
-    mapdl_object = None
-    if args.do_fea_analysis:
-        mapdl_object = MapdlFea() # Start the Ansys Mapdl object if the FEA analysis is turned on
-    
-    counter = 0
-
-    exit_code = -1
-
-    # The motor cost should be less than the threshold
-    while exit_code != 0 and counter < 5:
-        counter += 1
-        exit_code = 0
-
-        print("Decomposing and motor optimization process: ", counter)    
-
-        # Do mesh decomposition
-        print("Decomposing the mesh...")
-        mesh_decomp = Mesh_Decomp(args, mesh_loader)
-        mesh_decomp.decompose()
-        if show_render_result:
-            mesh_decomp.render()
-
-        # Do actuator optimization. The first step in Motor_Opt will use pinocchio to calculate the torque and choose the motor.
-        print("Optimizing the actuators...")
-        bounds = get_bounds(mesh_decomp.link_tree, threshold=6)
-
-        motor_param_lib = MotorParameterLib()
-        motor_lib = motor_param_lib.get_motor_lib()
-        connector_lib = motor_param_lib.get_connector_lib()
-        
-        motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib, connector_lib)
-        motor_results, cost_log, best_fitness = motor_opt.run_opt(generation_num=args.genetic_generation)
-
-        print("cost_log: ", cost_log)  #cost_log:  [(Motor_position_cost, Occupancy_cost), ...]
-        print("Auto design best fitness: ", best_fitness)
-
-        if show_render_result:
-            motor_opt.render()
-        time.sleep(1)
-
-        # Up scale the mesh if the avg motor cost is too high
-        avg_motor_cost_this = best_fitness / len(motor_results)
-        print("Average motor cost: ", avg_motor_cost_this)
-        if avg_motor_cost_this > avg_motor_cost_threshold:
-            print("Failure Code 1. The motor cost is too high. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
-            expected_x = expected_x * enlarge_scale
-            mesh_loader.scale(expected_x)
-            exit_code = 1
-            continue
-
-        # Refine the mesh to connect the joints
-        print("Refining the mesh to connect the actuators...")
-        joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
-        joint_connect_opt.run_opt()
-        if show_render_result:
-            mesh_decomp.mesh_group.render()
-        time.sleep(3)
-
-        # Remove the interference between the links while moving the joints
-        print("Removing the interference between the links...")
-        interference_removal = InterferenceRemoval(args=args, 
-                                                mesh_group=mesh_decomp.mesh_group, 
-                                                motor_param_result=motor_results, 
-                                                link_tree=mesh_decomp.link_tree, 
-                                                father_link_dict=mesh_decomp.father_link_dict)
-        
-        joint_limits = np.vstack([np.array([-args.joint_limitation, args.joint_limitation]) for _ in range(2*len(motor_results))])
-        # joint_limits = np.vstack([np.array([-0.785, 0.785]) for _ in range(2*len(motor_results))])
-
-        interference_removal.set_joint_limit(joint_limits)
-        interference_removal.remove_interference()
-
-        if show_render_result:
-            interference_removal.mesh_group.render()
-
-        time.sleep(1)
-        urdf_path = interference_removal.generate_urdf()
-        print("Saving the results... URDF file is saved at: ", urdf_path)
-
-        # Save results
-        robot_result = RobotOptResult(interference_removal, urdf_path, motor_lib)
-        results_dir = './auto_design/results'
-        os.makedirs(results_dir, exist_ok=True)
-        pkl_file_path = os.path.normpath(results_dir + '/' + args.model_name + time.strftime("%Y%m%d-%H%M%S") + '_robot_result.pkl')
-        pkl.dump(robot_result, open(pkl_file_path, 'wb'))
-
-        # Run mesh destruction checking
-        print("Checking the mesh destruction...")
-
-        urdf_folder = os.path.dirname(urdf_path)
-        print("urdf_folder: ", urdf_folder)
-
-        destruction_check_pass = destruction_check_urdf_folder(urdf_folder, pkl_file_path, plotting=False)
-        
-        if not destruction_check_pass:
-            print("Failure Code 2. The mesh is destroyed. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
-            exit_code = 2
-            continue
-
-        # Check if the meshes are watertight use trimesh
-        stl_files = []
-        for root, dirs, files in os.walk(urdf_folder):  # Search the urdf folder to find all the stl files
-            for file in files:
-                if file.endswith(".stl"):
-                    stl_files.append(os.path.join(root, file))
-        
-        for stl_file in stl_files:
-            mesh = trimesh.load(stl_file)
-            if not mesh.is_watertight:
-                print("Failure Code 3. The mesh is not watertight. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
-                exit_code = 3
-                break
-        
-        if exit_code == 3:
-            print("The mesh is not watertight. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
-            exit()
-
-        
-        # Do FEA analysis for each link if the flag is set
-        if args.do_fea_analysis:
-            print("Do FEA analysis...")
-            max_iteration = 1
-
-            for stl_file in stl_files:
-                print("************************stl_file: ", stl_file)
-                success_flag, best_relative_density = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, max_iteration=max_iteration, display_fea_result=False, display_force_result=False, mapdl_object=mapdl_object)
-                # exit()
-                if not success_flag:
-                    print("Failure Code 3. The mesh is not feasible in FEA. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
-                    exit_code = 4
-                    break
-                
-                time.sleep(3)
-            
-            if exit_code == 4:
-                print("The mesh is not feasible in FEA. Re-optimizing with a larger model... Scale the model by ", enlarge_scale)
-                continue
-            else:
-                print("Success!!!!!!!!!!! The model is feasible in FEA.")
-
-
-    if args.do_fea_analysis:
-        mapdl_object.shutdown()
-
-    return exit_code
+from auto_design import auto_design_function
 
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
-    parser.add_argument('--model_name', type=str, default='gold_lynel', help='The model name. The model is expected to be placed in the model/given_models folder. (e.g. gold_lynel). The model should be in STL format.')
+
+    parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel.stl'), help='The path to the stl mesh file.')
+    parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
     
-    parser.add_argument('--expected_x', type=float, default=20, help='The expected x-axis length of the model. (cm)')
+    parser.add_argument('--result_folder', type=str, default=os.path.normpath(project_path + '/result'), help='The folder to save the results.')
+
+    parser.add_argument('--expected_x', type=float, default=50, help='The expected x-axis length of the model. (cm)')
     parser.add_argument('--voxel_size', type=float, default=1, help='The size of the voxel. (cm)')
     parser.add_argument('--voxel_density', type=float, default=1.5e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
     parser.add_argument('--joint_limitation', type=float, default=1, help='The limitation of the joint. +-joint_limitation. (rad)')
 
-    parser.add_argument('--genetic_generation', type=int, default=20, help='The number of generations for the genetic algorithm')
+    parser.add_argument('--max_trial_round', type=int, default=5, help='The maximum number of trial rounds.')
+    parser.add_argument('--genetic_generation', type=int, default=5, help='The number of generations for the genetic algorithm')
     parser.add_argument('--do_fea_analysis', type=bool, default=False, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
-    parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not')
+    parser.add_argument('--regenerate_if_fea_failed', type=bool, default=False, help='Regenerate the model if the FEA analysis failed or not. FEAs are expensive and strict.')
+
+    parser.add_argument('--visualize', type=bool, default=False, help='Visualize the process or not. Need to close the windows to continue the process if turned on.')
+    parser.add_argument('--disable_joint_setting_ui', type=bool, default=True, help='Disable the joint setting UI or not')
+
+    ### No need to set model_name. This is a temporary value. It will be removed in the future.
+    parser.add_argument('--model_name', type=str, default='None', help='Temporary value. No need to set this value.')
+
     args = parser.parse_args()
 
-    auto_design(args)
+    auto_design_function(args)
     
