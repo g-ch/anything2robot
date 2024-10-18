@@ -24,11 +24,15 @@ from dash import Dash, dcc, html, Input, Output
 from wsgiref.simple_server import make_server
 from flask import Flask
 import time
+import pyvista as pv
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox, QPushButton
 
 import sys
+import pyvista as pv
+from pyvistaqt import QtInteractor
+
 
 class Line:
     def __init__(self, start, end):
@@ -168,8 +172,6 @@ class Link:
         return self.name
     
 
-
-
 class LinkTreeGUI(QtWidgets.QMainWindow):
     def __init__(self, mesh, args):
         super().__init__()
@@ -185,6 +187,8 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
 
         self.nodes = {}
         self.current_link = None
+
+        self.start_design_flag = False
         
         # Tree view
         self.tree_view_frame = self.create_tree_view_frame()
@@ -215,7 +219,16 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         self.save_frame = self.create_save_frame()
         self.layout.addWidget(self.save_frame, 2, 1)
 
-        # Plotly visualization
+        # Point selection frame
+        self.point_selection_frame = self.create_point_selection_frame()
+        self.point_selection_frame.setMinimumSize(400, 400) 
+        self.point_selection_frame.setMaximumSize(800, 800)
+        self.layout.addWidget(self.point_selection_frame, 0, 2, 2, 1)
+
+        self.point_selection_slider_frame = self.create_point_selection_slider_frame()
+        self.layout.addWidget(self.point_selection_slider_frame, 2, 2)
+
+        # Plotly visualization in the Web UI using Dash
         self.fig = make_subplots(specs=[[{"type": "scene"}]])
         self.fig.add_trace(mesh.mesh_plotly)
 
@@ -253,7 +266,7 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         self.fig.write_image(save_path)
 
     def create_tree_view_frame(self):
-        frame = QtWidgets.QGroupBox("Tree View")
+        frame = QtWidgets.QGroupBox("")
         layout = QtWidgets.QVBoxLayout()
 
         self.tree = QtWidgets.QTreeWidget()
@@ -265,7 +278,7 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         return frame
 
     def create_joint_list_frame(self):
-        frame = QtWidgets.QGroupBox("Joint List")
+        frame = QtWidgets.QGroupBox("")
         layout = QtWidgets.QVBoxLayout()
 
         self.joint_list = QtWidgets.QListWidget()
@@ -274,9 +287,116 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
 
         frame.setLayout(layout)
         return frame
+    
+    def create_point_selection_frame(self):
+        frame = QtWidgets.QGroupBox("")
+        layout = QtWidgets.QVBoxLayout()
+
+        # Create a PyVista plotter within the Qt window
+        self.plotter = QtInteractor(frame)
+        layout.addWidget(self.plotter.interactor)
+        frame.setLayout(layout)
+
+        # Load an STL file and add a sphere to the PyVista plotter
+        self.load_model()
+
+        return frame
+    
+    def create_point_selection_slider_frame(self):
+        frame = QtWidgets.QGroupBox("Point Selection Slider")
+        layout = QtWidgets.QVBoxLayout()
+
+        # Create sliders for controlling X, Y, Z coordinates
+        self.slider_x = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.slider_y = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.slider_z = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+
+
+        # Set slider ranges using self.mesh_bounds
+        bound = self.mesh_bounds
+        self.mesh_middle_point = [(bound[0] + bound[1]) / 2, (bound[2] + bound[3]) / 2, (bound[4] + bound[5]) / 2]
+        self.slider_x.setRange(bound[0], bound[1])
+        self.slider_y.setRange(bound[2], bound[3])
+        self.slider_z.setRange(bound[4], bound[5])
+        self.slider_x.setValue(self.mesh_middle_point[0])
+        self.slider_y.setValue(self.mesh_middle_point[1])
+        self.slider_z.setValue(self.mesh_middle_point[2])
+
+        # Update the min, max of the joint_x_input based on the mesh bounds
+        self.joint_x_input.setRange(bound[0], bound[1])
+        self.joint_y_input.setRange(bound[2], bound[3])
+        self.joint_z_input.setRange(bound[4], bound[5])
+
+        # Add labels
+        layout.addWidget(QtWidgets.QLabel("X Position"))
+        layout.addWidget(self.slider_x)
+        layout.addWidget(QtWidgets.QLabel("Y Position"))
+        layout.addWidget(self.slider_y)
+        layout.addWidget(QtWidgets.QLabel("Z Position"))
+        layout.addWidget(self.slider_z)
+
+        # Connect sliders to their respective functions
+        self.slider_x.valueChanged.connect(self.slider_position_updated)
+        self.slider_y.valueChanged.connect(self.slider_position_updated)
+        self.slider_z.valueChanged.connect(self.slider_position_updated)
+
+        frame.setLayout(layout)
+        return frame
+
+
+    def load_model(self):
+        # Load STL file
+        stl_file_path = self.args.stl_mesh_path
+        stl_mesh = pv.read(stl_file_path)
+        # Get the bounds of the mesh
+        self.mesh_bounds = stl_mesh.bounds
+        center = [(self.mesh_bounds[0] + self.mesh_bounds[1]) / 2, (self.mesh_bounds[2] + self.mesh_bounds[3]) / 2, (self.mesh_bounds[4] + self.mesh_bounds[5]) / 2]
+        # Create a sphere (representing a point)
+        self.shpere_position = center
+        self.sphere = pv.Sphere(radius=1, center=self.shpere_position)
+        # Add the STL mesh with transparency
+        self.plotter.add_mesh(stl_mesh, opacity=0.5, color="lightblue")
+        # Add a red sphere
+        self.sphere_actor = self.plotter.add_mesh(self.sphere, color="red")
+        self.plotter.add_axes()
+        self.plotter.show()
+
+    def slider_position_updated(self):
+        """ Update the sphere position based on the slider values """
+        x = self.slider_x.value()
+        y = self.slider_y.value()
+        z = self.slider_z.value()
+        self.shpere_position = (x, y, z)
+        self.update_sphere_position(self.shpere_position)
+
+        self.joint_x_input.setValue(x)
+        self.joint_y_input.setValue(y)
+        self.joint_z_input.setValue(z)
+
+    def update_slider_position(self):
+        """ Update the sphere position based on the joint input values """
+        x = self.joint_x_input.value()
+        y = self.joint_y_input.value()
+        z = self.joint_z_input.value()
+
+        self.slider_x.setValue(x)
+        self.slider_y.setValue(y)
+        self.slider_z.setValue(z)
+    
+    def update_sphere_position(self, new_position):
+        """ Update the sphere position and refresh the plot """
+        self.sphere_position = new_position
+        
+        # Remove the old sphere
+        self.plotter.remove_actor(self.sphere_actor)
+        # Add a new sphere at the updated position
+        self.sphere_actor = self.plotter.add_mesh(pv.Sphere(radius=1, center=self.sphere_position), color="red")
+        # Update the plotter to reflect changes
+        self.plotter.render()
+
 
     def create_link_edit_frame(self):
-        frame = QtWidgets.QGroupBox("Step 1: Link Edit")
+        frame = QtWidgets.QGroupBox("* Step 1: Link Edit")
         layout = QtWidgets.QVBoxLayout()
 
         self.link_name_input = QtWidgets.QLineEdit()
@@ -302,7 +422,7 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         return frame
 
     def create_joint_edit_frame(self):
-        frame = QtWidgets.QGroupBox("Step 2: Joint Edit")
+        frame = QtWidgets.QGroupBox("* Step 2: Joint Edit")
         layout = QtWidgets.QVBoxLayout()
 
         self.combo_joint_name = QtWidgets.QComboBox()
@@ -326,6 +446,10 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         self.joint_x_input.setDecimals(2)
         self.joint_y_input.setDecimals(2)
         self.joint_z_input.setDecimals(2)
+
+        self.joint_x_input.valueChanged.connect(self.update_slider_position)
+        self.joint_y_input.valueChanged.connect(self.update_slider_position)
+        self.joint_z_input.valueChanged.connect(self.update_slider_position)
 
         layout.addWidget(QtWidgets.QLabel("Joint Name"))
         layout.addWidget(self.combo_joint_name)
@@ -358,7 +482,7 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         return frame
 
     def create_axis_edit_frame(self):
-        frame = QtWidgets.QGroupBox("Step 3: Axis Edit")
+        frame = QtWidgets.QGroupBox("* Step 3: Axis Edit")
         layout = QtWidgets.QVBoxLayout()
 
         self.axis_display = QtWidgets.QLabel("Current Axis:")
@@ -396,9 +520,9 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         save_button.clicked.connect(self.save)
         layout.addWidget(save_button)
 
-        quit_button = QtWidgets.QPushButton("Run Design Process")
-        quit_button.clicked.connect(self.quit)
-        layout.addWidget(quit_button)
+        start_design_button = QtWidgets.QPushButton("Run Design Process")
+        start_design_button.clicked.connect(self.start_design)
+        layout.addWidget(start_design_button)
 
         frame.setLayout(layout)
         return frame
@@ -416,28 +540,23 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         self.dash_thread.join()
         self.close()
 
-     # Overriding the closeEvent method
+    # Overriding the closeEvent method
     def closeEvent(self, event):
         """Customize the action when the window's 'X' button is clicked."""
-        reply = QtWidgets.QMessageBox.question(
-            self, 'Quit Application',
-            "Are you sure you want to quit?",
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-            QtWidgets.QMessageBox.No
-        )
-
-        if reply == QtWidgets.QMessageBox.Yes:
+        if not self.start_design_flag:
             self.shutdown()
             exit(0)
+        else:
+            self.shutdown()
 
-    def quit(self):
-        reply = QtWidgets.QMessageBox.question(self, 'Quit', 
-                                               "Do you want to quit and start the design process?", 
+    def start_design(self):
+        reply = QtWidgets.QMessageBox.question(self, 'Start', 
+                                               "Do you want to quit the UI and start the design process?", 
                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, 
                                                QtWidgets.QMessageBox.No)
         if reply == QtWidgets.QMessageBox.Yes:
+            self.start_design_flag = True
             self.shutdown()
-
 
     def save(self):
         # Save the nodes as a pickle file
@@ -452,6 +571,7 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, 
                                                QtWidgets.QMessageBox.No)
         if reply == QtWidgets.QMessageBox.Yes:
+            self.start_design_flag = True
             self.shutdown()
 
     def remove_link(self):
@@ -572,7 +692,7 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         if self.current_link:
             joint_name = self.combo_joint_name.currentText()
             
-            if joint_name == "No_name":
+            if joint_name == "No_name" or not joint_name:
                 QtWidgets.QMessageBox.warning(self, "No joint name", "Please enter or select a joint name.")
                 return
             

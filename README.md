@@ -66,5 +66,6 @@ mkdir data
 - Others
 ```
 pip install -U kaleido tkinter
+conda install conda-forge::qt conda-forge::pyvistaqt
 
 ```
