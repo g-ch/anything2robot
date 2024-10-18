@@ -65,5 +65,6 @@ mkdir data
 
 - Others
 ```
-pip install -U kaleido
+pip install -U kaleido tkinter
+
 ```

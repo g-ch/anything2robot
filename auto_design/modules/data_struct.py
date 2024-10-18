@@ -86,8 +86,8 @@ class Graph(object):
 
 class TreeNode(object):
 
-    def __init__(self, val=None):
-        self.val = val
+    def __init__(self, link=None):
+        self.val = link
         self.children = []
 
     def add_child(self, new_node):

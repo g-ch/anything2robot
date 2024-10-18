@@ -25,11 +25,6 @@ from wsgiref.simple_server import make_server
 from flask import Flask
 import time
 
-from PyQt5 import QtWidgets, QtCore, QtGui
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox, QPushButton
-
-import sys
-
 class Line:
     def __init__(self, start, end):
         self.start = np.array(start)
@@ -168,56 +163,53 @@ class Link:
         return self.name
     
 
-
-
-class LinkTreeGUI(QtWidgets.QMainWindow):
-    def __init__(self, mesh, args):
-        super().__init__()
+class LinkTreeGUI:
+    def __init__(self, root, mesh, args):
         self.args = args
-        self.mesh = mesh
-        self.setWindowTitle("Link Tree Constructor")
-        self.setGeometry(100, 100, 800, 600)
-        
-        # Layout configuration
-        self.central_widget = QtWidgets.QWidget(self)
-        self.setCentralWidget(self.central_widget)
-        self.layout = QtWidgets.QGridLayout(self.central_widget)
+        self.root = root
+        self.root.title("Link Tree Constructor")
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
 
         self.nodes = {}
         self.current_link = None
+
+        self.link_name_set = set()
+        
+        # Layout configuration
+        self.frame = ttk.Frame(self.root, padding="3 3 12 12")
+        self.frame.grid(column=0, row=0, sticky=(tk.N, tk.W, tk.E, tk.S))
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
         
         # Tree view
-        self.tree_view_frame = self.create_tree_view_frame()
-        self.tree_view_frame.setMinimumSize(300, 300)  
-        self.tree_view_frame.setMaximumSize(800, 800)  
-
-        self.layout.addWidget(self.tree_view_frame, 0, 0)
+        self.tree_view_frame = self.create_tree_view_frame(self.root)
+        self.tree_view_frame.grid(column=0, row=0, sticky='nsew')
 
         # Joints in current link
-        self.joint_list_frame = self.create_joint_list_frame()
-        self.joint_list_frame.setMinimumSize(300, 300) 
-        self.joint_list_frame.setMaximumSize(800, 800)
-        self.layout.addWidget(self.joint_list_frame, 0, 1)
+        self.joint_list_frame = self.create_joint_list_frame(self.root)
+        self.joint_list_frame.grid(column=1, row=0, sticky='nsew')
 
         # Add link controls
-        self.link_edit_frame = self.create_link_edit_frame()
-        self.layout.addWidget(self.link_edit_frame, 1, 0)
+        self.link_edit_frame = self.create_link_edit_frame(self.root)
+        self.link_edit_frame.grid(column=0, row=1, sticky='nsew')
 
         # Joint controls
-        self.joint_edit_frame = self.create_joint_edit_frame()
-        self.layout.addWidget(self.joint_edit_frame, 1, 1)
+        self.joint_edit_frame = self.create_joint_edit_frame(self.root)
+        self.joint_edit_frame.grid(column=1, row=1, sticky='nsew')
 
         # Axis controls
-        self.axis_edit_frame = self.create_axis_edit_frame()
-        self.layout.addWidget(self.axis_edit_frame, 2, 0)
+        self.axis_edit_frame = self.create_axis_edit_frame(self.root)
+        self.axis_edit_frame.grid(column=0, row=2, sticky='nsew')
 
         # Save controls
-        self.save_frame = self.create_save_frame()
-        self.layout.addWidget(self.save_frame, 2, 1)
+        self.save_frame = self.create_save_frame(self.root)
+        self.save_frame.grid(column=1, row=2, sticky='nsew')
 
         # Plotly visualization
         self.fig = make_subplots(specs=[[{"type": "scene"}]])
         self.fig.add_trace(mesh.mesh_plotly)
+        self.mesh = mesh
 
         self.server = Flask(__name__)
         self.app = Dash(__name__, server=self.server)
@@ -231,382 +223,352 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
             html.Button("Update Data", id="update-button", n_clicks=0),
         ])
 
+
         @self.app.callback(
             Output("graph", "figure"), 
             Input("update-button", "n_clicks"))
         def update_bar_chart(n_clicks):
             return self.fig
+        
 
-        def run_dash_server():
-            # Start Dash app here without the reloader
-            self.app.run_server(debug=False, use_reloader=False)
+        def run_dash():
+            self.app.run_server(debug=True)
 
-        self.dash_thread = threading.Thread(target=run_dash_server)
+        # Create a thread to run the Dash app
+        self.dash_thread = Thread(target=run_dash)
         self.dash_thread.start()
 
+        # If not the disable_joint_setting_ui flag is not set, open the UI in the browser
         if not args.disable_joint_setting_ui:
             import webbrowser
             webbrowser.open('http://127.0.0.1:8050/')
 
-
+    
     def save_fig(self, save_path):
         self.fig.write_image(save_path)
 
-    def create_tree_view_frame(self):
-        frame = QtWidgets.QGroupBox("Tree View")
-        layout = QtWidgets.QVBoxLayout()
 
-        self.tree = QtWidgets.QTreeWidget()
-        self.tree.setHeaderHidden(True)
-        self.tree.itemSelectionChanged.connect(self.on_tree_select)
-        layout.addWidget(self.tree)
+    def create_tree_view_frame(self, root):
+        frame = ttk.Frame(root, borderwidth=2, relief="groove")
+
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(0, weight=1)
+
+        # Tree view
+        self.tree = ttk.Treeview(frame)
+        self.tree.grid(column=0, row=0, columnspan=3, sticky='nsew')
+        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+
+        return frame
+    
+    def create_joint_list_frame(self, root):
+        frame = ttk.Frame(root, borderwidth=2, relief="groove")
+
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(0, weight=1)
+
+        self.joint_list = tk.Listbox(frame)
+        self.joint_list.grid(column=0, row=0, columnspan=3, sticky='nsew')
+        self.joint_list.bind('<<ListboxSelect>>',self.joint_select)
+
+        return frame
+    
+    
+    def create_link_edit_frame(self, root):
+        frame = ttk.Frame(root, borderwidth=2, relief="groove")
+
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(1, weight=1)
+
+        ttk.Label(frame, text="STEP1: Add Links", font=('Helvetica', 12, 'bold')).grid(column=0, row=0)
         
-        frame.setLayout(layout)
-        return frame
-
-    def create_joint_list_frame(self):
-        frame = QtWidgets.QGroupBox("Joint List")
-        layout = QtWidgets.QVBoxLayout()
-
-        self.joint_list = QtWidgets.QListWidget()
-        self.joint_list.itemSelectionChanged.connect(self.joint_select)
-        layout.addWidget(self.joint_list)
-
-        frame.setLayout(layout)
-        return frame
-
-    def create_link_edit_frame(self):
-        frame = QtWidgets.QGroupBox("Step 1: Link Edit")
-        layout = QtWidgets.QVBoxLayout()
-
-        self.link_name_input = QtWidgets.QLineEdit()
-        self.combo_parent_name = QtWidgets.QComboBox()
-        self.combo_parent_name.addItem("NONE")
+        ttk.Label(frame, text="Enter New Link Name:").grid(column=0, row=1)
+        self.link_name = tk.StringVar()
+        ttk.Entry(frame, textvariable=self.link_name).grid(column=1, row=1)
         
-        add_link_button = QtWidgets.QPushButton("Add Link")
-        add_link_button.clicked.connect(self.add_link)
-        remove_link_button = QtWidgets.QPushButton("Remove Link")
-        remove_link_button.clicked.connect(self.remove_link)
+        ttk.Label(frame, text="Parent Name:").grid(column=0, row=2)
+        self.parent_name = tk.StringVar()
+        #ttk.Entry(frame, textvariable=self.parent_name).grid(column=1, row=3)
+        self.combo_parent_name = ttk.Combobox(frame, textvariable=self.parent_name, state='readonly')
+        self.combo_parent_name['values'] = ('NONE')
 
-        layout.addWidget(QtWidgets.QLabel("Input New Link Name"))
-        layout.addWidget(self.link_name_input)
-        layout.addWidget(QtWidgets.QLabel("Parent Name"))
-        layout.addWidget(self.combo_parent_name)
+        self.combo_parent_name.grid(column=1, row=2)
+        self.combo_parent_name.current(0)
+        self.rotation_axis = tk.StringVar()
+
+        ttk.Label(frame, text="Use NONE to add root link", font=('Helvetica', 8, 'bold')).grid(column=1, row=3)
+
+        ttk.Button(frame, text="Add new Link", command=self.add_link).grid(column=0, row=4)
+        ttk.Button(frame, text="Remove Link", command=self.remove_link).grid(column=1, row=4)
+
+        for widget in frame.winfo_children():
+            widget.grid(padx=5, pady=5)
+
+        return frame
+    
+    def create_joint_edit_frame(self, root):
+        frame = ttk.Frame(root, borderwidth=2, relief="groove")
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(1, weight=1)
+
+        ttk.Label(frame, text="STEP2: Add Joints", font=('Helvetica', 12, 'bold')).grid(column=0, row=0, sticky='nswe')
         
-        add_remove_hbox = QHBoxLayout()
-        add_remove_hbox.addWidget(add_link_button)
-        add_remove_hbox.addWidget(remove_link_button)
-        layout.addLayout(add_remove_hbox)
+        # Joint name frame
+        joint_name_frame = ttk.Frame(frame)
+        ttk.Label(joint_name_frame, text="Enter a new Joint or Select a Joint:").grid(column=0, row=0)
+        self.joint_name = tk.StringVar()
 
-        frame.setLayout(layout)
-        return frame
+        self.combo_joint_name = ttk.Combobox(joint_name_frame, textvariable=self.joint_name)
+        self.combo_joint_name['values'] = ('No_name')
+        self.combo_joint_name.bind('<<ComboboxSelected>>', self.joint_combo_select)
 
-    def create_joint_edit_frame(self):
-        frame = QtWidgets.QGroupBox("Step 2: Joint Edit")
-        layout = QtWidgets.QVBoxLayout()
+        self.combo_joint_name.grid(column=1, row=0)
+        self.combo_joint_name.current(0)
 
-        self.combo_joint_name = QtWidgets.QComboBox()
-        self.combo_joint_name.setEditable(True)
-        self.combo_joint_name.addItem("No_name")
-        self.combo_joint_name.currentTextChanged.connect(self.joint_combo_select)
+        joint_name_frame.grid(column=0, row=1)
 
-        self.joint_x_input = QtWidgets.QDoubleSpinBox()
-        self.joint_y_input = QtWidgets.QDoubleSpinBox()
-        self.joint_z_input = QtWidgets.QDoubleSpinBox()
-        self.joint_x_input.setRange(-1e6, 1e6)
-        self.joint_y_input.setRange(-1e6, 1e6)
-        self.joint_z_input.setRange(-1e6, 1e6)
-
-        # Set step size for more granular control
-        self.joint_x_input.setSingleStep(0.1)
-        self.joint_y_input.setSingleStep(0.1)
-        self.joint_z_input.setSingleStep(0.1)
-
-        # Set the number of decimal places to show
-        self.joint_x_input.setDecimals(2)
-        self.joint_y_input.setDecimals(2)
-        self.joint_z_input.setDecimals(2)
-
-        layout.addWidget(QtWidgets.QLabel("Joint Name"))
-        layout.addWidget(self.combo_joint_name)
-
-        hbox_x = QHBoxLayout()
-        hbox_x.addWidget(QLabel("Position X"))
-        hbox_x.addWidget(self.joint_x_input)
-        layout.addLayout(hbox_x)
-
-        hbox_y = QHBoxLayout()
-        hbox_y.addWidget(QLabel("Position Y"))
-        hbox_y.addWidget(self.joint_y_input)
-        layout.addLayout(hbox_y)
-
-        hbox_z = QHBoxLayout()
-        hbox_z.addWidget(QLabel("Position Z"))
-        hbox_z.addWidget(self.joint_z_input)
-        layout.addLayout(hbox_z)
-
-        add_remove_hbox = QHBoxLayout()
-        add_joint_button = QtWidgets.QPushButton("Add Joint")
-        add_joint_button.clicked.connect(self.add_joint)
-        remove_joint_button = QtWidgets.QPushButton("Remove Joint")
-        remove_joint_button.clicked.connect(self.remove_joint)
-        add_remove_hbox.addWidget(add_joint_button)
-        add_remove_hbox.addWidget(remove_joint_button)
-        layout.addLayout(add_remove_hbox)
+        # Position frame
+        position_frame = ttk.Frame(frame)
         
-        frame.setLayout(layout)
+        ttk.Label(position_frame, text="X:").grid(column=0, row=0)
+        self.joint_x = tk.DoubleVar()
+        ttk.Entry(position_frame, textvariable=self.joint_x).grid(column=1, row=0)
+        
+        ttk.Label(position_frame, text="Y:").grid(column=2, row=0)
+        self.joint_y = tk.DoubleVar()
+        ttk.Entry(position_frame, textvariable=self.joint_y).grid(column=3, row=0)
+        
+        ttk.Label(position_frame, text="Z:").grid(column=4, row=0)
+        self.joint_z = tk.DoubleVar()
+        ttk.Entry(position_frame, textvariable=self.joint_z).grid(column=5, row=0)
+
+        position_frame.grid(column=0, row=2)
+
+        # Enter frame
+        enter_frame = ttk.Frame(frame)
+        ttk.Button(enter_frame, text="Add Joint", command=self.add_joint).grid(column=0, row=0)
+        self.selected_link = tk.StringVar()
+        self.selected_link.set("Choose a link")
+        ttk.Label(enter_frame, text="to").grid(column=1, row=0)
+        ttk.Label(enter_frame, textvariable=self.selected_link).grid(column=2, row=0)
+        ttk.Button(enter_frame, text="Remove Joint", command=self.remove_joint).grid(column=3, row=0)
+
+        enter_frame.grid(column=0, row=3)
+
+        for widget in frame.winfo_children():
+            widget.grid(padx=5, pady=5)
+
         return frame
+    
 
-    def create_axis_edit_frame(self):
-        frame = QtWidgets.QGroupBox("Step 3: Axis Edit")
-        layout = QtWidgets.QVBoxLayout()
+    def create_axis_edit_frame(self, root):
+        frame = ttk.Frame(root, borderwidth=2, relief="groove")
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(1, weight=1)
 
-        self.axis_display = QtWidgets.QLabel("Current Axis:")
-        self.axis_input = QtWidgets.QLineEdit()
-        add_axis_button = QtWidgets.QPushButton("Add Axis")
-        add_axis_button.clicked.connect(self.add_axis)
-        remove_axis_button = QtWidgets.QPushButton("Remove Axis")
-        remove_axis_button.clicked.connect(self.remove_axis)
+        ttk.Label(frame, text="STEP3: Add Axis", font=('Helvetica', 12, 'bold')).grid(column=0, row=0)
 
-        layout.addWidget(self.axis_display)
-        layout.addWidget(self.axis_input)
-        explain_text = QtWidgets.QLabel("Format:[(3d position) + one or two (3d directions)]")
-        explain_text2 = QtWidgets.QLabel("E.g. [(-0.1, 0, 0), (0, 1, 0)]")
-        font = QtGui.QFont()
-        font.setPointSize(8)  # Set the font size to 16 points
-        explain_text.setFont(font)
-        explain_text2.setFont(font)
+        self.cur_rotation_axis = tk.StringVar()
+        ttk.Label(frame, text="Rotation Axis:").grid(column=0, row=1)
+        # Add text box to display rotation axis
+        ttk.Label(frame, textvariable=self.cur_rotation_axis).grid(column=1, row=1)
 
-        layout.addWidget(explain_text)
-        layout.addWidget(explain_text2)
+        # Axis controls
+        ttk.Label(frame, text="Axis:").grid(column=0, row=3)
+        ttk.Entry(frame, textvariable=self.rotation_axis).grid(column=1, row=3)
+        ttk.Button(frame, text="Add Axis", command=self.add_axis).grid(column=1, row=4, columnspan=1)
 
-        hbox = QHBoxLayout()
-        hbox.addWidget(add_axis_button)
-        hbox.addWidget(remove_axis_button)
-        layout.addLayout(hbox)
+        for widget in frame.winfo_children():
+            widget.grid(padx=5, pady=5)
 
-        frame.setLayout(layout)
         return frame
+    
+    def create_save_frame(self, root):
+        frame = ttk.Frame(root, borderwidth=2, relief="groove")
+        frame.columnconfigure(1, weight=1)
+        frame.rowconfigure(1, weight=1)
 
-    def create_save_frame(self):
-        frame = QtWidgets.QGroupBox("Save")
-        layout = QtWidgets.QVBoxLayout()
+        # quit button
+        ttk.Button(frame, text="Quit", command=self.quit).grid(column=0, row=1, columnspan=4)
+        # save button
+        ttk.Button(frame, text="Save", command=self.save).grid(column=0, row=3, columnspan=4)
 
-        save_button = QtWidgets.QPushButton("Save")
-        save_button.clicked.connect(self.save)
-        layout.addWidget(save_button)
+        # Bind the close window event to the quit function
+        self.root.protocol("WM_DELETE_WINDOW", self.quit)
 
-        quit_button = QtWidgets.QPushButton("Run Design Process")
-        quit_button.clicked.connect(self.quit)
-        layout.addWidget(quit_button)
-
-        frame.setLayout(layout)
         return frame
-
-
-    def update_joint_list(self):
-        self.joint_list.clear()
-        if self.current_link:
-            for joint_name, joint_position in self.current_link.joints.items():
-                self.joint_list.addItem(f"{joint_name}: {joint_position}")
-
+        
+    
     def shutdown(self):
         self.server.shutdown()
         self.server_thread.join()
         self.dash_thread.join()
-        self.close()
-
-     # Overriding the closeEvent method
-    def closeEvent(self, event):
-        """Customize the action when the window's 'X' button is clicked."""
-        reply = QtWidgets.QMessageBox.question(
-            self, 'Quit Application',
-            "Are you sure you want to quit?",
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-            QtWidgets.QMessageBox.No
-        )
-
-        if reply == QtWidgets.QMessageBox.Yes:
-            self.shutdown()
-            exit(0)
+        self.root.destroy()
 
     def quit(self):
-        reply = QtWidgets.QMessageBox.question(self, 'Quit', 
-                                               "Do you want to quit and start the design process?", 
-                                               QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, 
-                                               QtWidgets.QMessageBox.No)
-        if reply == QtWidgets.QMessageBox.Yes:
+        if messagebox.askyesno("Quit", "Do you want to quit and start the design process?"):
             self.shutdown()
-
+        else:
+            if messagebox.askyesno("Quit", "Do you want exit?"):
+                self.shutdown()
+                exit()
+            else:
+                return
 
     def save(self):
-        # Save the nodes as a pickle file
-        pkl.dump(self.nodes, open(f'./auto_design/model/given_models/{self.args.model_name}_joints.pkl', 'wb'))
+        pkl.dump(self.nodes, open('./auto_design/model/given_models/' + self.args.model_name + '_joints.pkl', 'wb'))
 
-        # Save a copy in result folder
-        pkl.dump(self.nodes, open(f'{self.args.result_folder}/{self.args.model_name}_joints.pkl', 'wb'))
+        # Save a copy of the pkl file in args.result_folder
+        pkl.dump(self.nodes, open(self.args.result_folder + '/' + self.args.model_name + '_joints.pkl', 'wb'))
 
-        # Confirm save
-        reply = QtWidgets.QMessageBox.question(self, 'Save', 
-                                               "Save successful. Start the design process?", 
-                                               QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, 
-                                               QtWidgets.QMessageBox.No)
-        if reply == QtWidgets.QMessageBox.Yes:
+        # Use a message box to confirm save and start the design process or not        
+        if messagebox.askyesno("Save", "Save successful. Start the design process. Do you want to start the design process?"):
             self.shutdown()
-
+        else:
+            self.shutdown()
+            exit()
+            
     def remove_link(self):
-        selected_items = self.tree.selectedItems()
-        if not selected_items:
-            QtWidgets.QMessageBox.warning(self, "No link selected", "Please select a link to remove.")
+        if not self.tree.selection():
+            messagebox.showwarning("No link selected", "Please select a link to remove.")
             return
         
-        selected_item = selected_items[0].text(0)
-        
-        # Remove the selected link from the nodes
+        selected_item = self.tree.selection()[0]
         if selected_item in self.nodes:
-            # Recursively remove the selected link's children
-            self.recursive_children_remove(selected_item)
-
-            # Remove the selected link.
-            self.remove_from_children(selected_item)
-            self.nodes[selected_item].val.joints = {}
             del self.nodes[selected_item]
-
-            # Refresh the joint list
-            self.joint_list.clear()
-            for joint_name, joint_position in self.current_link.joints.items():
-                self.joint_list.addItem(f"{joint_name}: {joint_position}")
-
-            self.tree.clear()
-            self.load_tree(self.nodes)
-
-            self.update_plot()
-
-            self.update_parent_name_combobox()
-            self.update_joint_combobox()
-            self.axis_input.setText("None")
-
-    def recursive_children_remove(self, selected_item):
-        children_copy = list(self.nodes[selected_item].children)
-        for child in children_copy:
-            self.recursive_children_remove(child.val.name)
-
-            # Remove the selected link name from the links who has the selected link as a child
-            self.remove_from_children(child.val.name)
-            self.nodes[child.val.name].val.joints = {}
-            del self.nodes[child.val.name]
-            print(f"Removed {child.val.name} from children of {selected_item}")
-
-
-    def remove_from_children(self, selected_item):
-        # Remove the selected link name from the links who has the selected link as a child
-        if selected_item in self.nodes:
+            self.tree.delete(selected_item)
             for node in self.nodes.values():
                 for child in node.children:
                     if child.val.name == selected_item:
                         node.children.remove(child)
-                        print(f"Removed {selected_item} from {node.val.name}'s children.")
+                        break
+            
+            # Remove the name from the combobox
+            self.combo_parent_name['values'] = tuple(filter(lambda x: x != selected_item, self.combo_parent_name['values']))
+
 
     def add_link(self):
-        link_name = self.link_name_input.text()
-        parent_name = self.combo_parent_name.currentText()
-        
+        link_name = self.link_name.get()
+        parent_name = self.parent_name.get()
+        print("Added link: ", link_name, " with parent: ", parent_name)
+
         if link_name and link_name not in self.nodes:
             link = Link(link_name)
             node = TreeNode(link)
             self.nodes[link_name] = node
-            if parent_name in self.nodes:
+            if parent_name and parent_name in self.nodes:
                 self.nodes[parent_name].add_child(node)
-                parent_item = self.tree.findItems(parent_name, QtCore.Qt.MatchExactly)[0]
-                parent_item.addChild(QtWidgets.QTreeWidgetItem([link_name]))
+                parent_id = self.nodes[parent_name].val.name
+                self.tree.insert(parent_id, 'end', link_name, text=link_name)
             else:
-                self.tree.addTopLevelItem(QtWidgets.QTreeWidgetItem([link_name]))
-            self.link_name_input.clear()
-
-            # Update combobox
-            self.combo_parent_name.addItem(link_name)
+                print("No parent name. Inserting into the root")
+                self.tree.insert('', 'end', link_name, text=link_name)
+            self.link_name.set("")
+            self.parent_name.set("")
         else:
-            QtWidgets.QMessageBox.warning(self, "No link name", "Please enter a link name.")
+            messagebox.showwarning("No link name", "Please enter a link name.")
+        
+        # Update the combobox
+        if link_name not in self.combo_parent_name['values']:
+            self.combo_parent_name['values'] = self.combo_parent_name['values'] + (link_name,)
 
-    def joint_select(self):
-        selected_items = self.joint_list.selectedItems()
-        if selected_items:
-            joint_name, joint_position = selected_items[0].text().split(":")
-            joint_position = joint_position.strip()
+    def joint_select(self, event):
+        selected_joint = self.joint_list.curselection()
+        joint_name = self.joint_list.get(selected_joint[0]).split(":")[0]
+        joint_pos = self.joint_list.get(selected_joint[0]).split(":")[1]
+        self.joint_name.set(joint_name)
+        tuple_val = ast.literal_eval(joint_pos[1:])
+        joint_pos = list(tuple_val)
 
-            joint_pos = ast.literal_eval(joint_position)
-            self.combo_joint_name.setCurrentText(joint_name)
+        self.joint_x.set(joint_pos[0])
+        self.joint_y.set(joint_pos[1])
+        self.joint_z.set(joint_pos[2])
 
-            self.joint_x_input.setValue(joint_pos[0])
-            self.joint_y_input.setValue(joint_pos[1])
-            self.joint_z_input.setValue(joint_pos[2])
-
-    def joint_combo_select(self):
-        joint_name = self.combo_joint_name.currentText()
+    def joint_combo_select(self, event):
+        joint_name = self.joint_name.get()
+        # Get joint position
         for link in self.nodes.values():
             if joint_name in link.val.joints:
                 joint_pos = link.val.joints[joint_name]
-                self.joint_x_input.setValue(joint_pos[0])
-                self.joint_y_input.setValue(joint_pos[1])
-                self.joint_z_input.setValue(joint_pos[2])
+                self.joint_x.set(joint_pos[0])
+                self.joint_y.set(joint_pos[1])
+                self.joint_z.set(joint_pos[2])
+                break
+            else:
+                self.joint_x.set(0)
+                self.joint_y.set(0)
+                self.joint_z.set(0)
+
+    def on_tree_select(self, event):        
+        selected_item = self.tree.selection()[0]
+        self.current_link = self.nodes[selected_item].val if selected_item in self.nodes else None
+
+        # Update selected item in the combobox
+        for i, value in enumerate(self.combo_parent_name['values']):
+            if value == selected_item:
+                self.combo_parent_name.current(i)
                 break
 
-    def on_tree_select(self):
-        selected_items = self.tree.selectedItems()
-        if selected_items:
-            selected_item = selected_items[0].text(0)
-            self.current_link = self.nodes[selected_item].val if selected_item in self.nodes else None
-            self.update_joint_list()
+        self.selected_link.set(selected_item)
 
-            # Update combobox
-            self.combo_parent_name.setCurrentText(selected_item)
+        # Update joint list
+        self.joint_list.delete(0, tk.END)
+        if self.current_link:
+            for joint_name, joint_position in self.current_link.joints.items():
+                self.joint_list.insert(tk.END, f"{joint_name}: {joint_position}")
 
-            #Update axis display
-            if self.current_link and self.current_link.axis:
-                self.axis_input.setText(f"{self.current_link.axis}")
-            else:
-                self.axis_input.setText("None")
-
+        
+        # Update rotation axis
+        if self.current_link.axis:
+            
+            renderings = ""
+            renderings_modify = ""
+            for i, axis in enumerate(self.current_link.axis):
+                if i == 0:
+                    renderings += f"Origin: {axis}\n"
+                    renderings_modify += ','.join(map(str, axis)) + ','
+                else:
+                    renderings += f"Axis {i}: {axis}\n"
+                    renderings_modify += ','.join(map(str, axis)) + ','
+            self.cur_rotation_axis.set(renderings)
+            self.rotation_axis.set(renderings_modify[:-1])
+        else:
+            self.cur_rotation_axis.set("")
 
     def add_joint(self):
         if self.current_link:
-            joint_name = self.combo_joint_name.currentText()
+            joint_name = self.joint_name.get()
             
             if joint_name == "No_name":
-                QtWidgets.QMessageBox.warning(self, "No joint name", "Please enter or select a joint name.")
+                messagebox.showwarning("No joint name", "Please enter or select a joint name.")
                 return
             
-            x, y, z = self.joint_x_input.value(), self.joint_y_input.value(), self.joint_z_input.value()
+            x, y, z = self.joint_x.get(), self.joint_y.get(), self.joint_z.get()
                 
             self.current_link.add_joint(joint_name, (x, y, z))
             
-            # Check if the joint is already in another link and if the position is different
+            # Check if the joint is already in a link and the position is different
             for link in self.nodes.values():
                 if joint_name in link.val.joints:
-                    if np.any(link.val.joints[joint_name] != (x, y, z)):
-                        print(f"Joint already exists in another link with a different position.")
-                        print(f"Current joint position: {x, y, z}")
-                        print(f"Existing joint position: {link.val.joints[joint_name]}")
-                        
-                        message_to_print = (f"Joint {joint_name} already exists in {link.val.name} with "
-                                            f"an existing position: {link.val.joints[joint_name]}. "
-                                            "Do you want to overwrite the position?")
-                        
-                        reply = QtWidgets.QMessageBox.question(self, "Overwrite", message_to_print, 
-                                                               QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-                        if reply == QtWidgets.QMessageBox.Yes:
+                    if np.all(link.val.joints[joint_name] != (x, y, z)):
+                        print("Joint already exists in another link with different position.")
+                        print("Current joint position: ", (x, y, z))
+                        print("Existing joint position: ", link.val.joints[joint_name])
+                        message_to_print = "Joint " + joint_name + " already exists in " + link.val.name + " with an existing position: " + str(link.val.joints[joint_name]) + ". Do you want to overwrite the position?"
+
+                        if messagebox.askyesno("Overwrite", message_to_print):
                             self.update_joint(link.val.name, joint_name, (x, y, z))
                         else:
                             continue
             
             self.update_plot()
 
-            # Refresh the joint list
-            self.joint_list.clear()
+            # Refresh self.joint_list
+            self.joint_list.delete(0, tk.END)
             for joint_name, joint_position in self.current_link.joints.items():
-                self.joint_list.addItem(f"{joint_name}: {joint_position}")
+                self.joint_list.insert(tk.END, f"{joint_name}: {joint_position}")
         else:
-            QtWidgets.QMessageBox.warning(self, "No link selected", "Please select a link to add the joint to.")
+            messagebox.showwarning("No link selected", "Please select a link to add the joint to.")
 
     def update_joint(self, link_name, joint_name, joint_position):
         if joint_name in self.nodes[link_name].val.joints:
@@ -615,71 +577,47 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
             self.nodes[link_name].val.construct_joint_lines()
         else:
             print("Joint not found in the link.")
-        print(self.nodes[link_name].val.joints)
 
+        print(self.nodes[link_name].val.joints)
+    
     def remove_joint(self):
         if self.current_link:
-            selected_items = self.joint_list.selectedItems()
-            if selected_items:
-                joint_name = selected_items[0].text().split(":")[0]
+            selected_joint = self.joint_list.curselection()
+            if selected_joint:
+                joint_name = self.joint_list.get(selected_joint[0]).split(":")[0]
                 
-                # Remove the line made by the joint
+                # remove the line made by the joint
                 for line in self.current_link.joint_lines:
                     if np.all(line.start == self.current_link.joints[joint_name]) or np.all(line.end == self.current_link.joints[joint_name]):
                         self.current_link.joint_lines.remove(line)
                 
-                # Remove the joint
+                # remove the joint
                 del self.current_link.joints[joint_name]
                 self.update_plot()
 
-                # Refresh the joint list
-                self.joint_list.clear()
+                # Refresh self.joint_list
+                self.joint_list.delete(0, tk.END)
                 for joint_name, joint_position in self.current_link.joints.items():
-                    self.joint_list.addItem(f"{joint_name}: {joint_position}")
+                    self.joint_list.insert(tk.END, f"{joint_name}: {joint_position}")
             else:
-                QtWidgets.QMessageBox.warning(self, "No joint selected", "Please select a joint to remove.")
+                messagebox.showwarning("No joint selected", "Please select a joint to remove.")
         else:
-            QtWidgets.QMessageBox.warning(self, "No link selected", "Please select a link to remove the joint from.")
-
+            messagebox.showwarning("No link selected", "Please select a link to remove the joint from.")
+   
     def add_axis(self):
         if self.current_link:
-            axis_str = self.axis_input.text()
-            #axis = tuple(map(float, axis_str.split(",")))
-            try:
-                # Try to safely convert the string to a list of tuples
-                axis_str = axis_str.strip() # Remove leading/trailing whitespace
-                real_list = ast.literal_eval(axis_str)
-
-                # Ensure the result is actually a list of tuples
-                if isinstance(real_list, list) and all(isinstance(item, tuple) for item in real_list):
-                    # Turn real_list into a one-dimensional list
-                    real_list = [item for sublist in real_list for item in sublist]
-                    print(real_list)
-
-                    self.current_link.add_axis(real_list)
-                    self.update_plot()
-                else:
-                    QtWidgets.QMessageBox.warning(self, "Invalid axis format", "Please enter a valid axis format.")
-            except (SyntaxError, ValueError) as e:
-                print(f"Error: {e}")
-                QtWidgets.QMessageBox.warning(self, "Invalid axis format", "Please enter a valid axis format.")
-        else:
-            QtWidgets.QMessageBox.warning(self, "No link selected", "Please select a link to add the axis to.")
-
-    def remove_axis(self):
-        if self.current_link:
-            self.current_link.axis = None
+            axis_str = self.rotation_axis.get()
+            axis = tuple(map(float, axis_str.split(",")))
+            self.current_link.add_axis(axis)
             self.update_plot()
-            self.axis_input.setText("None")
         else:
-            QtWidgets.QMessageBox.warning(self, "No link selected", "Please select a link to remove the axis from.")
-
+            messagebox.showwarning("No link selected", "Please select a link to add the axis to.")
+    
     def update_plot(self):
         self.fig.data = []  # Clear existing data
         x, y, z = [], [], []
         cone_size = 10
         axis_x, axis_y, axis_z, direct_x, direct_y, direct_z = [], [], [], [], [], []
-
         for link in self.nodes.values():
             if link.val is None or link.val.axis is None:
                 print(f"Warning: link {link.val} has no value or axis")
@@ -689,105 +627,58 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
                 axis_x.append(link.val.axis[0][0])
                 axis_y.append(link.val.axis[0][1])
                 axis_z.append(link.val.axis[0][2])
-                direct_x.append(link.val.axis[1][0] * cone_size)
-                direct_y.append(link.val.axis[1][1] * cone_size)
-                direct_z.append(link.val.axis[1][2] * cone_size)
+                direct_x.append(link.val.axis[1][0]*cone_size)
+                direct_y.append(link.val.axis[1][1]*cone_size)
+                direct_z.append(link.val.axis[1][2]*cone_size)
             elif len(link.val.axis) == 3:
                 axis_x.append(link.val.axis[0][0])
                 axis_y.append(link.val.axis[0][1])
                 axis_z.append(link.val.axis[0][2])
-                direct_x.append(link.val.axis[1][0] * cone_size)
-                direct_y.append(link.val.axis[1][1] * cone_size)
-                direct_z.append(link.val.axis[1][2] * cone_size)
+                direct_x.append(link.val.axis[1][0]*cone_size)
+                direct_y.append(link.val.axis[1][1]*cone_size)
+                direct_z.append(link.val.axis[1][2]*cone_size)
 
                 axis_x.append(link.val.axis[0][0])
                 axis_y.append(link.val.axis[0][1])
                 axis_z.append(link.val.axis[0][2])
-                direct_x.append(link.val.axis[2][0] * cone_size)
-                direct_y.append(link.val.axis[2][1] * cone_size)
-                direct_z.append(link.val.axis[2][2] * cone_size)
+                direct_x.append(link.val.axis[2][0]*cone_size)
+                direct_y.append(link.val.axis[2][1]*cone_size)
+                direct_z.append(link.val.axis[2][2]*cone_size)
 
             for pos in link.val.joints.values():
                 x.append(pos[0])
                 y.append(pos[1])
                 z.append(pos[2])
-
-        # Add joint markers and axes to the plot
+        
+        # Add joint markersplotly 
         self.fig.add_trace(self.mesh.mesh_plotly)
         self.fig.add_trace(go.Scatter3d(x=x, y=y, z=z, mode='markers'))
         cone = go.Cone(x=axis_x, y=axis_y, z=axis_z, u=direct_x, v=direct_y, w=direct_z)
         self.fig.add_trace(cone)
-        # Optionally refresh the plot if required
-
-
+        # self.fig.show(renderer="browser")  # Refresh the plot in the browser window
+    
     def get_tree(self):
-        """Function to return the root node of the tree."""
-        return self.nodes.get("BODY", None)
-
+        return self.nodes["BODY"]
+    
     def load_tree(self, nodes):
-        """Function to load a tree structure from the provided nodes."""
         self.nodes = nodes
-        print(self.nodes)
-
-        self.tree.clear()
-
-        # Add "BODY" as the root node in the tree widget
-        body_item = QtWidgets.QTreeWidgetItem(["BODY"])
-        self.tree.addTopLevelItem(body_item)
-        inserted_items_set = set()
-        inserted_items_set.add("BODY")
-
-        # Recursively add children to the root node
-        root_node = self.nodes.get("BODY", None)
-        self.add_children_to_tree(body_item, root_node)
-
-        # Expand all nodes by default
-        self.tree.expandAll()
-
-        # Ensure joint lines are constructed
+        self.tree.insert('', 'end', "BODY", text="BODY")
         for node_name, node in nodes.items():
             node.val.construct_joint_lines()
-            
-        # Update the parent name combobox with the node names
-        self.update_parent_name_combobox()
-
-        # Update the joint combobox with the joint names
-        self.update_joint_combobox()
-
-
-    def add_children_to_tree(self, parent_item, node):
-        """Recursively add child nodes to the tree."""
-        for child in node.children:
-            # Create a child tree item
-            child_item = QtWidgets.QTreeWidgetItem([child.val.name])
-
-            # Add child to the parent
-            parent_item.addChild(child_item)
-
-            # Recursively add children's children if they exist
-            if child.children:
-                self.add_children_to_tree(child_item, child)
-
-
-    def update_parent_name_combobox(self):
-        """Helper function to update the parent name combobox with node names."""
-        self.combo_parent_name.clear()
-        self.combo_parent_name.addItem("NONE")  # Reset with "NONE"
+            parent_name = node_name
+            for child in node.children:
+                self.tree.insert(parent_name, 'end', child.val.name, text=child.val.name)
         
+        # Add the names in nodes to the combobox
         for node in self.nodes.values():
-            self.combo_parent_name.addItem(node.val.name)
+            self.combo_parent_name['values'] = self.combo_parent_name['values'] + (node.val.name,)
+            print(self.combo_parent_name['values'])
 
-    def update_joint_combobox(self):
-        """Helper function to update the joint name combobox with available joints."""
-        self.combo_joint_name.clear()
-        self.combo_joint_name.addItem("No_name")  # Reset with "No_name"
-
+        # Add the links to the combobox
         for node in self.nodes.values():
             for joint_name in node.val.joints:
-                if joint_name not in [self.combo_joint_name.itemText(i) for i in range(self.combo_joint_name.count())]:
-                    self.combo_joint_name.addItem(joint_name)
-
-
+                if joint_name not in self.combo_joint_name['values']:
+                    self.combo_joint_name['values'] = self.combo_joint_name['values'] + (joint_name,)
 
 class Mesh_Loader:
     def __init__(self, args):
@@ -920,18 +811,13 @@ class Custom_Mesh_Loader(Mesh_Loader):
 
     def load_joint_positions(self, joint_path: str, figure_save_path=None):
         
-        # Create an instance of QApplication
-        app = QApplication(sys.argv)
         if os.path.exists(joint_path):
             print("Loading joint data from file...")
             with open(joint_path, 'rb') as f:
-                #linkLoader = LinkTreeGUI(tk.Tk(), self.mesh, self.args)
-                linkLoader = LinkTreeGUI(self.mesh, self.args)
+                linkLoader = LinkTreeGUI(tk.Tk(), self.mesh, self.args)
                 linkLoader.nodes = pkl.load(f)
                 linkLoader.load_tree(linkLoader.nodes)
                 linkLoader.update_plot()
-
-                linkLoader.show()
                 print(linkLoader.nodes)
                 
                 # Shutdown the GUI immediately if the joint data is already provided and the joint setting UI is disabled
@@ -941,15 +827,9 @@ class Custom_Mesh_Loader(Mesh_Loader):
                 
         else:
             print("No joint data found. Please construct the link tree.")
-            # linkLoader = LinkTreeGUI(tk.Tk(), self.mesh, self.args)
-            linkLoader = LinkTreeGUI(self.mesh, self.args)
-            linkLoader.show()
+            linkLoader = LinkTreeGUI(tk.Tk(), self.mesh, self.args)
         
-        # exit the application
-        app.exec_()
-
-        #linkLoader.root.mainloop()
-
+        linkLoader.root.mainloop()
         self.link_tree = linkLoader.get_tree()
 
         # Get all joint positions
