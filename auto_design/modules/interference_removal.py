@@ -391,11 +391,20 @@ class InterferenceRemoval:
                 H_matrix = self.rotate_around_axis(motor_direct, joint_angle, self.mesh_group.position_to_index(motor_position.reshape(-1, 3)))
 
                 new_indexs = expand_points(apply_transform(transformed_indexs, H_matrix))  
-                new_indexs = np.clip(new_indexs, 0, self.mesh_group.voxel_data.shape[0]-1)
+                #new_indexs = np.clip(new_indexs, 0, self.mesh_group.voxel_data.shape[0]-1)
+
+                new_indexs = np.clip(
+                    new_indexs, 
+                    [0, 0, 0],  # Minimum bounds for each axis (x, y, z)
+                    [
+                        self.mesh_group.voxel_data.shape[0] - 1,  # Max bound for x-axis
+                        self.mesh_group.voxel_data.shape[1] - 1,  # Max bound for y-axis
+                        self.mesh_group.voxel_data.shape[2] - 1   # Max bound for z-axis
+                    ]
+                )
 
                 values = self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]  # Value Point type.
                 non_removal = self.mesh_group.voxel_no_removal[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]
-
 
                 self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]] = np.where(np.logical_or(np.isin(values, other_link_values), non_removal),
                                                                                                             self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]], 
@@ -429,7 +438,17 @@ class InterferenceRemoval:
                     H_matrix = self.rotate_around_axis(motor_direct, joint_angle, self.mesh_group.position_to_index(motor_position.reshape(-1, 3)))
                     
                     new_indexs = expand_points(apply_transform(transformed_indexs, H_matrix))
-                    new_indexs = np.clip(new_indexs, 0, self.mesh_group.voxel_data.shape[0]-1)
+                    #new_indexs = np.clip(new_indexs, 0, self.mesh_group.voxel_data.shape[0]-1)
+                    new_indexs = np.clip(
+                        new_indexs,
+                        [0, 0, 0],  # Minimum bounds for each axis (x, y, z)
+                        [
+                            self.mesh_group.voxel_data.shape[0] - 1,  # Max bound for x-axis
+                            self.mesh_group.voxel_data.shape[1] - 1,  # Max bound for y-axis
+                            self.mesh_group.voxel_data.shape[2] - 1   # Max bound for z-axis
+                        ]
+                    )
+
                     values = self.mesh_group.voxel_data[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]
                     non_removal = self.mesh_group.voxel_no_removal[new_indexs[:, 0], new_indexs[:, 1], new_indexs[:, 2]]
                     
