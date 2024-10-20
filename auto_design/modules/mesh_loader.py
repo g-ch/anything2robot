@@ -634,19 +634,27 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         if link_name and link_name not in self.nodes:
             link = Link(link_name)
             node = TreeNode(link)
-            self.nodes[link_name] = node
+            self.nodes[link_name] = node 
             if parent_name in self.nodes:
                 self.nodes[parent_name].add_child(node)
-                parent_item = self.tree.findItems(parent_name, QtCore.Qt.MatchExactly)[0]
-                parent_item.addChild(QtWidgets.QTreeWidgetItem([link_name]))
             else:
-                self.tree.addTopLevelItem(QtWidgets.QTreeWidgetItem([link_name]))
+                # ROOT NODE
+                if link_name != "BODY":
+                    QtWidgets.QMessageBox.warning(self, "ROOT NODE CAN ONLY BE BODY", "ADDING BODY as the root node.")
+                    link_name = "BODY"
+
+                if link_name not in self.nodes:
+                    link = Link(link_name)
+                    node = TreeNode(link)
+                    self.nodes[link_name] = node
+                
             self.link_name_input.clear()
+            self.load_tree(self.nodes)
 
             # Update combobox
             self.combo_parent_name.addItem(link_name)
         else:
-            QtWidgets.QMessageBox.warning(self, "No link name", "Please enter a link name.")
+            QtWidgets.QMessageBox.warning(self, "No link name or link already exists", "Please enter a new link name or the link already exists.")
 
     def joint_select(self):
         selected_items = self.joint_list.selectedItems()
@@ -683,7 +691,17 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
 
             #Update axis display
             if self.current_link and self.current_link.axis:
-                self.axis_input.setText(f"{self.current_link.axis}")
+                text_to_display = ""
+                for elements in self.current_link.axis:
+                    text_to_display += str(elements)
+                    text_to_display += ","
+                # Change "[]" to "()"
+                text_to_display = text_to_display.replace("[", "(")
+                text_to_display = text_to_display.replace("]", ")")
+                # Remove the last comma
+                text_to_display = text_to_display[:-1] + "]"
+                text_to_display = "[" + text_to_display
+                self.axis_input.setText(text_to_display)
             else:
                 self.axis_input.setText("None")
 
