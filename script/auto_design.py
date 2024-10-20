@@ -105,6 +105,20 @@ def auto_design_function(args, mapdl_object=None):
     args.result_folder = args.result_folder + '/' + model_name + '_' + time.strftime("%Y%m%d-%H%M%S")
     os.makedirs(args.result_folder, exist_ok=True)
 
+    # Check if the stl file exists. If yes, scale it to 50cm in x-axis for joint setting. We use 50 as a standard scale for joint setting.
+    if not os.path.exists(mesh_path):
+        print("Error: The mesh path doesn't exist.")
+        return -1
+    
+    original_mesh = trimesh.load(mesh_path)
+    bounds = original_mesh.bounds
+    scale_factor = 50 / (bounds[1][0] - bounds[0][0])
+    original_mesh.apply_scale(scale_factor)
+    scaled_mesh_save_path = args.result_folder + '/scaled_model_for_joint_setting.stl'
+    original_mesh.export(scaled_mesh_save_path)
+    mesh_path = scaled_mesh_save_path
+    args.stl_mesh_path = mesh_path
+
     # Check if the joint path exists. If not, the UI shouldn't be disabled.
     if not os.path.exists(joint_path):
         print("Warning: The joint path doesn't exist. The joint setting UI will be enabled.")
