@@ -35,11 +35,13 @@ class MotorParameterLib:
         # Height (cm), Radius (cm), Max Torque (N*M) 
         self.motor_lib = [[5.6 + self.tenon_height, 4.2, 12],   # DM6006. DAMIAO Tech         
                           [3.42 + self.tenon_height, 2.65, 2.5], # MG4005V2. K-Tech
+                          [2.25 + self.tenon_height, 2.15, 0.9], # GIM3505. SITAIWEI
                           [8.1 + self.tenon_height, 5.3, 20]]  # DM8009. DAMIAO Tech
         
         # This is the connector length between two motors in a 2 DOF joint. L shape. Unit: cm
         self.connector_lib = [[6, 6], 
                               [4, 4], 
+                              [3.5, 3.5],
                               [6, 6]]
     
     def get_motor_lib(self):
@@ -110,14 +112,15 @@ def auto_design_function(args, mapdl_object=None):
         print("Error: The mesh path doesn't exist.")
         return -1
     
-    original_mesh = trimesh.load(mesh_path)
-    bounds = original_mesh.bounds
-    scale_factor = 50 / (bounds[1][0] - bounds[0][0])
-    original_mesh.apply_scale(scale_factor)
-    scaled_mesh_save_path = args.result_folder + '/scaled_model_for_joint_setting.stl'
-    original_mesh.export(scaled_mesh_save_path)
-    mesh_path = scaled_mesh_save_path
-    args.stl_mesh_path = mesh_path
+    ## Comment out the following code for lynel
+    # original_mesh = trimesh.load(mesh_path)
+    # bounds = original_mesh.bounds
+    # scale_factor = 50 / (bounds[1][0] - bounds[0][0])
+    # original_mesh.apply_scale(scale_factor)
+    # scaled_mesh_save_path = args.result_folder + '/scaled_model_for_joint_setting.stl'
+    # original_mesh.export(scaled_mesh_save_path)
+    # mesh_path = scaled_mesh_save_path
+    # args.stl_mesh_path = mesh_path
 
     # Check if the joint path exists. If not, the UI shouldn't be disabled.
     if not os.path.exists(joint_path):

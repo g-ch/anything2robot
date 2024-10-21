@@ -817,7 +817,10 @@ class Joint_Connect_Opt:
             #                                                                             condition_func=condition_father_link_radical)
             # else:
             #     # 2 axis joint has standardconnector between two motors. No need to add voxels to father link
-            #     pass
+            #     father_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=list(self.mesh_decomp.mesh_group.link_value_dict.keys()),
+            #                                                                         target_group_name=self.father_dict[cur_link_name],
+            #                                                                         condition_func=condition_child_link_top)
+            #     print("Father Link Addition Voxels Top: ", father_link_addition_voxels_top.shape)
             
             # # Add voxels to child link
             # child_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=list(self.mesh_decomp.mesh_group.link_value_dict.keys()),
@@ -827,10 +830,12 @@ class Joint_Connect_Opt:
             #                                                                             target_group_name=cur_link_name,
             #                                                                             condition_func=condition_child_link_radical)
             
-            # if len(cur_node.val.axis) == 2:
-            #     non_removal_voxels = np.vstack((father_link_addition_voxels_top, child_link_addition_voxels_top))
-            # else:
-            #     non_removal_voxels = child_link_addition_voxels_top
+            # # if len(cur_node.val.axis) == 2:
+            
+            # non_removal_voxels = np.vstack((father_link_addition_voxels_top, child_link_addition_voxels_top))
+            
+            # # else:
+            # #     non_removal_voxels = child_link_addition_voxels_top
                 
             # non_removal_voxels = np.unique(non_removal_voxels, axis=0)
             # non_removal_indices = self.mesh_decomp.mesh_group.position_to_index(non_removal_voxels)
@@ -856,7 +861,6 @@ class Joint_Connect_Opt:
             #     cur_idx += 1
             # elif len(cur_node.val.axis) == 3:
             #     cur_idx += 2
-
 
         
             if len(cur_node.val.axis) == 2:
@@ -910,8 +914,16 @@ class Joint_Connect_Opt:
                 child_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=list(self.mesh_decomp.mesh_group.link_value_dict.keys()),
                                                                                          target_group_name=cur_link_name,
                                                                                          condition_func=condition_child_link_top)
+                
+                child_link_addition_voxels_radical = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), cur_link_name),
+                                                                                            target_group_name=cur_link_name,
+                                                                                            condition_func=condition_child_link_radical)
+                
                 start_idx = self.mesh_decomp.mesh_group.position_to_index(child_link_addition_voxels_top)
-                target_positions = set_diff_numpy(self.mesh_decomp.mesh_group.get_voxels(cur_link_name), child_link_addition_voxels_top)
+                # target_positions = set_diff_numpy(self.mesh_decomp.mesh_group.get_voxels(cur_link_name), child_link_addition_voxels_top)
+
+                target_positions = set_diff_numpy(self.mesh_decomp.mesh_group.get_voxels(cur_link_name), np.vstack((child_link_addition_voxels_radical, child_link_addition_voxels_top)))
+
                 end_idxs = self.mesh_decomp.mesh_group.position_to_index(target_positions)
                 added_voxels = self.connect_voxels(self.mesh_decomp.mesh_group, start_idx, end_idxs, cur_link_name)
 

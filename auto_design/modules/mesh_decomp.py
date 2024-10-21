@@ -675,8 +675,10 @@ class Mesh_Decomp:
         # Sample a random joint configuration, joint velocities and accelerations
         for i in range(100):
             q = pin.randomConfiguration(model)
-            v = np.zeros((model.nv, 1))  # in rad/s 
-            a = np.zeros((model.nv, 1))  # in rad/s² 
+            # v = np.zeros((model.nv, 1))  # in rad/s 
+            # a = np.zeros((model.nv, 1))  # in rad/s² 
+            v = np.ones((model.nv, 1)) * 3  # in rad/s
+            a = np.ones((model.nv, 1)) * 3  # in rad/s²
             
             # Add external forces to the link which contains the joint whose name contains 'foot'    
             fs_ext = [pin.Force(np.array([0,0,0,0,0,0])) for _ in range(len(model.joints))]
