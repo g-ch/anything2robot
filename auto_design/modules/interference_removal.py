@@ -7,7 +7,7 @@ import plotly
 import pinocchio as pin
 import open3d as o3d
 import time
-from urdf_generator import write_link, write_joint, write_material, voxel_grid_to_mesh, calculate_inertia_tensor
+from urdf_generator import write_link, write_joint, write_material, voxel_grid_to_mesh, calculate_inertia_tensor, write_transmission
 from mesh_decomp import Mesh_Decomp, Mesh_Group
 from mesh_loader import Custom_Mesh_Loader
 from motor_opt import Motor_Opt, get_bounds, Joint_Connect_Opt, is_points_in_cylinder
@@ -650,6 +650,205 @@ class InterferenceRemoval:
         # Return the dir of urdf file
         return self.urdf_dir
 
+    def generate_champ_urdf(self, result_saving_folder=None):
+        """
+        Generate the URDF file.
+        """
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        dir = './urdf/' + self.args.model_name + timestr + '/'
+
+        if result_saving_folder is not None:
+            dir = result_saving_folder + '/urdf/'
+
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+
+        urdf_file = open(dir + self.args.model_name + timestr + '.urdf', 'w+')
+        package_name = "urdf_description"
+
+        self.urdf_dir = dir + self.args.model_name + timestr + '.urdf'
+        urdf_file.write('<?xml version="1.0"?>\n')
+        urdf_file.write('<robot name="robot">\n')
+        
+        # Define materials
+        materials = {
+            "red": "1 0 0 1", "magenta": "0.2 0 0.2 1", "green": "0 1 0 1",
+            "cyan": "0 1 1 1", "blue": "0 0 1 1", "orange": "1 0.5 0 1",
+            "yellow": "1 1 0 1", "pink": "1 0 1 1", "grey": "0.8 0.8 0.8 1", "motor":"0.2 0.2 0.2 1"
+        }
+        for material_name, rgba in materials.items():
+            write_material(urdf_file, material_name, rgba)
+
+        cur_node = self.link_tree
+        node_queue = [cur_node]
+
+        self.ideal_mass = 0
+
+        while node_queue:
+            root_node = node_queue.pop(0)
+            child_nodes = root_node.children
+            for child_node in child_nodes:
+                node_queue.append(child_node)
+            
+            if root_node.val.axis is None or np.linalg.norm(root_node.val.axis[1]) == 0:
+                
+                # Write BODY link
+                voxel_grid_to_mesh(voxel_positions=self.mesh_group.get_voxels("BODY") - np.array([[10,0,25]]), dir=dir + 'BODY.stl', voxel_size=self.args.voxel_size)
+                link_visual = {
+                    "origin": {"xyz": "0 0 0", "rpy": "0 0 0"},
+                    "geometry": {"filename": "package://" + package_name + "/" + dir + "BODY.stl"},
+                    "material": "grey"
+                }
+                link_collision = {
+                    "origin": {"xyz": "0 0 0", "rpy": "0 0 0"},
+                    "geometry": {"filename": "package://" + package_name + "/" + dir + "BODY.stl"}
+                }
+                per_voxel_mass = self.args.voxel_density * (self.args.voxel_size ** 3)
+                part_mass = per_voxel_mass * self.mesh_group.get_voxels("BODY").shape[0]
+                inetial_matrix, CoM = calculate_inertia_tensor((self.mesh_group.get_voxels("BODY") - np.array([[10,0,25]])) / 100.0, part_mass, np.eye(4))
+                link_inertial = {
+                    "origin": {"xyz": ' '.join(map(str, CoM)), "rpy": '0 0 0'},
+                    "mass": str(self.mesh_group.get_voxels("BODY").shape[0] * self.args.voxel_density),
+                    "inertia": {"ixx": inetial_matrix[0, 0], "iyy": inetial_matrix[1, 1], "izz": inetial_matrix[2, 2], "ixy": inetial_matrix[0, 1], "ixz": inetial_matrix[0, 2], "iyz": inetial_matrix[1, 2]}
+                }
+                write_link(urdf_file=urdf_file, link_name="BODY", visual=link_visual, collision=link_collision, inertial=link_inertial)
+                
+                continue
+
+            # Write current link
+            cur_link = root_node.val
+            motor_pos, motor_direct, motor_radius = self.link_motor_dict[cur_link.name][-1]
+            motor_direct = np.abs(motor_direct)
+            # Hard code to make body frame up
+            father_motor_pos = self.link_motor_dict[self.father_link_dict[cur_link.name]][0][0] if self.father_link_dict[cur_link.name] != "BODY" else np.array([10, 0, 25])
+
+            # father_motor_pos = self.link_motor_dict[self.father_link_dict[cur_link.name]][0][0] if self.father_link_dict[cur_link.name] != "BODY" else np.zeros(3)
+
+            link_dir = dir + cur_link.name + '' + '.stl'
+            voxel_grid_to_mesh(voxel_positions=self.mesh_group.get_voxels(cur_link.name), dir=link_dir, voxel_size=self.args.voxel_size)
+            rel_pos = (motor_pos - father_motor_pos) / 100.0 if cur_link.name != "BODY" else motor_pos / 100.0
+            
+            visual_pos = -np.array(motor_pos) / 100.0 if len(cur_link.axis) == 2 else -self.link_motor_dict[cur_link.name][0][0] / 100.0
+
+            link_visual = {
+                "origin": {"xyz": ' '.join(map(str, visual_pos)), "rpy": '0 0 0'},
+                "geometry": {"filename": "package://" + package_name + "/" + dir + "" + cur_link.name + ".stl"},
+                "material": "grey"
+            }
+            link_collision = {
+                "origin": {"xyz": ' '.join(map(str, visual_pos)), "rpy": '0 0 0'},
+                "geometry": {"filename": "package://" + package_name + "/" + dir + "" + cur_link.name + ".stl"}
+            }
+
+            per_voxel_mass = self.args.voxel_density * (self.args.voxel_size ** 3)
+            part_mass = per_voxel_mass * self.mesh_group.get_voxels(cur_link.name).shape[0]
+            inetial_matrix, CoM = calculate_inertia_tensor(self.mesh_group.get_voxels(cur_link.name) / 100.0, part_mass, np.eye(4))
+            link_inertial = {
+                "origin": {"xyz": ' '.join(map(str, CoM + (rel_pos - motor_pos) / 100.0)), "rpy": '0 0 0'},
+                "mass": str(self.mesh_group.get_voxels(cur_link.name).shape[0] * self.args.voxel_density),
+                "inertia": {"ixx": inetial_matrix[0, 0], "iyy": inetial_matrix[1, 1], "izz": inetial_matrix[2, 2], "ixy": inetial_matrix[0, 1], "ixz": inetial_matrix[0, 2], "iyz": inetial_matrix[1, 2]}
+            }
+            write_link(urdf_file=urdf_file, link_name=cur_link.name, visual=link_visual, collision=link_collision, inertial=link_inertial)
+            
+            per_voxel_mass = self.args.voxel_density * (self.args.voxel_size ** 3)
+            self.ideal_mass += self.mesh_group.get_voxels(cur_link.name).shape[0] * per_voxel_mass
+
+            if cur_link.name != "BODY":
+                # Write a 2DoF joint
+                if len(cur_link.axis) == 3:
+                    # TODO:add motor connector stl
+                    link_inertial = {
+                        "origin": {"xyz": '0 0 0', "rpy": '0 0 0'},
+                        "mass": "0.3",
+                        "inertia": {"ixx": 1.2e-05, 
+                                    "iyy": 1.2e-05, 
+                                    "izz": 1.2e-05, 
+                                    "ixy": 0, 
+                                    "ixz": 0, 
+                                    "iyz": 0}
+                    }
+                    write_link(urdf_file=urdf_file, link_name=cur_link.name + '_virtual', inertial=link_inertial)
+                    joint1 = {
+                        "joint_name": cur_link.name + '_joint1',
+                        "joint_type": "revolute",
+                        "parent_link": self.father_link_dict[cur_link.name],
+                        "child_link": cur_link.name + '_virtual',
+                        "origin": {"xyz": ' '.join(map(str, rel_pos)), "rpy": "0 0 0"},
+                        "axis": {"xyz": ' '.join(map(str, motor_direct))},
+                        "limit": {"lower": "-1.57", "upper": "1.57", "effort": "20", "velocity": "1.5"}
+                    }
+                    write_joint(urdf_file, **joint1)
+                    write_transmission(urdf_file, joint1["joint_name"] + '_tran', joint1["joint_name"], joint1["joint_name"] + '_motor')
+
+                    motor2_pos, motor2_direct, motor_radius = self.link_motor_dict[cur_link.name][0]
+                    motor2_direct = np.abs(motor2_direct)
+                    joint2 = {
+                        "joint_name": cur_link.name + '_joint2',
+                        "joint_type": "revolute",
+                        "parent_link": cur_link.name + '_virtual',
+                        "child_link": cur_link.name,
+                        "origin": {"xyz": ' '.join(map(str, (motor2_pos - motor_pos) / 100.0)), "rpy": "0 0 0"},
+                        "axis": {"xyz": ' '.join(map(str, motor2_direct))},
+                        "limit": {"lower": "-1.57", "upper": "1.57", "effort": "20", "velocity": "1.5"}
+                    }
+                    write_joint(urdf_file, **joint2)
+                    write_transmission(urdf_file, joint2["joint_name"] + '_tran', joint2["joint_name"], joint2["joint_name"] + '_motor')
+
+
+                # Write a 1 DoF joint
+                elif len(cur_link.axis) == 2:
+                    cur_joint = {
+                        "joint_name": cur_link.name + '_joint',
+                        "joint_type": "revolute",
+                        "parent_link": self.father_link_dict[cur_link.name],
+                        "child_link": cur_link.name,
+                        "origin": {"xyz": ' '.join(map(str, rel_pos)), "rpy": "0 0 0"},
+                        "axis": {"xyz": ' '.join(map(str, motor_direct))},
+                        "limit": {"lower": "-1.57", "upper": "1.57", "effort": "20", "velocity": "1.5"}
+                    }
+                    write_joint(urdf_file, **cur_joint)
+                    write_transmission(urdf_file, cur_joint["joint_name"] + '_tran', cur_joint["joint_name"], cur_joint["joint_name"] + '_motor')
+            
+        # Writre foot link
+        for contact_node in self.contact_nodes:
+            for joint_name, joint_pos in contact_node.val.joints.items():
+                if 'foot' in joint_name:
+                    write_link(urdf_file=urdf_file, link_name=joint_name)
+                    rel_pos = np.array(np.array(joint_pos) - contact_node.val.axis[0]) / 100.0
+                    foot_joint = {
+                        "joint_name": joint_name + '_joint',
+                        "joint_type": "fixed",
+                        "parent_link": contact_node.val.name,
+                        "child_link": joint_name,
+                        "origin": {"xyz": ' '.join(map(str, rel_pos)), "rpy": "0 0 0"},
+                        "axis": {"xyz": "0 0 0"},
+                        "limit": {"lower": "0", "upper": "0", "effort": "0", "velocity": "0"}
+                    }
+                    write_joint(urdf_file=urdf_file, **foot_joint)
+                    break
+
+        urdf_file.write('<gazebo>\n')
+        urdf_file.write('   <plugin filename="libgazebo_ros_p3d.so" name="p3d_base_controller">\n')
+        urdf_file.write('   <alwaysOn>true</alwaysOn>\n')
+        urdf_file.write('       <updateRate>10.0</updateRate>\n')
+        urdf_file.write('       <bodyName>base_link</bodyName>\n')
+        urdf_file.write('       <topicName>odom/ground_truth</topicName>\n')
+        urdf_file.write('       <gaussianNoise>0.00000001</gaussianNoise>\n')
+        urdf_file.write('       <frameName>world</frameName>\n')
+        urdf_file.write('       <xyzOffsets>0 0 0</xyzOffsets>\n')
+        urdf_file.write('       <rpyOffsets>0 0 0</rpyOffsets>\n')
+        urdf_file.write('   </plugin>\n')
+        urdf_file.write('</gazebo>\n')
+        urdf_file.write('<gazebo>\n')
+        urdf_file.write('   <plugin filename="libgazebo_ros_control.so" name="gazebo_ros_control">\n')
+        urdf_file.write('       <legacyModeNS>true</legacyModeNS>\n')
+        urdf_file.write('   </plugin>\n')
+        urdf_file.write('</gazebo>\n')
+        urdf_file.write('</robot>\n')
+
+        # Return the dir of urdf file
+        return self.urdf_dir
+        
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
     parser.add_argument('--model_name', type=str, default='lynel', help='The model name')

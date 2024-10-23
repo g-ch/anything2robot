@@ -6,7 +6,7 @@ import numpy as np
 from interference_removal import RobotOptResult, LinkResult, InterferenceRemoval
 
 # auto_design/results/gold_lynel20241010-101912_robot_result.pkl
-robot_result = pkl.load(open('./auto_design/results/gold_lynel20241010-101912_robot_result.pkl', 'rb'))
+robot_result = pkl.load(open('./auto_design/results/lynel.pkl', 'rb'))
 
 
 H = np.array([
@@ -77,4 +77,4 @@ interference_removal.mesh_group.y_range = exchange
 
 
 
-interference_removal.generate_urdf()
+interference_removal.generate_champ_urdf()
