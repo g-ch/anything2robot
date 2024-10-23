@@ -113,14 +113,14 @@ def auto_design_function(args, mapdl_object=None):
         return -1
     
     ## Comment out the following code for lynel
-    # original_mesh = trimesh.load(mesh_path)
-    # bounds = original_mesh.bounds
-    # scale_factor = 50 / (bounds[1][0] - bounds[0][0])
-    # original_mesh.apply_scale(scale_factor)
-    # scaled_mesh_save_path = args.result_folder + '/scaled_model_for_joint_setting.stl'
-    # original_mesh.export(scaled_mesh_save_path)
-    # mesh_path = scaled_mesh_save_path
-    # args.stl_mesh_path = mesh_path
+    original_mesh = trimesh.load(mesh_path)
+    bounds = original_mesh.bounds
+    scale_factor = 50 / (bounds[1][0] - bounds[0][0])
+    original_mesh.apply_scale(scale_factor)
+    scaled_mesh_save_path = args.result_folder + '/scaled_model_for_joint_setting.stl'
+    original_mesh.export(scaled_mesh_save_path)
+    mesh_path = scaled_mesh_save_path
+    args.stl_mesh_path = mesh_path
 
     # Check if the joint path exists. If not, the UI shouldn't be disabled.
     if not os.path.exists(joint_path):
@@ -313,8 +313,9 @@ def auto_design_function(args, mapdl_object=None):
             for stl_file in stl_files:
                 log.log_txt("*******Do FEA analysis for: " + stl_file)
                 # More parameters can be set in the function stl_force_relative_density_fea_opt
-                success_flag, best_relative_density = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, max_iteration=max_iteration, display_fea_result=False, display_force_result=False, mapdl_object=mapdl_object)
-                # exit()
+                success_flag, best_relative_density = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, max_iteration=max_iteration, display_fea_result=args.visualize, display_force_result=False, mapdl_object=mapdl_object)
+                #exit()
+
                 if not success_flag:
                     log.log_txt("Failure Code 4. The mesh is not feasible in FEA. Re-optimizing with a larger model... Scale the model by " + str(enlarge_scale))
                     exit_code = 4
@@ -355,7 +356,7 @@ if __name__=="__main__":
 
     parser.add_argument('--expected_x', type=float, default=50, help='The expected x-axis length of the model. (cm)')
     parser.add_argument('--voxel_size', type=float, default=1, help='The size of the voxel. (cm)')
-    parser.add_argument('--voxel_density', type=float, default=1.5e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
+    parser.add_argument('--voxel_density', type=float, default=1.2e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
     parser.add_argument('--joint_limitation', type=float, default=1, help='The limitation of the joint. +-joint_limitation. (rad)')
 
     parser.add_argument('--max_trial_round', type=int, default=5, help='The maximum number of trial rounds.')

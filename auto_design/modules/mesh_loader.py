@@ -634,8 +634,9 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         if link_name and link_name not in self.nodes:
             link = Link(link_name)
             node = TreeNode(link)
-            self.nodes[link_name] = node 
+
             if parent_name in self.nodes:
+                self.nodes[link_name] = node 
                 self.nodes[parent_name].add_child(node)
             else:
                 # ROOT NODE
