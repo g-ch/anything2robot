@@ -21,6 +21,8 @@ from plot_utils import rotation_matrix_from_vectors
 from collision_check import check_collision
 from sklearn import svm
 
+import multiprocessing
+
 def set_diff_numpy(A, B):
     # Create an array of shape (A.shape[0], B.shape[0]) where each element in A is compared with each in B
     # This results in a boolean array where True indicates that an element of A exists in B
@@ -685,6 +687,14 @@ class Motor_Opt:
                                                 showlegend=False)
                 objs.append(cylinder_surface)
         return objs
+    
+
+    def save_fig(self, fig, save_path):
+        """Save the figure to a file."""
+        try:
+            fig.write_image(save_path)
+        except Exception as e:
+            print(f"Error while saving the figure: {e}")
 
     def render(self, save_only=False, save_path=None):
         fig = go.Figure(data=[self.mesh.mesh_plotly, *self.create_motors(self.motor_results)])
@@ -712,7 +722,23 @@ class Motor_Opt:
         if not save_only:
             fig.show()
         if save_path is not None:
-            fig.write_image(save_path)
+            # Create a separate process for saving the figure
+            process = multiprocessing.Process(target=self.save_fig, args=(fig, save_path))
+            process.start()
+            
+            # Wait for the process to complete or timeout
+            timeout = 30  # Timeout in seconds
+            process.join(timeout)
+            
+            if process.is_alive():
+                print("Saving the figure took too long! Terminating the process...")
+                process.terminate()  # Forcefully kill the process
+                process.join()       # Ensure the process is terminated
+            else:
+                if os.path.exists(save_path):
+                    print(f"Image saved at: {save_path}")
+                else:
+                    print("Saving failed.")
 
 class Joint_Connect_Opt:
     def __init__(self, args, mesh_decomp : Mesh_Decomp, motor_params_results: np.ndarray):

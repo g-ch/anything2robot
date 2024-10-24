@@ -26,7 +26,7 @@ from scipy.ndimage import label, find_objects
 from sklearn.cluster import DBSCAN
 from scipy.spatial import ConvexHull
 import tqdm
-
+import multiprocessing
 
 def erode_zeros(arr, structure=None):
     """
@@ -192,6 +192,13 @@ class Mesh_Group:
         """
         indices = self.position_to_index(positions)
         return self.voxel_data[indices[:, 0], indices[:, 1], indices[:, 2]]
+    
+    def save_fig(self, fig, save_path):
+        """Save the figure to a file."""
+        try:
+            fig.write_image(save_path)
+        except Exception as e:
+            print(f"Error while saving the figure: {e}")
 
     def render(self, mesh_plotly=None, save_only=False, save_path=None):
         """
@@ -216,6 +223,17 @@ class Mesh_Group:
                     )
                 )
                 scatters.append(voxel_scatter)
+
+        # Set camera based on the data bounds
+        x_range = np.ptp(self.x_range) / 50.0
+        y_range = np.ptp(self.y_range) / 50.0
+        z_range = np.ptp(self.z_range) / 100.0
+        camera = dict(
+            up=dict(x=0, y=0, z=1),
+            center=dict(x=0, y=0, z=0),
+            eye=dict(x=1.5 * x_range, y=1.5 *y_range, z=1.5 * z_range)  # Set distance proportional to data range
+        )
+
         fig = go.Figure(data=scatters+[mesh_plotly] if mesh_plotly is not None else scatters)
         fig.update_layout(
             autosize=False,
@@ -233,15 +251,32 @@ class Mesh_Group:
             # paper_bgcolor='rgba(0,0,0,0)',  # Set paper background to be transparent
             showlegend=False,  # Hide the legend
             annotations=[],  # Remove annotations
-            scene_camera=dict(up=dict(x=0, y=0, z=1), center=dict(x=0, y=-0.22, z=0), eye=dict(x=1.1, y=-0.9, z=0.4)),  # Optional: Adjust camera for better view
+            #scene_camera=dict(up=dict(x=0, y=0, z=1), center=dict(x=0, y=-0.22, z=0), eye=dict(x=1.1, y=-0.9, z=0.4)),  # Optional: Adjust camera for better view
+            scene_camera=camera,
             width=740,
             height=600
         )
 
         if not save_only:
             fig.show()
-        if save_path is not None:
-            fig.write_image(save_path)
+        if save_path is not None:           
+            # Create a separate process for saving the figure
+            process = multiprocessing.Process(target=self.save_fig, args=(fig, save_path))
+            process.start()
+            
+            # Wait for the process to complete or timeout
+            timeout = 30  # Timeout in seconds
+            process.join(timeout)
+            
+            if process.is_alive():
+                print("Saving the figure took too long! Terminating the process...")
+                process.terminate()  # Forcefully kill the process
+                process.join()       # Ensure the process is terminated
+            else:
+                if os.path.exists(save_path):
+                    print(f"Image saved at: {save_path}")
+                else:
+                    print("Saving failed.")
             
 
 class Mesh_Decomp:

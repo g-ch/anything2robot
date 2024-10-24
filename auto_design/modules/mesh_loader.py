@@ -597,6 +597,8 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         if not foot_found:
             QtWidgets.QMessageBox.warning(self, "No Foot Joint", "At least one joint must contain the word 'foot'.")
             return False
+        
+        return True
 
 
     def save(self):
