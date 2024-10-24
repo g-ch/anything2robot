@@ -112,15 +112,16 @@ def auto_design_function(args, mapdl_object=None):
         print("Error: The mesh path doesn't exist.")
         return -1
     
-    ## Comment out the following code for lynel
-    original_mesh = trimesh.load(mesh_path)
-    bounds = original_mesh.bounds
-    scale_factor = 50 / (bounds[1][0] - bounds[0][0])
-    original_mesh.apply_scale(scale_factor)
-    scaled_mesh_save_path = args.result_folder + '/scaled_model_for_joint_setting.stl'
-    original_mesh.export(scaled_mesh_save_path)
-    mesh_path = scaled_mesh_save_path
-    args.stl_mesh_path = mesh_path
+    # Use a standard scale (delt x = 50cm) for joint setting if the flag is set
+    if args.joint_setting_standard_scale:
+        original_mesh = trimesh.load(mesh_path)
+        bounds = original_mesh.bounds
+        scale_factor = 50 / (bounds[1][0] - bounds[0][0])
+        original_mesh.apply_scale(scale_factor)
+        scaled_mesh_save_path = args.result_folder + '/scaled_model_for_joint_setting.stl'
+        original_mesh.export(scaled_mesh_save_path)
+        mesh_path = scaled_mesh_save_path
+        args.stl_mesh_path = mesh_path
 
     # Check if the joint path exists. If not, the UI shouldn't be disabled.
     if not os.path.exists(joint_path):
@@ -357,7 +358,7 @@ if __name__=="__main__":
     parser.add_argument('--expected_x', type=float, default=50, help='The expected x-axis length of the model. (cm)')
     parser.add_argument('--voxel_size', type=float, default=1, help='The size of the voxel. (cm)')
     parser.add_argument('--voxel_density', type=float, default=1.2e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
-    parser.add_argument('--joint_limitation', type=float, default=1, help='The limitation of the joint. +-joint_limitation. (rad)')
+    parser.add_argument('--joint_limitation', type=float, default=0.785, help='The limitation of the joint. +-joint_limitation. (rad)')
 
     parser.add_argument('--max_trial_round', type=int, default=5, help='The maximum number of trial rounds.')
     parser.add_argument('--genetic_generation', type=int, default=5, help='The number of generations for the genetic algorithm')
@@ -366,6 +367,7 @@ if __name__=="__main__":
 
     parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not. Need to close the windows to continue the process if turned on.')
     parser.add_argument('--disable_joint_setting_ui', type=bool, default=False, help='Disable the joint setting UI or not')
+    parser.add_argument('--joint_setting_standard_scale', type=bool, default=False, help='Scale the model to a standard scale for easier joint setting in the UI or not')
 
     ### No need to set model_name. This is a temporary value. It will be removed in the future.
     parser.add_argument('--model_name', type=str, default='None', help='Temporary value. No need to set this value.')

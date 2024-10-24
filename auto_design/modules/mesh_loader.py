@@ -3,7 +3,7 @@
 The mesh loader module is responsible for loading the mesh data and joint data from the file system 
 and scale them to the appropriate size.
 
-author: Moji Shi
+author: Moji Shi and Clarence Chen
 date: 2024-03-01
 
 """
@@ -173,7 +173,7 @@ class Link:
     
 
 class LinkTreeGUI(QtWidgets.QMainWindow):
-    def __init__(self, mesh, args):
+    def __init__(self, mesh, args, initialize_body=False):
         super().__init__()
         self.args = args
         self.mesh = mesh
@@ -261,6 +261,13 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
             import webbrowser
             webbrowser.open('http://127.0.0.1:8050/')
 
+        if initialize_body:
+            self.nodes["BODY"] = TreeNode(Link("BODY"))
+            self.current_link = self.nodes["BODY"].val
+            self.load_tree(self.nodes)
+            self.axis_input.setText("[(0,0,0),(0,0,0)]")
+            self.add_axis()
+            self.axis_input.setText("")
 
     def save_fig(self, save_path):
         self.fig.write_image(save_path)
@@ -273,13 +280,18 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         self.tree.setHeaderHidden(True)
         self.tree.itemSelectionChanged.connect(self.on_tree_select)
         layout.addWidget(self.tree)
-        
+
         frame.setLayout(layout)
         return frame
 
     def create_joint_list_frame(self):
         frame = QtWidgets.QGroupBox("")
         layout = QtWidgets.QVBoxLayout()
+
+        tips = QtWidgets.QLabel("Tips: each link should have at least two joints.")
+        tips2 = QtWidgets.QLabel("Joints that touch the ground should contain 'foot'.")
+        layout.addWidget(tips)
+        layout.addWidget(tips2)
 
         self.joint_list = QtWidgets.QListWidget()
         self.joint_list.itemSelectionChanged.connect(self.joint_select)
@@ -550,6 +562,11 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
             self.shutdown()
 
     def start_design(self):
+        # Run some checking before saving
+        checking_passed = self.run_checking()
+        if not checking_passed:
+            return
+        
         reply = QtWidgets.QMessageBox.question(self, 'Start', 
                                                "Do you want to quit the UI and start the design process?", 
                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, 
@@ -558,7 +575,36 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
             self.start_design_flag = True
             self.shutdown()
 
+    def run_checking(self):
+        # Check if "Body" is in the nodes
+        if "BODY" not in self.nodes:
+            QtWidgets.QMessageBox.warning(self, "No Body", "Please add a root link named 'BODY'.")
+            return False
+        
+        # Check if each link has at least two joints
+        for link in self.nodes.values():
+            if len(link.val.joints) < 2:
+                QtWidgets.QMessageBox.warning(self, "Not Enough Joints", f"Link {link.val.name} does not have enough joints.")
+                return False
+            
+        # Check if at least one link has joint with name that contains "foot". Eg. "left_foot"
+        foot_found = False
+        for link in self.nodes.values():
+            for joint_name in link.val.joints:
+                if "foot" in joint_name:
+                    foot_found = True
+                    break
+        if not foot_found:
+            QtWidgets.QMessageBox.warning(self, "No Foot Joint", "At least one joint must contain the word 'foot'.")
+            return False
+
+
     def save(self):
+        # Run some checking before saving
+        checking_passed = self.run_checking()
+        if not checking_passed:
+            return
+
         # Save the nodes as a pickle file
         pkl.dump(self.nodes, open(f'./auto_design/model/given_models/{self.args.model_name}_joints.pkl', 'wb'))
 
@@ -1081,7 +1127,7 @@ class Custom_Mesh_Loader(Mesh_Loader):
         else:
             print("No joint data found. Please construct the link tree.")
             # linkLoader = LinkTreeGUI(tk.Tk(), self.mesh, self.args)
-            linkLoader = LinkTreeGUI(self.mesh, self.args)
+            linkLoader = LinkTreeGUI(self.mesh, self.args, initialize_body=True)
             linkLoader.show()
         
         # exit the application
