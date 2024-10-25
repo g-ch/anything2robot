@@ -17,7 +17,7 @@ import pickle as pkl
 from mesh_decomp import Mesh_Decomp, Mesh_Group, is_points_in_cylinder, is_points_in_shell_top, is_points_in_sphere
 from mesh_loader import Custom_Mesh_Loader
 from generic import Generic_Algorithm, Improved_Generic_Algorithm
-from plot_utils import rotation_matrix_from_vectors
+from plot_utils import rotation_matrix_from_vectors, rotate_point_along_axis
 from collision_check import check_collision
 from sklearn import svm
 from sklearn.exceptions import ConvergenceWarning
@@ -129,7 +129,7 @@ class General_GA(Improved_Generic_Algorithm):
             motor_positions.append(motor_position)
             motor_types.append(x[3 * motor_num + link_idx])
             motor_directs.append(np.array(cur_node.val.axis[1]))
-            motor_relations.append("")
+            motor_relations.append(0) # 0 for child
 
             if len(cur_node.val.axis) == 3:
                 # This is the axis of the second motor which is connected to the father link
@@ -138,10 +138,11 @@ class General_GA(Improved_Generic_Algorithm):
                 motor_positions.append(motor2_position)
                 motor_types.append(x[3 * motor_num + link_idx])
                 motor_directs.append(np.array(cur_node.val.axis[2]))
+                motor_relations.append(1) # 1 for father
             
             link_idx += 1
 
-        return np.array(motor_positions), np.array(motor_directs), np.array(motor_types, dtype=int)
+        return np.array(motor_positions), np.array(motor_directs), np.array(motor_types, dtype=int), np.array(motor_relations, dtype=int)
     
     def get_occupancy_cost(self, motor_poses, motor_directs, motor_types):
         """
@@ -258,11 +259,49 @@ class General_GA(Improved_Generic_Algorithm):
         return False
     
 
-    def get_costs(self, genome):  #chg
-        motor_positions, motor_directs, motor_types = self.get_motor_params(genome)
+    def check_two_degree_rotation_interference_cost(self, motor_positions, motor_directs, motor_types, motor_relations):
+        cost = 0
+        for i in range(len(motor_positions)):
+            if motor_relations[i] == 1 and i >= 2:  # Father motor of the two-motor joint
+                child_id = i - 1
+                cost_this = 2e6
+                # Rotate the center of the child motor by +/- 30 degrees along the axis of the father motor
+                angle_to_check = [30, -30]
+                for angle in angle_to_check:
+                    center_child = motor_positions[child_id]
+                    center_child_bias = center_child - motor_positions[i] # Move the child motor to the origin, which is the center of the father motor
+                    father_motor_axis = motor_directs[i]
+                    # Rotate center_child_bias by angle degrees along the axis of the father_motor_axis
+                    center_child_rotated = rotate_point_along_axis(center_child_bias, father_motor_axis, angle)
+                    center_child_rebiased = center_child_rotated + motor_positions[i] 
+
+                    cylinder_child = {'center': center_child_rebiased,
+                                        'direct': motor_directs[child_id],
+                                        'height': self.motor_type_params[motor_types[child_id]][0],
+                                        'radius': self.motor_type_params[motor_types[child_id]][1]}
+                
+                    for j in range(len(motor_positions)):
+                        if j != child_id and j != i: # Check collision with other motors
+                            cylinder_other = {'center': motor_positions[j],
+                                            'direct': motor_directs[j],
+                                            'height': self.motor_type_params[motor_types[j]][0],
+                                            'radius': self.motor_type_params[motor_types[j]][1]}
+                            flag_collision, _ = check_collision(cylinder_child, cylinder_other)
+                            if flag_collision:
+                                return cost_this
+                            
+        return cost
+                    
+
+    def get_costs(self, genome): 
+        motor_positions, motor_directs, motor_types, motor_relations = self.get_motor_params(genome)
         if self.check_constraint(motor_positions, motor_directs, motor_types):
             return 500000, 500000
         
+        two_degree_rotation_interference_cost = self.check_two_degree_rotation_interference_cost(motor_positions, motor_directs, motor_types, motor_relations)
+        if two_degree_rotation_interference_cost > 1e6:
+            return 1000000, 1000000
+
         cost_motor_position = 0
         cost_motor_occupancy = 0
 
@@ -294,6 +333,7 @@ class General_GA(Improved_Generic_Algorithm):
                 motor2_pos = motor_position - self.connector_lib[motor_idx][0] * np.array(cur_node.val.axis[1]) + self.connector_lib[motor_idx][1] * np.array(cur_node.val.axis[2])
                 motor2_direct = np.array(cur_node.val.axis[2])
                 motor2_type = motor_type
+
                 # cost_motor_position += 0.5 * self.get_position_cost(np.linalg.norm(motor2_pos - np.array(cur_node.val.axis[0])), sigmoidal=False)
                 cur_idx += 1
         
@@ -315,7 +355,7 @@ class General_GA(Improved_Generic_Algorithm):
 
     def from_genome_to_motor_results(self, genome):
         results = []
-        motor_positions, motor_directs, motor_types = self.get_motor_params(genome)
+        motor_positions, motor_directs, motor_types, __ = self.get_motor_params(genome)
 
         for i in range(len(motor_positions)):
             base = motor_positions[i] - motor_directs[i] * self.motor_type_params[motor_types[i]][0] / 2

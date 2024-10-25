@@ -240,3 +240,20 @@ def create_voxel_grid_np(grid, voxel_size):
         marker=dict(size=voxel_size, opacity=0.5)
     )
     return scatter
+
+
+def rotate_point_along_axis(point, axis, angle_degrees):
+    # Convert angle to radians
+    angle_radians = np.radians(angle_degrees)
+    
+    # Normalize the rotation axis
+    axis = axis / np.linalg.norm(axis)
+    
+    # Apply Rodrigues' rotation formula
+    rotated_point = (
+        point * np.cos(angle_radians) +
+        np.cross(axis, point) * np.sin(angle_radians) +
+        axis * np.dot(axis, point) * (1 - np.cos(angle_radians))
+    )
+    
+    return rotated_point
