@@ -14,12 +14,15 @@ import os
 import heapq
 import matplotlib.pyplot as plt
 import pickle as pkl
-from mesh_decomp import Mesh_Decomp, is_points_in_cylinder, is_points_in_shell_top, is_points_in_sphere
+from mesh_decomp import Mesh_Decomp, Mesh_Group, is_points_in_cylinder, is_points_in_shell_top, is_points_in_sphere
 from mesh_loader import Custom_Mesh_Loader
 from generic import Generic_Algorithm, Improved_Generic_Algorithm
 from plot_utils import rotation_matrix_from_vectors
 from collision_check import check_collision
 from sklearn import svm
+from sklearn.exceptions import ConvergenceWarning
+import warnings
+
 import math
 
 import multiprocessing
@@ -111,6 +114,7 @@ class General_GA(Improved_Generic_Algorithm):
         motor_positions = []
         motor_types = []
         motor_directs = []
+        motor_relations = []
 
         queue = [self.joint_tree]
         link_idx = 0
@@ -125,8 +129,10 @@ class General_GA(Improved_Generic_Algorithm):
             motor_positions.append(motor_position)
             motor_types.append(x[3 * motor_num + link_idx])
             motor_directs.append(np.array(cur_node.val.axis[1]))
+            motor_relations.append("")
 
             if len(cur_node.val.axis) == 3:
+                # This is the axis of the second motor which is connected to the father link
                 motor_idx = int(x[3 * motor_num + link_idx])
                 motor2_position = motor_position - self.connector_lib[motor_idx][0] * np.array(cur_node.val.axis[1]) + self.connector_lib[motor_idx][1] * np.array(cur_node.val.axis[2])
                 motor_positions.append(motor2_position)
@@ -252,7 +258,7 @@ class General_GA(Improved_Generic_Algorithm):
         return False
     
 
-    def get_costs(self, genome):
+    def get_costs(self, genome):  #chg
         motor_positions, motor_directs, motor_types = self.get_motor_params(genome)
         if self.check_constraint(motor_positions, motor_directs, motor_types):
             return 500000, 500000
@@ -530,7 +536,10 @@ class Joint_Connect_Opt:
             cur_link_name = cur_node.val.name
             print("Joint Connection Opt: ", count, "Current Link Name: ", cur_link_name)
             get_removed_list = lambda list, remove_value: [value for value in list if value != remove_value]
-            
+
+            # Get the motor parameters. The motor parameters are stored in the form of [base (3D position), top (3D position), radius]
+            motor_param = self.motor_params_results[cur_idx]
+
             def condition_classification(pts):
                 #return is_points_in_sphere(pts, (motor_param[:3] + motor_param[3:6]) / 2, radius=10)
                 top_point = motor_param[:3]
@@ -538,9 +547,6 @@ class Joint_Connect_Opt:
                 top_bottom_dist_half = np.linalg.norm(top_point - bottom_point) / 2
                 sphere_radius = math.sqrt(top_bottom_dist_half**2 + motor_param[6]**2)
                 return is_points_in_sphere(pts, (motor_param[:3] + motor_param[3:6]) / 2, sphere_radius * 2)
-
-            # Get the motor parameters. The motor parameters are stored in the form of [base (3D position), top (3D position), radius]
-            motor_param = self.motor_params_results[cur_idx]
             
             # Given a sphere, the center is the motor's center, find all the voxels that are in the sphere and their types
             classify_voxels = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=[cur_link_name, self.father_dict[cur_link_name]],
@@ -567,6 +573,24 @@ class Joint_Connect_Opt:
             clf = svm.LinearSVC(C=1.0, fit_intercept=False, max_iter=100, tol=10, dual=True)
             clf.fit(projected_voxels, classify_voxels_values)
 
+            ## Looks the result is nice, no warning
+            # clf = svm.LinearSVC(C=1.0, fit_intercept=False, max_iter=100, tol=10, dual=True)
+            # try:
+            #     # Attempt to fit the model
+            #     with warnings.catch_warnings():
+            #         warnings.filterwarnings("error", category=ConvergenceWarning)  # Raise warnings as errors
+            #         clf.fit(projected_voxels, classify_voxels_values)
+            # except ConvergenceWarning:
+            #     print("Warning: Model did not converge.")
+            #     exit(1)
+            #     # Consider increasing max_iter or adjusting tol
+
+            # except Exception as e:
+            #     print(f"Training failed with error: {e}")
+            #     exit(1)
+            #     # Handle the error or adjust the training configuration
+
+
             def svm_predict_with_margin(clf, pts, margin=0.5):
                 distances = clf.decision_function(pts)
                 svm_result = np.where(
@@ -578,15 +602,15 @@ class Joint_Connect_Opt:
             
             def condition_child_link_radical(pts):
                 projected_pts = np.dot(pts - motor_param[:3], np.array([x_direct, y_direct, motor_direct]))[:, :2]
-                #svm_result = clf.predict(projected_pts)
-                margin = motor_param[6] * 0.5
+                # svm_result = clf.predict(projected_pts)
+                margin = motor_param[6] * 0.2
                 svm_result = svm_predict_with_margin(clf, projected_pts, margin)
                 return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell), 
                                       svm_result == 1)
             def condition_father_link_radical(pts):
                 projected_pts = np.dot(pts - motor_param[:3], np.array([x_direct, y_direct, motor_direct]))[:, :2]
                 # svm_result = clf.predict(projected_pts)
-                margin = motor_param[6] * 0.5
+                margin = motor_param[6] * 0.2
                 svm_result = svm_predict_with_margin(clf, projected_pts, margin)
                 return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell), 
                                       svm_result == 0)
