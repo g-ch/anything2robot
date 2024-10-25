@@ -698,26 +698,7 @@ class Motor_Opt:
 
     def render(self, save_only=False, save_path=None):
         fig = go.Figure(data=[self.mesh.mesh_plotly, *self.create_motors(self.motor_results)])
-        # fig.update_layout(
-        #     autosize=False,
-        #     margin = {'l':0,'r':0,'t':0,'b':0},
-        #     scene=dict(
-        #         xaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)", 
-        #                 zeroline=False, showbackground=False, title=''),  # Remove X-axis title
-        #         yaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)",
-        #                 zeroline=False, showbackground=False, title=''),  # Remove Y-axis title
-        #         zaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)",
-        #                 zeroline=False, showbackground=False, title=''),  # Remove Z-axis title
-        #     ),
-        #     scene_aspectmode='data',
-        #     # plot_bgcolor='rgba(0,0,0,0)',  # Set plot background to be transparent
-        #     # paper_bgcolor='rgba(0,0,0,0)',  # Set paper background to be transparent
-        #     showlegend=False,  # Hide the legend
-        #     annotations=[],  # Remove annotations
-        #     scene_camera=dict(up=dict(x=0, y=0, z=1), center=dict(x=0, y=-0.25, z=0), eye=dict(x=1.2, y=-1.0, z=0.4)),  # Optional: Adjust camera for better view
-        #     width=740,
-        #     height=600
-        # )
+        fig.update_layout(scene_aspectmode='data')
 
         if not save_only:
             fig.show()

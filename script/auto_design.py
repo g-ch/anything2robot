@@ -358,13 +358,13 @@ if __name__=="__main__":
     parser.add_argument('--joint_limitation', type=float, default=0.785, help='The limitation of the joint. +-joint_limitation. (rad)')
 
     parser.add_argument('--max_trial_round', type=int, default=5, help='The maximum number of trial rounds.')
-    parser.add_argument('--genetic_generation', type=int, default=20, help='The number of generations for the genetic algorithm')
+    parser.add_argument('--genetic_generation', type=int, default=10, help='The number of generations for the genetic algorithm')
     parser.add_argument('--do_fea_analysis', type=bool, default=False, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
     parser.add_argument('--regenerate_if_fea_failed', type=bool, default=False, help='Regenerate the model if the FEA analysis failed or not. FEAs are expensive and strict.')
 
     parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not. Need to close the windows to continue the process if turned on.')
     parser.add_argument('--disable_joint_setting_ui', type=bool, default=False, help='Disable the joint setting UI or not')
-    parser.add_argument('--joint_setting_standard_scale', type=bool, default=True, help='Scale the model to a standard scale for easier joint setting in the UI or not')
+    parser.add_argument('--joint_setting_standard_scale', type=bool, default=False, help='Scale the model to a standard scale for easier joint setting in the UI or not')
 
     ### No need to set model_name. This is a temporary value. It will be removed in the future.
     parser.add_argument('--model_name', type=str, default='None', help='Temporary value. No need to set this value.')

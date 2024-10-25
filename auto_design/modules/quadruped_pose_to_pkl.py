@@ -39,18 +39,19 @@ def visualize_animal3d(mesh_path, keypoint_3d):
 
 class Quadruped_Mesh_Transformer():
 
-    def __init__(self, stl_path : str, joint_path : str, output_name : str, expected_x : float):
+    def __init__(self, stl_path : str, joint_path : str, output_folder : str, expected_x : float):
         self.stl_path = stl_path
         self.joint_path = joint_path
 
-        self.output_pkl_path = current_path + "/../model/given_models/" + output_name + "_joints.pkl"
-        self.output_stl_path = current_path + "/../model/given_models/" + output_name + ".stl"
+        name = os.path.basename(stl_path).split('.')[0]
+        self.output_pkl_path = output_folder + "/" + name + "_joints.pkl"
+        self.output_stl_path = output_folder + "/" + name + "_scaled.stl"
 
         self.expected_x = expected_x
         self.joint_dict = None
         self.mesh = None
 
-        self.scale_factor = self.load_mesh(self.stl_path)
+        self.scale_factor, self.ori_center = self.load_mesh(self.stl_path)
         self.load_joint_positions(self.joint_path)
 
         self.links = {}
@@ -58,17 +59,17 @@ class Quadruped_Mesh_Transformer():
 
         self.set_links_and_nodes()
 
-        # Print the links and nodes
-        print(self.links)
-        for link_name, link in self.links.items():
-            print(link_name)
-            print(link.joints)
-            print("Axis: ", link.axis)
+        ## Print the links and nodes
+        # print(self.links)
+        # for link_name, link in self.links.items():
+        #     print(link_name)
+        #     print(link.joints)
+        #     print("Axis: ", link.axis)
         
-        for node_name, node in self.nodes.items():
-            print("Parent: ", node_name)
-            for child in node.children:
-                print("Child: ", child.val.name)
+        # for node_name, node in self.nodes.items():
+        #     print("Parent: ", node_name)
+        #     for child in node.children:
+        #         print("Child: ", child.val.name)
 
 
     def load_mesh(self, stl_path : str):
@@ -76,18 +77,20 @@ class Quadruped_Mesh_Transformer():
         Load the mesh from the file system.
         """
         self.mesh = pv.read(stl_path)
-        # Scale the mesh to the expected x and return the scale factor
+        # Scale the mesh to the expected x and center the mesh to the origin
         scale_factor = self.expected_x / (self.mesh.bounds[1] - self.mesh.bounds[0])
-
-        print("Original bounds: ", self.mesh.bounds)
-        print("Expected x: ", self.expected_x)
-        print("Scale factor: ", scale_factor)
-
         self.mesh = self.mesh.scale(scale_factor, inplace=False)
+
+        center_vector = np.array(self.mesh.center)
+        self.mesh = self.mesh.translate(-center_vector)
+
+        # Rotate the mesh along the z-axis by 90 degrees
+        self.mesh = self.mesh.rotate_z(-90)
+
         # Save the mesh to the output stl file
         self.mesh.save(self.output_stl_path)
 
-        return scale_factor
+        return scale_factor, center_vector
 
 
     def load_joint_positions(self, joint_path : str):
@@ -97,8 +100,17 @@ class Quadruped_Mesh_Transformer():
 
         joint_data = np.load(joint_path)
 
-        # Scale the joint positions to the expected x
+        # Scale the joint positions to the expected x and center the mesh to the origin
         joint_data = joint_data * self.scale_factor
+        joint_data = joint_data - self.ori_center
+        # Define the 90-degree rotation matrix around the z-axis
+        rotation_matrix = np.array([
+            [0, -1, 0],
+            [1, 0, 0],
+            [0, 0, 1]
+        ])
+        joint_data = np.dot(joint_data, rotation_matrix)
+
 
         joint_dict = {
             "waist": joint_data[4],
@@ -121,28 +133,42 @@ class Quadruped_Mesh_Transformer():
             'left_foot':joint_data[20],
             'right_foot':joint_data[24],
             'head':joint_data[16],
-            'tail':joint_data[30],
+            'tail':joint_data[30]
         }
 
         # Adjust the joint positions:
-        ## 1. Push the hip joints down a little bit
-        joint_dict["left_hip"] = joint_dict["left_hip"] * 0.7 + joint_dict["left_knee"] * 0.3
-        joint_dict["right_hip"] = joint_dict["right_hip"] * 0.7 + joint_dict["right_knee"] * 0.3
+        ## 1. Push the hip and shoulder joints down 
+        joint_dict["left_hip"] = joint_dict["left_hip"] * 0.5 + joint_dict["left_knee"] * 0.5
+        joint_dict["right_hip"] = joint_dict["right_hip"] * 0.5 + joint_dict["right_knee"] * 0.5
+        joint_dict["left_shoulder"] = joint_dict["left_shoulder"] * 0.5 + joint_dict["left_elbow"] * 0.5
+        joint_dict["right_shoulder"] = joint_dict["right_shoulder"] * 0.5 + joint_dict["right_elbow"] * 0.5
+
+        joint_dict["left_knee"] = joint_dict["left_knee"] * 0.5 + joint_dict["left_ankle"] * 0.5
+        joint_dict["right_knee"] = joint_dict["right_knee"] * 0.5 + joint_dict["right_ankle"] * 0.5
+        joint_dict["left_elbow"] = joint_dict["left_elbow"] * 0.5 + joint_dict["left_wrist"] * 0.5
+        joint_dict["right_elbow"] = joint_dict["right_elbow"] * 0.5 + joint_dict["right_wrist"] * 0.5
         
         ## 2. Push the hip, shoulder, elbow, and knee joints towards the center
         center_hip = (joint_dict["left_hip"] + joint_dict["right_hip"]) / 2
         center_shoulder = (joint_dict["left_shoulder"] + joint_dict["right_shoulder"]) / 2
         center_elbow = (joint_dict["left_elbow"] + joint_dict["right_elbow"]) / 2
         center_knee = (joint_dict["left_knee"] + joint_dict["right_knee"]) / 2
-        joint_dict["left_hip"] = joint_dict["left_hip"] + (center_hip - joint_dict["left_hip"]) * 0.3
-        joint_dict["right_hip"] = joint_dict["right_hip"] + (center_hip - joint_dict["right_hip"]) * 0.3
-        joint_dict["left_shoulder"] = joint_dict["left_shoulder"] + (center_shoulder - joint_dict["left_shoulder"]) * 0.3
-        joint_dict["right_shoulder"] = joint_dict["right_shoulder"] + (center_shoulder - joint_dict["right_shoulder"]) * 0.3
+        joint_dict["left_hip"] = joint_dict["left_hip"] + (center_hip - joint_dict["left_hip"]) * 0.15
+        joint_dict["right_hip"] = joint_dict["right_hip"] + (center_hip - joint_dict["right_hip"]) * 0.15
+        joint_dict["left_shoulder"] = joint_dict["left_shoulder"] + (center_shoulder - joint_dict["left_shoulder"]) * 0.15
+        joint_dict["right_shoulder"] = joint_dict["right_shoulder"] + (center_shoulder - joint_dict["right_shoulder"]) * 0.15
         joint_dict["left_elbow"] = joint_dict["left_elbow"] + (center_elbow - joint_dict["left_elbow"]) * 0.15
         joint_dict["right_elbow"] = joint_dict["right_elbow"] + (center_elbow - joint_dict["right_elbow"]) * 0.15
         joint_dict["left_knee"] = joint_dict["left_knee"] + (center_knee - joint_dict["left_knee"]) * 0.15
         joint_dict["right_knee"] = joint_dict["right_knee"] + (center_knee - joint_dict["right_knee"]) * 0.15
         self.joint_dict = joint_dict
+
+        joint_dict["belly"] = joint_dict["waist"]
+        joint_dict["belly"][2] = joint_dict["left_hip"][2] # Set a belly joint.
+
+        # Change the joints to list
+        for joint in self.joint_dict:
+            self.joint_dict[joint] = self.joint_dict[joint].tolist()
 
     def visualize_mesh_with_joints(self):
         """
@@ -160,7 +186,7 @@ class Quadruped_Mesh_Transformer():
         # The link config dict is used to specify the joints that are connected to each other.
         # NOTE: The order of the joints in the list is important. The first joint must be the parent joint. We use this to determine the axis of the link.
         link_config_dict = {
-            "BODY": ["waist", "hip", "scapula", "head", "tail", "left_shoulder", "right_shoulder", "left_hip", "right_hip"],
+            "BODY": ["waist", "hip", "scapula", "head", "tail", "left_shoulder", "right_shoulder", "left_hip", "right_hip", "belly"],
             "FL_UP": ["left_shoulder", "left_elbow"],
             "FL_LOW": ["left_elbow", "left_wrist", "left_front_foot"],
             "FR_UP": ["right_shoulder", "right_elbow"],
@@ -186,17 +212,17 @@ class Quadruped_Mesh_Transformer():
             "head": None,
             "tail": None,
             "left_shoulder": [1, 0, 0, 0, 1, 0],
-            "right_shoulder": [1, 0, 0, 0,-1, 0],
-            "left_elbow": [0, 1, 0],
-            "right_elbow": [0, -1, 0],
+            "right_shoulder": [-1, 0, 0, 0, 1, 0],
+            "left_elbow": [1, 0, 0],
+            "right_elbow": [-1, 0, 0],
             "left_wrist": None,
             "right_wrist": None,
             "left_front_foot": None,
             "right_front_foot": None,
-            "left_hip": [1, 0, 0, 0, 1, 0],
-            "right_hip": [1, 0, 0, 0,-1, 0],
-            "left_knee": [0, 1, 0],
-            "right_knee": [0, -1, 0],
+            "left_hip": [1, 0, 0, 0, -1, 0],
+            "right_hip": [-1, 0, 0, 0,-1, 0],
+            "left_knee": [1, 0, 0],
+            "right_knee": [-1, 0, 0],
             "left_ankle": None,
             "right_ankle": None,
             "left_foot": None,
@@ -213,7 +239,7 @@ class Quadruped_Mesh_Transformer():
             for joint in joints:
                 if joints_axis_dict[joint] is not None:
                     # If the joint is not None, then we need to add the axis to the link. The first three elements are joint position, the last three or six elements are joint axis direction.
-                    link_axis_dict[link_name] = np.concatenate([self.joint_dict[joint], joints_axis_dict[joint]])
+                    link_axis_dict[link_name] = np.concatenate([self.joint_dict[joint], joints_axis_dict[joint]]).tolist()
                     break
 
         # Set the links
@@ -227,10 +253,6 @@ class Quadruped_Mesh_Transformer():
                 body_axis = [self.joint_dict["waist"][0], self.joint_dict["waist"][1], self.joint_dict["waist"][2], 0, 0, 0]
                 link.add_axis(body_axis)
 
-            # for joint_name, joint_position in link.joints.items():
-            #     if joints_axis_dict[joint_name] is not None:
-            #         link.add_axis(joints_axis_dict[joint_name])
-
             self.links[link_name] = link
             node = TreeNode(link)
             self.nodes[link_name] = node
@@ -243,18 +265,21 @@ class Quadruped_Mesh_Transformer():
 
         # Save the nodes to a pkl file
         pkl.dump(self.nodes, open(self.output_pkl_path, 'wb'))
-        print("Save the nodes to a pkl file: " + self.output_pkl_path)
+        # print("Save the nodes to a pkl file: " + self.output_pkl_path)
+
+    def get_pkl_path(self):
+        return self.output_pkl_path
         
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Quadruped Mesh Loader')
     parser.add_argument('--joint_path', type=str, default='/media/clarence/Clarence/dataset/standford_dogs/images/result/batch_1/n02088364_3752_neutral_joints.npy', help='The path to the joint data')
     parser.add_argument('--stl_path', type=str, default='/media/clarence/Clarence/dataset/standford_dogs/images/result/batch_1/n02088364_3752_neutral_res_e300_smoothed.stl', help='The path to the stl file')
-    parser.add_argument('--expected_x', type=float, default=60, help='The expected x of the model. Length. Unit: cm')
-    parser.add_argument('--output_name', type=str, default='n02088364_3752_neutral', help='The path to the output pkl file')
+    parser.add_argument('--expected_x', type=float, default=50, help='The expected x of the model. Length. Unit: cm')
+    parser.add_argument('--joint_pkl_save_folder', type=str, default='/media/clarence/Clarence/dataset/standford_dogs/images/result/batch_1', help='The folder to save the joint pkl file')
     args = parser.parse_args()
 
-    quadruped_mesh_transformer = Quadruped_Mesh_Transformer(args.stl_path, args.joint_path, args.output_name, args.expected_x)
+    quadruped_mesh_transformer = Quadruped_Mesh_Transformer(args.stl_path, args.joint_path, args.joint_pkl_save_folder, args.expected_x)
 
     quadruped_mesh_transformer.visualize_mesh_with_joints()
     

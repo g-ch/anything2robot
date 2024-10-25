@@ -236,7 +236,7 @@ class Mesh_Group:
 
         fig = go.Figure(data=scatters+[mesh_plotly] if mesh_plotly is not None else scatters)
         fig.update_layout(
-            autosize=False,
+            #autosize=False,
             margin = {'l':0,'r':0,'t':0,'b':0},
             scene=dict(
                 xaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)", 
@@ -252,9 +252,9 @@ class Mesh_Group:
             showlegend=False,  # Hide the legend
             annotations=[],  # Remove annotations
             #scene_camera=dict(up=dict(x=0, y=0, z=1), center=dict(x=0, y=-0.22, z=0), eye=dict(x=1.1, y=-0.9, z=0.4)),  # Optional: Adjust camera for better view
-            scene_camera=camera,
-            width=740,
-            height=600
+            scene_camera=camera #,
+            # width=740,
+            # height=600
         )
 
         if not save_only:

@@ -898,6 +898,8 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
                 x.append(pos[0])
                 y.append(pos[1])
                 z.append(pos[2])
+        # Update layout
+        self.fig.update_layout(scene_aspectmode='data')
 
         # Add joint markers and axes to the plot
         self.fig.add_trace(self.mesh.mesh_plotly)
@@ -1049,58 +1051,6 @@ class Mesh_Loader:
         pass
         
 
-    def render(self, save_only=False, save_path=None):
-        """
-        Render the scaled mesh and joint data.
-        """
-        axes_lines = create_axes_lines(np.array([0,0,0]), 
-                                       np.array([1,0,0]), 
-                                       np.array([0,1,0]), 
-                                       np.array([0,0,1]))
-        transformed_joints_vis, transformed_lines_vis = create_joint_visualization(self.scaled_joint_dict)
-        fig = go.Figure(data=[transformed_joints_vis, self.mesh.mesh_plotly, *transformed_lines_vis, *axes_lines])
-        fig.update_layout(
-            autosize=False,
-            margin = {'l':0,'r':0,'t':0,'b':0},
-            scene=dict(
-                xaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)", 
-                        zeroline=False, showbackground=False, title=''),  # Remove X-axis title
-                yaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)",
-                        zeroline=False, showbackground=False, title=''),  # Remove Y-axis title
-                zaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)",
-                        zeroline=False, showbackground=False, title=''),  # Remove Z-axis title
-            ),
-            scene_aspectmode='data',
-            # plot_bgcolor='rgba(0,0,0,0)',  # Set plot background to be transparent
-            # paper_bgcolor='rgba(0,0,0,0)',  # Set paper background to be transparent
-            showlegend=False,  # Hide the legend
-            annotations=[],  # Remove annotations
-            scene_camera=dict(up=dict(x=0, y=0, z=1), center=dict(x=0, y=-0.25, z=0), eye=dict(x=1.2, y=-1.0, z=0.4)),  # Optional: Adjust camera for better view
-            width=740,
-            height=600
-        )
-        #fig.show()
-        if not save_only:
-            fig.show()
-        if save_path is not None:
-            fig.write_image(save_path)
-        print("scale factor:", self.scale_factor)
-
-    def run(self, render=True):
-        """
-        The main function to run the mesh loader.
-        """
-        self.mesh_dir = os.path.normpath('./model/sample_models/' + self.args.model_name + '_res_e300_smoothed.stl')
-        self.joint_dir = os.path.normpath('./model/sample_models/' + self.args.model_name + '_joints.npy')
-        self.load_mesh(self.mesh_dir)
-        self.load_joint_positions(self.joint_dir)
-        self.set_scale()
-        self.scale()
-        if render:
-            self.render()
-
-
-
 class Custom_Mesh_Loader(Mesh_Loader):
     def __init__(self, args):
         super().__init__(args)
@@ -1155,143 +1105,6 @@ class Custom_Mesh_Loader(Mesh_Loader):
         if figure_save_path is not None:
             linkLoader.save_fig(figure_save_path)
             
-
-    def render(self, save_only=False, save_path=None):
-        fig = go.Figure()
-
-        x, y, z = [], [], []
-        for joint in self.scaled_joint_dict.items():
-            x.append(joint[1][0])
-            y.append(joint[1][1])
-            z.append(joint[1][2])
-        
-        # Add joint markers
-        fig.add_trace(self.scaled_mesh.mesh_plotly)
-        fig.add_trace(go.Scatter3d(x=x, y=y, z=z, mode='markers'))
-
-        if not save_only:
-            fig.show(renderer="browser")
-        if save_path is not None:
-            fig.write_image(save_path)
-        #fig.show(renderer="browser")  # Refresh the plot in the browser window
-
-class Quadruped_Mesh_Loader(Mesh_Loader):
-    def __init__(self, args):
-        super().__init__(args)
-    
-    def load_joint_positions(self, joint_path : str):
-        """
-        Load the joint data from the file system.
-        """
-        joint_data = np.load(joint_path)
-        joint_dict = {
-            "waist": joint_data[4],
-            "hip": joint_data[1],
-            "left_hip" : joint_data[17],
-            "right_hip":joint_data[21],
-            "left_knee": joint_data[18],
-            "right_knee":joint_data[22],
-            "left_ankle":joint_data[19],
-            "right_ankle":joint_data[23],
-            "scapula":joint_data[6],
-            "left_shoulder":joint_data[7],
-            "right_shoulder":joint_data[11],
-            "left_elbow":joint_data[8],
-            "right_elbow":joint_data[12],
-            "left_wrist":joint_data[9],
-            "right_wrist":joint_data[13],
-            'left_hand':joint_data[10],
-            'right_hand':joint_data[14],
-            'left_foot':joint_data[20],
-            'right_foot':joint_data[24],
-            'head':joint_data[16],
-            'tail':joint_data[30],
-        }
-
-        # Adjust the joint positions:
-        ## 1. Push the hip joints down
-        joint_dict["left_hip"] = (joint_dict["left_hip"] + joint_dict["left_knee"]) / 2
-        joint_dict["right_hip"] = (joint_dict["right_hip"] + joint_dict["right_knee"]) / 2
-        
-        ## 2. Push the hip, shoulder, elbow, and knee joints towards the center
-        center_hip = (joint_dict["left_hip"] + joint_dict["right_hip"]) / 2
-        center_shoulder = (joint_dict["left_shoulder"] + joint_dict["right_shoulder"]) / 2
-        center_elbow = (joint_dict["left_elbow"] + joint_dict["right_elbow"]) / 2
-        center_knee = (joint_dict["left_knee"] + joint_dict["right_knee"]) / 2
-        joint_dict["left_hip"] = joint_dict["left_hip"] + (center_hip - joint_dict["left_hip"]) * 0.3
-        joint_dict["right_hip"] = joint_dict["right_hip"] + (center_hip - joint_dict["right_hip"]) * 0.3
-        joint_dict["left_shoulder"] = joint_dict["left_shoulder"] + (center_shoulder - joint_dict["left_shoulder"]) * 0.3
-        joint_dict["right_shoulder"] = joint_dict["right_shoulder"] + (center_shoulder - joint_dict["right_shoulder"]) * 0.3
-        joint_dict["left_elbow"] = joint_dict["left_elbow"] + (center_elbow - joint_dict["left_elbow"]) * 0.15
-        joint_dict["right_elbow"] = joint_dict["right_elbow"] + (center_elbow - joint_dict["right_elbow"]) * 0.15
-        joint_dict["left_knee"] = joint_dict["left_knee"] + (center_knee - joint_dict["left_knee"]) * 0.15
-        joint_dict["right_knee"] = joint_dict["right_knee"] + (center_knee - joint_dict["right_knee"]) * 0.15
-        self.joint_dict = joint_dict
-
-    def update_link_tree(self):
-        # Update Link Tree
-        joint_dict = self.scaled_joint_dict
-
-        # Define the link configuration
-        link_config = {
-            "BODY": ["waist", "hip", "scapula", "head", "tail"],
-            "FL_UP": ["left_shoulder", "left_elbow"],
-            "FL_LOW": ["left_elbow", "left_wrist", "left_hand"],
-            "FR_UP": ["right_shoulder", "right_elbow"],
-            "FR_LOW": ["right_elbow", "right_wrist", "right_hand"],
-            "RL_UP": ["left_hip", "left_knee"],
-            "RL_LOW": ["left_knee", "left_ankle", "left_foot"],
-            "RR_UP": ["right_hip", "right_knee"],
-            "RR_LOW": ["right_knee", "right_ankle", "right_foot"]
-        }
-
-        links = {}
-        nodes = {}
-
-        # Create links and tree nodes
-        for link_name, joints in link_config.items():
-            link = Link(link_name)
-            link.add_joints({joint: joint_dict[joint] for joint in joints})
-            links[link_name] = link
-            nodes[link_name] = TreeNode(link)
-
-        # Define parent-child relationships
-        hierarchy = {
-            "BODY": ["FL_UP", "FR_UP", "RL_UP", "RR_UP"],
-            "FL_UP": ["FL_LOW"],
-            "FR_UP": ["FR_LOW"],
-            "RL_UP": ["RL_LOW"],
-            "RR_UP": ["RR_LOW"]
-        }
-
-        # Build the tree structure
-        for parent, children in hierarchy.items():
-            for child in children:
-                nodes[parent].add_child(nodes[child])
-
-        self.link_tree = nodes["BODY"]
-
-    def set_scale(self):
-        """
-        Do the preprocess to scale the mesh and joint data.
-        """
-        # Set Transformation
-        ## 1. The new origin is the projection of the waist joint on the ground plane
-        self.new_origin = np.array([self.joint_dict["waist"][0], 
-                                    self.joint_dict["waist"][1], 
-                                    min(self.mesh.mesh_plotly.z)])
-        ## 2. The new axis(y is the heading direction from waist to hip, z is the vertical direction)
-        body_direct = (self.joint_dict["hip"] - self.joint_dict["waist"]) / np.linalg.norm(self.joint_dict["hip"] - self.joint_dict["waist"])
-        self.new_z_axis = np.array([0, 0, 1])
-        self.new_x_axis = np.cross(body_direct, self.new_z_axis)
-        self.new_y_axis = np.cross(self.new_z_axis, self.new_x_axis)
-
-        ## 3. The transformation matrix
-        self.transformation = np.block([[np.column_stack([self.new_x_axis, self.new_y_axis, self.new_z_axis]), self.new_origin.reshape((3, 1))],
-                                        [np.array([0, 0, 0, 1])]])
-        self.transformation = np.linalg.inv(self.transformation)
-        
-        return self.transformation
 
 if __name__ == "__main__":
     # parser = argparse.ArgumentParser(description='Mesh Loader')
