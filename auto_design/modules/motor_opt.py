@@ -602,6 +602,32 @@ class Joint_Connect_Opt:
             # set binary values for the voxels
             classify_voxels_values = np.where(classify_voxels_values == self.mesh_decomp.mesh_group.link_value_dict[cur_link_name], 1, 0)
 
+            # If the link has only two joints, find the joint farthest from the motor and add 100 points belonging to class 1 to help SVM
+            if len(cur_node.val.joints) == 2:
+                farthest_dist = 0
+                farthest_joint = None
+                for joint_name, joint_position in cur_node.val.joints.items():
+                    dist = np.linalg.norm(motor_param[:3] - joint_position)
+                    if dist > farthest_dist:
+                        farthest_dist = dist
+                        farthest_joint = joint_position
+
+                if farthest_joint is not None: 
+                    farthest_joint = np.array(farthest_joint)
+                    oppsite_joint = motor_param[:3] + (motor_param[:3] - farthest_joint)
+
+                    farthest_joint = np.tile(farthest_joint, (100, 1))
+                    classify_voxels = np.vstack((classify_voxels, farthest_joint))
+                    classify_voxels_values = np.hstack((classify_voxels_values, np.ones(100)))
+                    
+                    oppsite_joint = np.tile(oppsite_joint, (100, 1))
+                    classify_voxels = np.vstack((classify_voxels, oppsite_joint))
+                    classify_voxels_values = np.hstack((classify_voxels_values, np.zeros(100)))
+
+                    # print(cur_link_name)
+                    # print(motor_param[:3])
+                    # print("Farthest Joint Added: ", farthest_joint)
+
             # Find a planar coordinate that is perpendicular to the motor's direction, the coordinate is defined by x and y axis
             motor_direct = (motor_param[3:6] - motor_param[:3]) / np.linalg.norm(motor_param[3:6] - motor_param[:3])
 
@@ -618,45 +644,28 @@ class Joint_Connect_Opt:
             clf = svm.LinearSVC(C=1.0, fit_intercept=False, max_iter=100, tol=10, dual=True)
             clf.fit(projected_voxels, classify_voxels_values)
 
-            ## Looks the result is nice, no warning
-            # clf = svm.LinearSVC(C=1.0, fit_intercept=False, max_iter=100, tol=10, dual=True)
-            # try:
-            #     # Attempt to fit the model
-            #     with warnings.catch_warnings():
-            #         warnings.filterwarnings("error", category=ConvergenceWarning)  # Raise warnings as errors
-            #         clf.fit(projected_voxels, classify_voxels_values)
-            # except ConvergenceWarning:
-            #     print("Warning: Model did not converge.")
-            #     exit(1)
-            #     # Consider increasing max_iter or adjusting tol
-
-            # except Exception as e:
-            #     print(f"Training failed with error: {e}")
-            #     exit(1)
-            #     # Handle the error or adjust the training configuration
-
-
-            def svm_predict_with_margin(clf, pts, margin=0.5):
-                distances = clf.decision_function(pts)
-                svm_result = np.where(
-                    np.abs(distances) < margin, 
-                    -1,  # -1 for points near the decision boundary
-                    clf.predict(pts)  # Original class labels for others
-                )
-                return svm_result
+            ## TODO: Check why this function is not working
+            # def svm_predict_with_margin(clf, pts, margin=0.5):
+            #     distances = clf.decision_function(pts)
+            #     svm_result = np.where(
+            #         np.abs(distances) < margin, 
+            #         -1,  # -1 for points near the decision boundary
+            #         clf.predict(pts)  # Original class labels for others
+            #     )
+            #     return svm_result
             
             def condition_child_link_radical(pts):
                 projected_pts = np.dot(pts - motor_param[:3], np.array([x_direct, y_direct, motor_direct]))[:, :2]
-                # svm_result = clf.predict(projected_pts)
-                margin = motor_param[6] * 0.2
-                svm_result = svm_predict_with_margin(clf, projected_pts, margin)
+                svm_result = clf.predict(projected_pts)
+                # margin = motor_param[6] * 0.2
+                # svm_result = svm_predict_with_margin(clf, projected_pts, margin)
                 return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell), 
                                       svm_result == 1)
             def condition_father_link_radical(pts):
                 projected_pts = np.dot(pts - motor_param[:3], np.array([x_direct, y_direct, motor_direct]))[:, :2]
-                # svm_result = clf.predict(projected_pts)
-                margin = motor_param[6] * 0.2
-                svm_result = svm_predict_with_margin(clf, projected_pts, margin)
+                svm_result = clf.predict(projected_pts)
+                # margin = motor_param[6] * 0.2
+                # svm_result = svm_predict_with_margin(clf, projected_pts, margin)
                 return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell), 
                                       svm_result == 0)
 
