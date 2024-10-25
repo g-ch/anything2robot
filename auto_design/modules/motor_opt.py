@@ -264,10 +264,14 @@ class General_GA(Improved_Generic_Algorithm):
         for i in range(len(motor_positions)):
             if motor_relations[i] == 1 and i >= 2:  # Father motor of the two-motor joint
                 child_id = i - 1
-                cost_this = 2e6
-                # Rotate the center of the child motor by +/- 30 degrees along the axis of the father motor
-                angle_to_check = [30, -30]
+
+                # Rotate the center of the child motor by +/- 30 degrees, etc, along the axis of the father motor
+                angle_to_check = [30, -30, 40, -40, 50, -50, 60, -60] # 30 and -30 is the minimum angle to check, the bigger the lower the cost
+                cost_list = [2e6, 2e6, 100, 100, 50, 50, 0, 0]
+
+                count = 0
                 for angle in angle_to_check:
+                    count += 1
                     center_child = motor_positions[child_id]
                     center_child_bias = center_child - motor_positions[i] # Move the child motor to the origin, which is the center of the father motor
                     father_motor_axis = motor_directs[i]
@@ -288,19 +292,20 @@ class General_GA(Improved_Generic_Algorithm):
                                             'radius': self.motor_type_params[motor_types[j]][1]}
                             flag_collision, _ = check_collision(cylinder_child, cylinder_other)
                             if flag_collision:
-                                return cost_this
+                                return cost_list[count-1]
                             
         return cost
                     
 
     def get_costs(self, genome): 
         motor_positions, motor_directs, motor_types, motor_relations = self.get_motor_params(genome)
+
         if self.check_constraint(motor_positions, motor_directs, motor_types):
-            return 500000, 500000
+            return 0, 0, 1e6
         
         two_degree_rotation_interference_cost = self.check_two_degree_rotation_interference_cost(motor_positions, motor_directs, motor_types, motor_relations)
         if two_degree_rotation_interference_cost > 1e6:
-            return 1000000, 1000000
+            return 0, 0, 8e5
 
         cost_motor_position = 0
         cost_motor_occupancy = 0
@@ -342,14 +347,14 @@ class General_GA(Improved_Generic_Algorithm):
                                              motor_directs, 
                                              motor_types)
         
-        return cost_motor_position, cost_motor_occupancy
+        return cost_motor_position, cost_motor_occupancy, two_degree_rotation_interference_cost
 
 
 
     def fitness_function(self, genome) -> float:
         
-        cost_motor_position, cost_motor_occupancy = self.get_costs(genome) 
-        cost = cost_motor_position + cost_motor_occupancy
+        cost_motor_position, cost_motor_occupancy, cost_interference = self.get_costs(genome) 
+        cost = cost_motor_position + cost_motor_occupancy + cost_interference
 
         return cost
 

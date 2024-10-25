@@ -359,7 +359,7 @@ if __name__=="__main__":
     parser.add_argument('--joint_limitation', type=float, default=0.785, help='The limitation of the joint. +-joint_limitation. (rad)')
 
     parser.add_argument('--max_trial_round', type=int, default=5, help='The maximum number of trial rounds.')
-    parser.add_argument('--genetic_generation', type=int, default=30, help='The number of generations for the genetic algorithm')
+    parser.add_argument('--genetic_generation', type=int, default=10, help='The number of generations for the genetic algorithm')
     parser.add_argument('--do_fea_analysis', type=bool, default=False, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
     parser.add_argument('--regenerate_if_fea_failed', type=bool, default=False, help='Regenerate the model if the FEA analysis failed or not. FEAs are expensive and strict.')
 
