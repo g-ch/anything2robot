@@ -267,8 +267,11 @@ class Quadruped_Mesh_Transformer():
         pkl.dump(self.nodes, open(self.output_pkl_path, 'wb'))
         # print("Save the nodes to a pkl file: " + self.output_pkl_path)
 
-    def get_pkl_path(self):
+    def get_result_pkl_path(self):
         return self.output_pkl_path
+    
+    def get_result_stl_path(self):
+        return self.output_stl_path
         
 
 if __name__ == "__main__":

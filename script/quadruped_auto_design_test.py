@@ -42,35 +42,45 @@ def quadruped_dataset_auto_design(args):
     # Do mesh transformation
     print("Start mesh transformation ...")
     joint_pkl_files = []
+    transformed_stl_files = []
     for i in tqdm.tqdm(range(len(stl_files))):
         stl_file = stl_files[i]
         joint_npy_file = joint_npy_files[i]        
 
         mesh_transformer = Quadruped_Mesh_Transformer(stl_file, joint_npy_file, args.result_folder, 50)
-        joint_plk_file = mesh_transformer.get_pkl_path()
+        transformed_stl_file = mesh_transformer.get_result_stl_path()
+        transformed_stl_files.append(transformed_stl_file)
+        joint_plk_file = mesh_transformer.get_result_pkl_path()
         joint_pkl_files.append(joint_plk_file)
 
-    
+    # Do auto design
+    print("Start auto design ...")
+    for i in tqdm.tqdm(range(len(joint_pkl_files))):
+        print("Working on ", joint_pkl_files[i])
+        args.joint_pkl_path = joint_pkl_files[i]
+        args.stl_mesh_path = transformed_stl_files[i]
+
+        auto_design_function(args)
 
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
     
     parser.add_argument('--dataset_path', type=str, default='/media/clarence/Clarence/anything2robot_data/standford_dogs/images/result', help='The path to the dataset.')
-    parser.add_argument('--result_folder', type=str, default='/media/clarence/Clarence/anything2robot_data/standford_dogs/images/urdf', help='The folder to save the results.')
+    parser.add_argument('--result_folder', type=str, default=os.path.normpath(project_path + '/result'), help='The folder to save the results.')
 
-    parser.add_argument('--expected_x', type=float, default=50, help='The expected x-axis length of the model. (cm)')
+    parser.add_argument('--expected_x', type=float, default=22, help='The expected x-axis length of the model. (cm)')
     parser.add_argument('--voxel_size', type=float, default=1, help='The size of the voxel. (cm)')
     parser.add_argument('--voxel_density', type=float, default=1.2e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
     parser.add_argument('--joint_limitation', type=float, default=0.785, help='The limitation of the joint. +-joint_limitation. (rad)')
 
-    parser.add_argument('--max_trial_round', type=int, default=5, help='The maximum number of trial rounds.')
-    parser.add_argument('--genetic_generation', type=int, default=10, help='The number of generations for the genetic algorithm')
+    parser.add_argument('--max_trial_round', type=int, default=8, help='The maximum number of trial rounds.')
+    parser.add_argument('--genetic_generation', type=int, default=30, help='The number of generations for the genetic algorithm')
     parser.add_argument('--do_fea_analysis', type=bool, default=False, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
     parser.add_argument('--regenerate_if_fea_failed', type=bool, default=False, help='Regenerate the model if the FEA analysis failed or not. FEAs are expensive and strict.')
 
-    parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not. Need to close the windows to continue the process if turned on.')
-    parser.add_argument('--disable_joint_setting_ui', type=bool, default=False, help='Disable the joint setting UI or not')
+    parser.add_argument('--visualize', type=bool, default=False, help='Visualize the process or not. Need to close the windows to continue the process if turned on.')
+    parser.add_argument('--disable_joint_setting_ui', type=bool, default=True, help='Disable the joint setting UI or not. To continuously handle different models, this need to be set True.')
     parser.add_argument('--joint_setting_standard_scale', type=bool, default=False, help='Scale the model to a standard scale for easier joint setting in the UI or not')
 
     ### No need to set model_name. This is a temporary value. It will be removed in the future.

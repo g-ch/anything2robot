@@ -28,6 +28,7 @@ import pyvista as pv
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox, QPushButton
+from PyQt5.QtCore import QTimer
 
 import sys
 import pyvista as pv
@@ -177,6 +178,10 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         super().__init__()
         self.args = args
         self.mesh = mesh
+        self.nodes = {}
+        self.current_link = None
+
+        
         self.setWindowTitle("Link Tree Constructor")
         self.setGeometry(100, 100, 800, 600)
         
@@ -185,10 +190,7 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.layout = QtWidgets.QGridLayout(self.central_widget)
 
-        self.nodes = {}
-        self.current_link = None
-
-        self.start_design_flag = False
+        # self.start_design_flag = False
         
         # Tree view
         self.tree_view_frame = self.create_tree_view_frame()
@@ -228,46 +230,49 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         self.point_selection_slider_frame = self.create_point_selection_slider_frame()
         self.layout.addWidget(self.point_selection_slider_frame, 2, 2)
 
-        # Plotly visualization in the Web UI using Dash
-        self.fig = make_subplots(specs=[[{"type": "scene"}]])
-        self.fig.add_trace(mesh.mesh_plotly)
-
-        self.server = Flask(__name__)
-        self.app = Dash(__name__, server=self.server)
-
-        self.server = make_server("localhost", 8050, self.server)
-        self.server_thread = threading.Thread(target=self.server.serve_forever)
-        self.server_thread.start()
-        self.app.layout = html.Div([
-            html.H4('Interactive plot with custom data source'),
-            dcc.Graph(id="graph", style={'width': '90vh', 'height': '90vh'}),
-            html.Button("Update Data", id="update-button", n_clicks=0),
-        ])
-
-        @self.app.callback(
-            Output("graph", "figure"), 
-            Input("update-button", "n_clicks"))
-        def update_bar_chart(n_clicks):
-            return self.fig
-
-        def run_dash_server():
-            # Start Dash app here without the reloader
-            self.app.run_server(debug=False, use_reloader=False)
-
-        self.dash_thread = threading.Thread(target=run_dash_server)
-        self.dash_thread.start()
+        if args.disable_joint_setting_ui:
+            QTimer.singleShot(2000, self.close) # Close the window after 2 seconds
 
         if not args.disable_joint_setting_ui:
+            # Plotly visualization in the Web UI using Dash
+            self.fig = make_subplots(specs=[[{"type": "scene"}]])
+            self.fig.add_trace(mesh.mesh_plotly)
+
+            self.server = Flask(__name__)
+            self.app = Dash(__name__, server=self.server)
+
+            self.server = make_server("localhost", 8050, self.server)
+            self.server_thread = threading.Thread(target=self.server.serve_forever)
+            self.server_thread.start()
+            self.app.layout = html.Div([
+                html.H4('Interactive plot with custom data source'),
+                dcc.Graph(id="graph", style={'width': '90vh', 'height': '90vh'}),
+                html.Button("Update Data", id="update-button", n_clicks=0),
+            ])
+
+            @self.app.callback(
+                Output("graph", "figure"), 
+                Input("update-button", "n_clicks"))
+            def update_bar_chart(n_clicks):
+                return self.fig
+
+            def run_dash_server():
+                # Start Dash app here without the reloader
+                self.app.run_server(debug=False, use_reloader=False)
+
+            self.dash_thread = threading.Thread(target=run_dash_server)
+            self.dash_thread.start()
+
             import webbrowser
             webbrowser.open('http://127.0.0.1:8050/')
 
-        if initialize_body:
-            self.nodes["BODY"] = TreeNode(Link("BODY"))
-            self.current_link = self.nodes["BODY"].val
-            self.load_tree(self.nodes)
-            self.axis_input.setText("[(0,0,0),(0,0,0)]")
-            self.add_axis()
-            self.axis_input.setText("")
+            if initialize_body:
+                self.nodes["BODY"] = TreeNode(Link("BODY"))
+                self.current_link = self.nodes["BODY"].val
+                self.load_tree(self.nodes)
+                self.axis_input.setText("[(0,0,0),(0,0,0)]")
+                self.add_axis()
+                self.axis_input.setText("")
 
     def save_fig(self, save_path):
         self.fig.write_image(save_path)
@@ -546,20 +551,21 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
             for joint_name, joint_position in self.current_link.joints.items():
                 self.joint_list.addItem(f"{joint_name}: {joint_position}")
 
-    def shutdown(self):
+    def shutdown(self):   
         self.server.shutdown()
         self.server_thread.join()
         self.dash_thread.join()
         self.close()
 
     # Overriding the closeEvent method
-    def closeEvent(self, event):
-        """Customize the action when the window's 'X' button is clicked."""
-        if not self.start_design_flag:
-            self.shutdown()
-            exit(0)
-        else:
-            self.shutdown()
+    # def closeEvent(self, event):
+    #     """Customize the action when the window's 'X' button is clicked."""            
+    #     if not self.start_design_flag:
+    #         self.shutdown()
+    #         exit(0)
+    #     else:
+    #         self.shutdown()
+
 
     def start_design(self):
         # Run some checking before saving
@@ -572,7 +578,7 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, 
                                                QtWidgets.QMessageBox.No)
         if reply == QtWidgets.QMessageBox.Yes:
-            self.start_design_flag = True
+            # self.start_design_flag = True
             self.shutdown()
 
     def run_checking(self):
@@ -619,7 +625,7 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, 
                                                QtWidgets.QMessageBox.No)
         if reply == QtWidgets.QMessageBox.Yes:
-            self.start_design_flag = True
+            # self.start_design_flag = True
             self.shutdown()
 
     def remove_link(self):
@@ -1059,22 +1065,28 @@ class Custom_Mesh_Loader(Mesh_Loader):
         
         # Create an instance of QApplication
         app = QApplication(sys.argv)
+
         if os.path.exists(joint_path):
             print("Loading joint data from file...")
             with open(joint_path, 'rb') as f:
                 #linkLoader = LinkTreeGUI(tk.Tk(), self.mesh, self.args)
                 linkLoader = LinkTreeGUI(self.mesh, self.args)
+                print("GUI initialized.")
+
                 linkLoader.nodes = pkl.load(f)
                 linkLoader.load_tree(linkLoader.nodes)
-                linkLoader.update_plot()
+
+                print("Joint data loaded successfully.")
+
+                if not self.args.disable_joint_setting_ui:
+                    linkLoader.update_plot()
 
                 linkLoader.show()
-                print(linkLoader.nodes)
                 
-                # Shutdown the GUI immediately if the joint data is already provided and the joint setting UI is disabled
-                if self.args.disable_joint_setting_ui:
-                    time.sleep(1)
-                    linkLoader.shutdown()
+                # # Shutdown the GUI immediately if the joint data is already provided and the joint setting UI is disabled
+                # if self.args.disable_joint_setting_ui:
+                #     time.sleep(3)
+                #     linkLoader.shutdown()         
                 
         else:
             print("No joint data found. Please construct the link tree.")
@@ -1083,6 +1095,7 @@ class Custom_Mesh_Loader(Mesh_Loader):
             linkLoader.show()
         
         # exit the application
+        print("GUI Closed.")
         app.exec_()
 
         #linkLoader.root.mainloop()
@@ -1102,7 +1115,7 @@ class Custom_Mesh_Loader(Mesh_Loader):
                 self.joint_dict[joint_name] = joint_position
         
         # Save the joint data if the figure_save_path is provided
-        if figure_save_path is not None:
+        if figure_save_path is not None and not self.args.disable_joint_setting_ui:
             linkLoader.save_fig(figure_save_path)
             
 
