@@ -20,6 +20,7 @@ from generic import Generic_Algorithm, Improved_Generic_Algorithm
 from plot_utils import rotation_matrix_from_vectors
 from collision_check import check_collision
 from sklearn import svm
+import math
 
 import multiprocessing
 
@@ -531,8 +532,14 @@ class Joint_Connect_Opt:
             get_removed_list = lambda list, remove_value: [value for value in list if value != remove_value]
             
             def condition_classification(pts):
-                return is_points_in_sphere(pts, (motor_param[:3] + motor_param[3:6]) / 2, radius=10)
+                #return is_points_in_sphere(pts, (motor_param[:3] + motor_param[3:6]) / 2, radius=10)
+                top_point = motor_param[:3]
+                bottom_point = motor_param[3:6]
+                top_bottom_dist_half = np.linalg.norm(top_point - bottom_point) / 2
+                sphere_radius = math.sqrt(top_bottom_dist_half**2 + motor_param[6]**2)
+                return is_points_in_sphere(pts, (motor_param[:3] + motor_param[3:6]) / 2, sphere_radius * 2)
 
+            # Get the motor parameters. The motor parameters are stored in the form of [base (3D position), top (3D position), radius]
             motor_param = self.motor_params_results[cur_idx]
             
             # Given a sphere, the center is the motor's center, find all the voxels that are in the sphere and their types
@@ -546,6 +553,7 @@ class Joint_Connect_Opt:
 
             # Find a planar coordinate that is perpendicular to the motor's direction, the coordinate is defined by x and y axis
             motor_direct = (motor_param[3:6] - motor_param[:3]) / np.linalg.norm(motor_param[3:6] - motor_param[:3])
+
             x_direct = np.array([1, 0, 0])
             if np.abs(np.dot(motor_direct, x_direct)) > 0.9:
                 x_direct = np.array([0, 1, 0])
@@ -558,15 +566,28 @@ class Joint_Connect_Opt:
             # SVM to classify the voxels
             clf = svm.LinearSVC(C=1.0, fit_intercept=False, max_iter=100, tol=10, dual=True)
             clf.fit(projected_voxels, classify_voxels_values)
+
+            def svm_predict_with_margin(clf, pts, margin=0.5):
+                distances = clf.decision_function(pts)
+                svm_result = np.where(
+                    np.abs(distances) < margin, 
+                    -1,  # -1 for points near the decision boundary
+                    clf.predict(pts)  # Original class labels for others
+                )
+                return svm_result
             
             def condition_child_link_radical(pts):
                 projected_pts = np.dot(pts - motor_param[:3], np.array([x_direct, y_direct, motor_direct]))[:, :2]
-                svm_result = clf.predict(projected_pts)
+                #svm_result = clf.predict(projected_pts)
+                margin = motor_param[6] * 0.5
+                svm_result = svm_predict_with_margin(clf, projected_pts, margin)
                 return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell), 
                                       svm_result == 1)
             def condition_father_link_radical(pts):
                 projected_pts = np.dot(pts - motor_param[:3], np.array([x_direct, y_direct, motor_direct]))[:, :2]
-                svm_result = clf.predict(projected_pts)
+                # svm_result = clf.predict(projected_pts)
+                margin = motor_param[6] * 0.5
+                svm_result = svm_predict_with_margin(clf, projected_pts, margin)
                 return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell), 
                                       svm_result == 0)
 

@@ -299,8 +299,8 @@ class Mesh_Decomp:
         mesh_tri = o3d.t.geometry.TriangleMesh.from_legacy(self.mesh.mesh_o3d)
         scene = o3d.t.geometry.RaycastingScene()
         _ = scene.add_triangles(mesh_tri)
-        min_bound = aabb.min_bound
-        max_bound = aabb.max_bound
+        min_bound = aabb.min_bound - self.args.voxel_size*5  # Add some padding
+        max_bound = aabb.max_bound + self.args.voxel_size*5  # Add some padding
         x_range = np.arange(min_bound[0], max_bound[0], self.args.voxel_size)
         y_range = np.arange(min_bound[1], max_bound[1], self.args.voxel_size)
         z_range = np.arange(min_bound[2], max_bound[2], self.args.voxel_size)
