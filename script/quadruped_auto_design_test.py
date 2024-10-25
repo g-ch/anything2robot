@@ -55,10 +55,12 @@ def quadruped_dataset_auto_design(args):
 
     # Do auto design
     print("Start auto design ...")
+    result_folder = args.result_folder
     for i in tqdm.tqdm(range(len(joint_pkl_files))):
         print("Working on ", joint_pkl_files[i])
         args.joint_pkl_path = joint_pkl_files[i]
         args.stl_mesh_path = transformed_stl_files[i]
+        args.result_folder = result_folder  # Update the result folder every time because it will be changed in the auto_design_function
 
         auto_design_function(args)
 
