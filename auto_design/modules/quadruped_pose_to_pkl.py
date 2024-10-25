@@ -159,8 +159,8 @@ class Quadruped_Mesh_Transformer():
         joint_dict["right_shoulder"] = joint_dict["right_shoulder"] + (center_shoulder - joint_dict["right_shoulder"]) * 0.15
         joint_dict["left_elbow"] = joint_dict["left_elbow"] + (center_elbow - joint_dict["left_elbow"]) * 0.15
         joint_dict["right_elbow"] = joint_dict["right_elbow"] + (center_elbow - joint_dict["right_elbow"]) * 0.15
-        joint_dict["left_knee"] = joint_dict["left_knee"] + (center_knee - joint_dict["left_knee"]) * 0.15
-        joint_dict["right_knee"] = joint_dict["right_knee"] + (center_knee - joint_dict["right_knee"]) * 0.15
+        joint_dict["left_knee"] = joint_dict["left_knee"] + (center_knee - joint_dict["left_knee"]) * 0.12
+        joint_dict["right_knee"] = joint_dict["right_knee"] + (center_knee - joint_dict["right_knee"]) * 0.12
         self.joint_dict = joint_dict
 
         joint_dict["belly"] = joint_dict["waist"]

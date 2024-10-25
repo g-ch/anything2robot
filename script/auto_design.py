@@ -203,6 +203,7 @@ def auto_design_function(args, mapdl_object=None):
         # Log the best fitness and the cost log of the optimization and show the result
         log.log_variable('motor_opt_cost_log', cost_log)
         log.log_variable('motor_opt_time', actuator_opt_end_time - actuator_opt_start_time)
+        log.log_variable('motor_opt_motor_results', motor_opt.motor_results)
         log.log_txt("Auto design best fitness: " + str(best_fitness))
         motor_opt_image_path = round_result_saving_folder + '/motor_opt_result.png'
         motor_opt.render(save_only=save_only, save_path=motor_opt_image_path)
