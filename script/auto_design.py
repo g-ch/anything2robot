@@ -41,6 +41,8 @@ class MotorParameterLib:
                           [6.2, 5.56, 120], # DM10010. DAMIAO Tech
                          ]  
         
+        # TODO: CONSIDER MOTOR WEIGHT
+
         # This is the connector length between two motors in a 2 DOF joint. L shape. Unit: cm
         self.connector_lib = []
         for i in range(len(self.motor_lib)):

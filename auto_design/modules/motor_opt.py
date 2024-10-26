@@ -628,6 +628,29 @@ class Joint_Connect_Opt:
                     # print(motor_param[:3])
                     # print("Farthest Joint Added: ", farthest_joint)
 
+            # Check if classify_voxels_values has both 0 and 1, otherwise, randomly select 100 points in the existing class and use motor_param[:3] + (motor_param[:3]-point) to add 100 points to the other class
+            if not (0 in classify_voxels_values and 1 in classify_voxels_values):
+                print("Warning: The voxels do not have both classes. Randomly selecting 100 points to add to the other class.")
+                # Get the class that exists (either 0 or 1)
+                existing_class = classify_voxels_values[0]
+                
+                # Randomly select 100 points from the existing class
+                existing_points = classify_voxels[classify_voxels_values == existing_class]
+                if len(existing_points) >= 100:
+                    selected_points = existing_points[np.random.choice(len(existing_points), 100, replace=False)]
+                else:
+                    selected_points = existing_points[np.random.choice(len(existing_points), 100, replace=True)]
+                
+                # Calculate new points for the other class
+                new_class = 1 - existing_class  # Switch class (0 -> 1, 1 -> 0)
+                new_points = motor_param[:3] + (motor_param[:3] - selected_points)
+                
+                # Append new points and class labels
+                classify_voxels = np.vstack((classify_voxels, new_points))
+                classify_voxels_values = np.hstack((classify_voxels_values, np.full(100, new_class)))
+            
+
+
             # Find a planar coordinate that is perpendicular to the motor's direction, the coordinate is defined by x and y axis
             motor_direct = (motor_param[3:6] - motor_param[:3]) / np.linalg.norm(motor_param[3:6] - motor_param[:3])
 
@@ -638,7 +661,8 @@ class Joint_Connect_Opt:
             y_direct = np.cross(motor_direct, x_direct)
 
             # Project the voxels to the planar coordinate
-            projected_voxels = np.dot(classify_voxels - motor_param[:3], np.array([x_direct, y_direct, motor_direct]))[:, :2]
+            projected_voxels = np.dot(classify_voxels - motor_param[:3], np.array([x_direct, y_direct, motor_direct]))[:, :2]                
+
 
             # SVM to classify the voxels
             clf = svm.LinearSVC(C=1.0, fit_intercept=False, max_iter=100, tol=10, dual=True)
