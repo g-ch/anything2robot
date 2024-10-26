@@ -44,7 +44,6 @@ def quadruped_dataset_auto_design(args):
     joint_pkl_files = []
     transformed_stl_files = []
     for i in tqdm.tqdm(range(len(stl_files))):
-        print("Working on ", stl_files[i])
         stl_file = stl_files[i]
         joint_npy_file = joint_npy_files[i]        
 
