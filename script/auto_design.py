@@ -184,166 +184,175 @@ def auto_design_function(args, mapdl_object=None):
 
         log.log_txt("Decomposing and motor optimization process: " + str(round))    
 
-        ##### Do mesh decomposition
-        log.log_txt("Decomposing the mesh...")
-        mesh_decomp_start_time = time.time()
-        mesh_decomp = Mesh_Decomp(args, mesh_loader)
-        mesh_decomp.decompose()
-        mesh_decomp_end_time = time.time()
 
-        # Log the number of voxels after the decomposition and show the result
-        voxel_num = np.count_nonzero(mesh_decomp.mesh_group.voxel_data)
-        log.log_variable('decompose_voxel_num', voxel_num)
-        log.log_variable('decompose_time', mesh_decomp_end_time - mesh_decomp_start_time)
-        decompose_result_image_path = round_result_saving_folder + '/decompose_result.png'
-        mesh_decomp.render(save_only=save_only, save_path=decompose_result_image_path)
+        try:
+            ##### Do mesh decomposition
+            log.log_txt("Decomposing the mesh...")
+            mesh_decomp_start_time = time.time()
+            mesh_decomp = Mesh_Decomp(args, mesh_loader)
+            mesh_decomp.decompose()
+            mesh_decomp_end_time = time.time()
 
-        ##### Do actuator optimization. The first step in Motor_Opt will use pinocchio to calculate the torque and choose the motor.
-        log.log_txt("Optimizing the actuators...")
-        actuator_opt_start_time = time.time()
-        bounds = get_bounds(mesh_decomp.link_tree, threshold=6)
-        motor_param_lib = MotorParameterLib()
-        motor_lib = motor_param_lib.get_motor_lib()
-        connector_lib = motor_param_lib.get_connector_lib()
-        
-        motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib, connector_lib)
-        motor_results, cost_log, best_fitness = motor_opt.run_opt(generation_num=args.genetic_generation)
-        actuator_opt_end_time = time.time()
+            # Log the number of voxels after the decomposition and show the result
+            voxel_num = np.count_nonzero(mesh_decomp.mesh_group.voxel_data)
+            log.log_variable('decompose_voxel_num', voxel_num)
+            log.log_variable('decompose_time', mesh_decomp_end_time - mesh_decomp_start_time)
+            decompose_result_image_path = round_result_saving_folder + '/decompose_result.png'
+            mesh_decomp.render(save_only=save_only, save_path=decompose_result_image_path)
 
-        # Log the best fitness and the cost log of the optimization and show the result
-        log.log_variable('motor_opt_cost_log', cost_log)
-        log.log_variable('motor_opt_time', actuator_opt_end_time - actuator_opt_start_time)
-        log.log_variable('motor_opt_motor_results', motor_opt.motor_results)
-        log.log_txt("Auto design best fitness: " + str(best_fitness))
-        motor_opt_image_path = round_result_saving_folder + '/motor_opt_result.png'
-        motor_opt.render(save_only=save_only, save_path=motor_opt_image_path)
-
-        # Up scale the mesh if the avg motor cost is too high
-        avg_motor_cost_this = best_fitness / len(motor_results)
-        log.log_txt("Average motor cost: " + str(avg_motor_cost_this))
-        if avg_motor_cost_this > avg_motor_cost_threshold:
-            log.log_txt("Failure Code 1. The motor cost is too high. Re-optimizing with a larger model... Scale the model by " + str(enlarge_scale))
-            exit_code = 1
-            log.close(exit_code)
-            continue
-
-        ##### Refine the mesh to connect the joints
-        log.log_txt("Refining the mesh to connect the actuators...")
-        refine_start_time = time.time()
-        joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
-        joint_connect_opt.run_opt()
-        refine_end_time = time.time()
-
-        # Log the number of voxels after the joint connection and show the result
-        voxel_num = np.count_nonzero(mesh_decomp.mesh_group.voxel_data)
-        log.log_variable('joint_connect_voxel_num', voxel_num)
-        log.log_variable('joint_connect_time', refine_end_time - refine_start_time)
-        joint_connect_opt_image_path = round_result_saving_folder + '/joint_connect_opt_result.png'
-        mesh_decomp.mesh_group.render(save_only=save_only, save_path=joint_connect_opt_image_path)
-
-        ##### Remove the interference between the links while moving the joints
-        log.log_txt("Removing the interference between the links...")
-        interference_removal_start_time = time.time()
-        interference_removal = InterferenceRemoval(args=args, 
-                                                mesh_group=mesh_decomp.mesh_group, 
-                                                motor_param_result=motor_results, 
-                                                link_tree=mesh_decomp.link_tree, 
-                                                father_link_dict=mesh_decomp.father_link_dict)
-        
-        joint_limits = np.vstack([np.array([-args.joint_limitation, args.joint_limitation]) for _ in range(2*len(motor_results))])
-        # joint_limits = np.vstack([np.array([-0.785, 0.785]) for _ in range(2*len(motor_results))])
-        interference_removal.set_joint_limit(joint_limits)
-        interference_removal.remove_interference()
-        interference_removal_end_time = time.time()
-
-        # Log the number of voxels after the interference removal and show the result
-        voxel_num = np.count_nonzero(interference_removal.mesh_group.voxel_data)
-        log.log_variable('interference_removal_voxel_num', voxel_num)
-        log.log_variable('interference_removal_time', interference_removal_end_time - interference_removal_start_time)
-        interference_removal_image_path = round_result_saving_folder + '/interference_removal_result.png'
-        interference_removal.mesh_group.render(save_only=save_only, save_path=interference_removal_image_path)
-
-        ##### Save results
-        result_saving_start_time = time.time()
-        urdf_path = interference_removal.generate_urdf(result_saving_folder=round_result_saving_folder)
-        log.log_txt("Saving the results... URDF file is saved at: " + urdf_path)
-        robot_result = RobotOptResult(interference_removal, urdf_path, motor_lib)
-        
-        pkl_file_path = os.path.normpath(round_result_saving_folder + '/robot_result.pkl')
-        pkl.dump(robot_result, open(pkl_file_path, 'wb'))
-        result_saving_end_time = time.time()
-
-        log.log_variable('result_saving_time', result_saving_end_time - result_saving_start_time)
-
-        ##### Run mesh destruction checking
-        log.log_txt("Checking the mesh destruction...")
-        destruction_check_start_time = time.time()
-        urdf_folder = os.path.dirname(urdf_path)
-        destruction_check_pass = destruction_check_urdf_folder(urdf_folder, pkl_file_path, plotting=False)
-        destruction_check_end_time = time.time()
-        
-        log.log_variable('destruction_check_time', destruction_check_end_time - destruction_check_start_time)
-        
-        if not destruction_check_pass:
-            log.log_txt("Failure Code 2. The mesh is destroyed. Re-optimizing with a larger model... Scale the model by " + str(enlarge_scale))
-            exit_code = 2
-            log.close(exit_code)
-            continue
-
-        ##### Check if the meshes are watertight use trimesh
-        water_tight_check_start_time = time.time()
-        stl_files = []
-        for root, dirs, files in os.walk(urdf_folder):  # Search the urdf folder to find all the stl files
-            for file in files:
-                if file.endswith(".stl"):
-                    stl_files.append(os.path.join(root, file))
-        
-        for stl_file in stl_files:
-            mesh = trimesh.load(stl_file)
-            if not mesh.is_watertight:
-                log.log_txt("Failure Code 3. The mesh is not watertight. Re-optimizing with a larger model... Scale the model by " + str(enlarge_scale))
-                exit_code = 3
-                break
-        
-        water_tight_check_end_time = time.time()
-        log.log_variable('water_tight_check_time', water_tight_check_end_time - water_tight_check_start_time)
-        
-        if exit_code == 3:
-            log.log_txt("The mesh is not watertight. Re-optimizing with a larger model... Scale the model by " + str(enlarge_scale))
-            log.close(exit_code)
-            continue
-
-        
-        ##### Do FEA analysis for each link if the flag is set
-        if args.do_fea_analysis:
-            log.log_txt("Do FEA analysis...")
-            fea_start_time = time.time()
-            max_iteration = 2 # The maximum number of searching iterations for the FEA analysis to determine the best relative density of the voxels
-            for stl_file in stl_files:
-                log.log_txt("*******Do FEA analysis for: " + stl_file)
-                # More parameters can be set in the function stl_force_relative_density_fea_opt
-                success_flag, best_relative_density = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, max_iteration=max_iteration, display_fea_result=args.visualize, display_force_result=False, mapdl_object=mapdl_object)
-                #exit()
-
-                if not success_flag:
-                    log.log_txt("Failure Code 4. The mesh is not feasible in FEA. Re-optimizing with a larger model... Scale the model by " + str(enlarge_scale))
-                    exit_code = 4
-                    break
-                time.sleep(3)
+            ##### Do actuator optimization. The first step in Motor_Opt will use pinocchio to calculate the torque and choose the motor.
+            log.log_txt("Optimizing the actuators...")
+            actuator_opt_start_time = time.time()
+            bounds = get_bounds(mesh_decomp.link_tree, threshold=6)
+            motor_param_lib = MotorParameterLib()
+            motor_lib = motor_param_lib.get_motor_lib()
+            connector_lib = motor_param_lib.get_connector_lib()
             
-            fea_end_time = time.time()
-            log.log_variable('fea_time', fea_end_time - fea_start_time)
-            
-            if exit_code == 4 and args.regenerate_if_fea_failed:               
+            motor_opt = Motor_Opt(args, mesh_decomp, bounds, motor_lib, connector_lib)
+            motor_results, cost_log, best_fitness = motor_opt.run_opt(generation_num=args.genetic_generation)
+            actuator_opt_end_time = time.time()
+
+            # Log the best fitness and the cost log of the optimization and show the result
+            log.log_variable('motor_opt_cost_log', cost_log)
+            log.log_variable('motor_opt_time', actuator_opt_end_time - actuator_opt_start_time)
+            log.log_variable('motor_opt_motor_results', motor_opt.motor_results)
+            log.log_txt("Auto design best fitness: " + str(best_fitness))
+            motor_opt_image_path = round_result_saving_folder + '/motor_opt_result.png'
+            motor_opt.render(save_only=save_only, save_path=motor_opt_image_path)
+
+            # Up scale the mesh if the avg motor cost is too high
+            avg_motor_cost_this = best_fitness / len(motor_results)
+            log.log_txt("Average motor cost: " + str(avg_motor_cost_this))
+            if avg_motor_cost_this > avg_motor_cost_threshold:
+                log.log_txt("Failure Code 1. The motor cost is too high. Re-optimizing with a larger model... Scale the model by " + str(enlarge_scale))
+                exit_code = 1
                 log.close(exit_code)
                 continue
-            else:
-                log.log_txt("Success!!!!!!!!!!! The model is feasible in FEA.")
-        
-        
-        log.log_txt("Round " + str(round) + " is done. Time: " + str(time.time() - start_time) + " seconds.")
-        log.log_txt("Exit code: " + str(exit_code))
-        log.close(exit_code)
+
+            ##### Refine the mesh to connect the joints
+            log.log_txt("Refining the mesh to connect the actuators...")
+            refine_start_time = time.time()
+            joint_connect_opt = Joint_Connect_Opt(args, mesh_decomp, motor_opt.motor_results)
+            joint_connect_opt.run_opt()
+            refine_end_time = time.time()
+
+            # Log the number of voxels after the joint connection and show the result
+            voxel_num = np.count_nonzero(mesh_decomp.mesh_group.voxel_data)
+            log.log_variable('joint_connect_voxel_num', voxel_num)
+            log.log_variable('joint_connect_time', refine_end_time - refine_start_time)
+            joint_connect_opt_image_path = round_result_saving_folder + '/joint_connect_opt_result.png'
+            mesh_decomp.mesh_group.render(save_only=save_only, save_path=joint_connect_opt_image_path)
+
+            ##### Remove the interference between the links while moving the joints
+            log.log_txt("Removing the interference between the links...")
+            interference_removal_start_time = time.time()
+            interference_removal = InterferenceRemoval(args=args, 
+                                                    mesh_group=mesh_decomp.mesh_group, 
+                                                    motor_param_result=motor_results, 
+                                                    link_tree=mesh_decomp.link_tree, 
+                                                    father_link_dict=mesh_decomp.father_link_dict)
+            
+            joint_limits = np.vstack([np.array([-args.joint_limitation, args.joint_limitation]) for _ in range(2*len(motor_results))])
+            # joint_limits = np.vstack([np.array([-0.785, 0.785]) for _ in range(2*len(motor_results))])
+            interference_removal.set_joint_limit(joint_limits)
+            interference_removal.remove_interference()
+            interference_removal_end_time = time.time()
+
+            # Log the number of voxels after the interference removal and show the result
+            voxel_num = np.count_nonzero(interference_removal.mesh_group.voxel_data)
+            log.log_variable('interference_removal_voxel_num', voxel_num)
+            log.log_variable('interference_removal_time', interference_removal_end_time - interference_removal_start_time)
+            interference_removal_image_path = round_result_saving_folder + '/interference_removal_result.png'
+            interference_removal.mesh_group.render(save_only=save_only, save_path=interference_removal_image_path)
+
+            ##### Save results
+            result_saving_start_time = time.time()
+            urdf_path = interference_removal.generate_urdf(result_saving_folder=round_result_saving_folder)
+            log.log_txt("Saving the results... URDF file is saved at: " + urdf_path)
+            robot_result = RobotOptResult(interference_removal, urdf_path, motor_lib)
+            
+            pkl_file_path = os.path.normpath(round_result_saving_folder + '/robot_result.pkl')
+            pkl.dump(robot_result, open(pkl_file_path, 'wb'))
+            result_saving_end_time = time.time()
+
+            log.log_variable('result_saving_time', result_saving_end_time - result_saving_start_time)
+
+            ##### Run mesh destruction checking
+            log.log_txt("Checking the mesh destruction...")
+            destruction_check_start_time = time.time()
+            urdf_folder = os.path.dirname(urdf_path)
+            destruction_check_pass = destruction_check_urdf_folder(urdf_folder, pkl_file_path, plotting=False)
+            destruction_check_end_time = time.time()
+            
+            log.log_variable('destruction_check_time', destruction_check_end_time - destruction_check_start_time)
+            
+            if not destruction_check_pass:
+                log.log_txt("Failure Code 2. The mesh is destroyed. Re-optimizing with a larger model... Scale the model by " + str(enlarge_scale))
+                exit_code = 2
+                log.close(exit_code)
+                continue
+
+            ##### Check if the meshes are watertight use trimesh
+            water_tight_check_start_time = time.time()
+            stl_files = []
+            for root, dirs, files in os.walk(urdf_folder):  # Search the urdf folder to find all the stl files
+                for file in files:
+                    if file.endswith(".stl"):
+                        stl_files.append(os.path.join(root, file))
+            
+            for stl_file in stl_files:
+                mesh = trimesh.load(stl_file)
+                if not mesh.is_watertight:
+                    log.log_txt("Failure Code 3. The mesh is not watertight. Re-optimizing with a larger model... Scale the model by " + str(enlarge_scale))
+                    exit_code = 3
+                    break
+            
+            water_tight_check_end_time = time.time()
+            log.log_variable('water_tight_check_time', water_tight_check_end_time - water_tight_check_start_time)
+            
+            if exit_code == 3:
+                log.log_txt("The mesh is not watertight. Re-optimizing with a larger model... Scale the model by " + str(enlarge_scale))
+                log.close(exit_code)
+                continue
+
+            
+            ##### Do FEA analysis for each link if the flag is set
+            if args.do_fea_analysis:
+                log.log_txt("Do FEA analysis...")
+                fea_start_time = time.time()
+                max_iteration = 2 # The maximum number of searching iterations for the FEA analysis to determine the best relative density of the voxels
+                for stl_file in stl_files:
+                    log.log_txt("*******Do FEA analysis for: " + stl_file)
+                    # More parameters can be set in the function stl_force_relative_density_fea_opt
+                    success_flag, best_relative_density = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, max_iteration=max_iteration, display_fea_result=args.visualize, display_force_result=False, mapdl_object=mapdl_object)
+                    #exit()
+
+                    if not success_flag:
+                        log.log_txt("Failure Code 4. The mesh is not feasible in FEA. Re-optimizing with a larger model... Scale the model by " + str(enlarge_scale))
+                        exit_code = 4
+                        break
+                    time.sleep(3)
+                
+                fea_end_time = time.time()
+                log.log_variable('fea_time', fea_end_time - fea_start_time)
+                
+                if exit_code == 4 and args.regenerate_if_fea_failed:               
+                    log.close(exit_code)
+                    continue
+                else:
+                    log.log_txt("Success!!!!!!!!!!! The model is feasible in FEA.")
+            
+            
+            log.log_txt("Round " + str(round) + " is done. Time: " + str(time.time() - start_time) + " seconds.")
+            log.log_txt("Exit code: " + str(exit_code))
+            log.close(exit_code)
+
+        except Exception as e:
+            log.log_txt("Error: " + str(e))
+            log.log_txt("Error in round " + str(round) + ". Time: " + str(time.time() - start_time) + " seconds.")
+            log.close(555)
+            continue
+
 
     if args.do_fea_analysis and not external_mapdl_object: 
         # If the mapdl_object is created in this function, then we need to shut it down. Otherwise, we need to keep it alive.
