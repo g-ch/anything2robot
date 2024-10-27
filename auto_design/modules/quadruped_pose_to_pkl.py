@@ -163,8 +163,10 @@ class Quadruped_Mesh_Transformer():
         joint_dict["right_knee"] = joint_dict["right_knee"] + (center_knee - joint_dict["right_knee"]) * 0.12
         self.joint_dict = joint_dict
 
-        joint_dict["belly"] = joint_dict["waist"]
+        joint_dict["belly"] = joint_dict["waist"].copy()
         joint_dict["belly"][2] = joint_dict["left_hip"][2] # Set a belly joint.
+        joint_dict["belly_front"] = joint_dict["belly"].copy()
+        joint_dict["belly_front"][1] = (joint_dict["belly"][1] + joint_dict["left_shoulder"][1]) * 0.5
 
         # Change the joints to list
         for joint in self.joint_dict:
@@ -186,7 +188,7 @@ class Quadruped_Mesh_Transformer():
         # The link config dict is used to specify the joints that are connected to each other.
         # NOTE: The order of the joints in the list is important. The first joint must be the parent joint. We use this to determine the axis of the link.
         link_config_dict = {
-            "BODY": ["waist", "hip", "scapula", "head", "tail", "left_shoulder", "right_shoulder", "left_hip", "right_hip", "belly"],
+            "BODY": ["waist", "hip", "scapula", "head", "tail", "left_shoulder", "right_shoulder", "left_hip", "right_hip", "belly", "belly_front"],
             "FL_UP": ["left_shoulder", "left_elbow"],
             "FL_LOW": ["left_elbow", "left_wrist", "left_front_foot"],
             "FR_UP": ["right_shoulder", "right_elbow"],
