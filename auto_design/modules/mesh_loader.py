@@ -537,6 +537,10 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         save_button.clicked.connect(self.save)
         layout.addWidget(save_button)
 
+        quit_button = QtWidgets.QPushButton("Quit")
+        quit_button.clicked.connect(self.quit)
+        layout.addWidget(quit_button)
+
         start_design_button = QtWidgets.QPushButton("Run Design Process")
         start_design_button.clicked.connect(self.start_design)
         layout.addWidget(start_design_button)
@@ -550,6 +554,10 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         if self.current_link:
             for joint_name, joint_position in self.current_link.joints.items():
                 self.joint_list.addItem(f"{joint_name}: {joint_position}")
+
+    def quit(self):
+        self.shutdown()
+        exit(0)
 
     def shutdown(self):   
         self.server.shutdown()
