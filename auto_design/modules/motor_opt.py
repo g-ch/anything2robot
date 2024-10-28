@@ -22,6 +22,7 @@ from collision_check import check_collision
 from sklearn import svm
 from sklearn.exceptions import ConvergenceWarning
 import warnings
+import pyvista as pv
 
 import math
 
@@ -129,7 +130,9 @@ class General_GA(Improved_Generic_Algorithm):
             motor_positions.append(motor_position)
             motor_types.append(x[3 * motor_num + link_idx])
             motor_directs.append(np.array(cur_node.val.axis[1]))
-            motor_relations.append(0) # 0 for child
+            link_name = cur_node.val.name
+            father_link_name = self.father_link_dict[link_name].name
+            motor_relations.append(link_name + '_child' + '_' + father_link_name) 
 
             if len(cur_node.val.axis) == 3:
                 # This is the axis of the second motor which is connected to the father link
@@ -138,11 +141,11 @@ class General_GA(Improved_Generic_Algorithm):
                 motor_positions.append(motor2_position)
                 motor_types.append(x[3 * motor_num + link_idx])
                 motor_directs.append(np.array(cur_node.val.axis[2]))
-                motor_relations.append(1) # 1 for father
+                motor_relations.append(link_name + '_father'+ '_' + father_link_name)
             
             link_idx += 1
 
-        return np.array(motor_positions), np.array(motor_directs), np.array(motor_types, dtype=int), np.array(motor_relations, dtype=int)
+        return np.array(motor_positions), np.array(motor_directs), np.array(motor_types, dtype=int), motor_relations
     
     def get_occupancy_cost(self, motor_poses, motor_directs, motor_types):
         """
@@ -262,7 +265,7 @@ class General_GA(Improved_Generic_Algorithm):
     def check_two_degree_rotation_interference_cost(self, motor_positions, motor_directs, motor_types, motor_relations):
         cost = 0
         for i in range(len(motor_positions)):
-            if motor_relations[i] == 1 and i >= 2:  # Father motor of the two-motor joint
+            if "father" in motor_relations[i] and i >= 2:  # Father motor of the two-motor joint
                 child_id = i - 1
 
                 # Rotate the center of the child motor by +/- 30 degrees, etc, along the axis of the father motor
@@ -283,9 +286,14 @@ class General_GA(Improved_Generic_Algorithm):
                                         'direct': motor_directs[child_id],
                                         'height': self.motor_type_params[motor_types[child_id]][0],
                                         'radius': self.motor_type_params[motor_types[child_id]][1]}
-                
+                    
+                    # Get link name
+                    parts = motor_relations[i].split('_')
+                    father_index = parts.index("father")
+                    link_name = "_".join(parts[:father_index])
+
                     for j in range(len(motor_positions)):
-                        if j != child_id and j != i: # Check collision with other motors
+                        if j != child_id and j != i and link_name not in motor_relations[j]: # Check collision with other motors that are not on the same link.
                             cylinder_other = {'center': motor_positions[j],
                                             'direct': motor_directs[j],
                                             'height': self.motor_type_params[motor_types[j]][0],
@@ -703,7 +711,7 @@ class Joint_Connect_Opt:
         
             if len(cur_node.val.axis) == 2:  # One DOF axis
 
-                # Add voxels to father link     
+                # Add voxels to father link     0
                 father_link_addition_voxels_top = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=list(self.mesh_decomp.mesh_group.link_value_dict.keys()),
                                                                                         target_group_name=self.father_dict[cur_link_name],
                                                                                         condition_func=condition_father_link_top)
@@ -729,17 +737,30 @@ class Joint_Connect_Opt:
                 start_idx = self.mesh_decomp.mesh_group.position_to_index(child_link_addition_voxels_top)
                 target_positions = set_diff_numpy(self.mesh_decomp.mesh_group.get_voxels(cur_link_name), np.vstack((child_link_addition_voxels_radical, child_link_addition_voxels_top)))
                 end_idxs = self.mesh_decomp.mesh_group.position_to_index(target_positions)
-                self.connect_voxels(self.mesh_decomp.mesh_group, start_idx, end_idxs, cur_link_name)
+                added_voxels1 = self.connect_voxels(self.mesh_decomp.mesh_group, start_idx, end_idxs, cur_link_name)
 
                 # Connect the addictive father link voxels to father link
                 father_link_top_voxels = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=list(self.mesh_decomp.mesh_group.link_value_dict.keys()),
                                                                                 target_group_name=None,
                                                                                 condition_func=condition_father_link_top)
                 start_idx = self.mesh_decomp.mesh_group.position_to_index(father_link_top_voxels)
+                # target_positions = set_diff_numpy(self.mesh_decomp.mesh_group.get_voxels(self.father_dict[cur_link_name]), np.vstack((father_link_addition_voxels_radical, father_link_addition_voxels_top)))
                 target_positions = set_diff_numpy(self.mesh_decomp.mesh_group.get_voxels(self.father_dict[cur_link_name]), np.vstack((father_link_addition_voxels_radical, father_link_addition_voxels_top)))
+
                 end_idxs = self.mesh_decomp.mesh_group.position_to_index(target_positions)
-                self.connect_voxels(self.mesh_decomp.mesh_group, start_idx, end_idxs, self.father_dict[cur_link_name])
+                added_voxels2 = self.connect_voxels(self.mesh_decomp.mesh_group, start_idx, end_idxs, self.father_dict[cur_link_name])
                 cur_idx += 1
+
+                # Visualize the added_voxels
+                father_voxel_positions = self.mesh_decomp.mesh_group.get_voxels(self.father_dict[cur_link_name])
+                pv.plot(father_voxel_positions, point_size=10)
+                pv.plot(added_voxels2, point_size=15)
+
+                non_removal_voxels = np.vstack((father_link_addition_voxels_top, added_voxels1, added_voxels2))
+                non_removal_voxels = np.unique(non_removal_voxels, axis=0)
+                non_removal_indices = self.mesh_decomp.mesh_group.position_to_index(non_removal_voxels)
+                self.mesh_decomp.mesh_group.voxel_no_removal[non_removal_indices[:,0], non_removal_indices[:,1], non_removal_indices[:,2]] = 1
+                
 
             elif len(cur_node.val.axis) == 3: # Two DOF axis
 
@@ -765,7 +786,12 @@ class Joint_Connect_Opt:
                 end_idxs = self.mesh_decomp.mesh_group.position_to_index(target_positions)
                 added_voxels = self.connect_voxels(self.mesh_decomp.mesh_group, start_idx, end_idxs, cur_link_name)
 
-                
+                # points_to_visualize1 = np.vstack((child_link_addition_voxels_top, target_positions))
+                # points_to_visualize2 = np.vstack((child_link_addition_voxels_top, added_voxels, target_positions))
+                # pv.plot(points_to_visualize1, point_size=10)
+                # pv.plot(points_to_visualize2, point_size=20)
+
+
                 # Connect the addictive father link voxels to father link
                 motor_param = self.motor_params_results[cur_idx + 1]
                 # check_voxels = self.mesh_decomp.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_decomp.mesh_group.link_value_dict.keys()), self.father_dict[cur_link_name]),
@@ -780,9 +806,12 @@ class Joint_Connect_Opt:
                 self.mesh_decomp.mesh_group.voxel_no_removal[non_removal_indices[:,0], non_removal_indices[:,1], non_removal_indices[:,2]] = 1
 
                 
-                start_idx = self.mesh_decomp.mesh_group.position_to_index(father_link_addition_voxels_top)
-                target_positions = set_diff_numpy(self.mesh_decomp.mesh_group.get_voxels(self.father_dict[cur_link_name]), father_link_addition_voxels_top)
-                end_idxs = self.mesh_decomp.mesh_group.position_to_index(target_positions)
+                ### CHG. This seems never been used
+                # start_idx = self.mesh_decomp.mesh_group.position_to_index(father_link_addition_voxels_top)
+                # target_positions = set_diff_numpy(self.mesh_decomp.mesh_group.get_voxels(self.father_dict[cur_link_name]), father_link_addition_voxels_top)
+                # end_idxs = self.mesh_decomp.mesh_group.position_to_index(target_positions)
+
+
                 cur_idx += 2
             
         
