@@ -12,10 +12,11 @@ from mesh_decomp import Mesh_Decomp, Mesh_Group
 from mesh_loader import Custom_Mesh_Loader
 from motor_opt import Motor_Opt, get_bounds, Joint_Connect_Opt, is_points_in_cylinder
 from itertools import product
+import tqdm
 
 
 apply_transform = lambda x, T: np.dot(T, np.hstack([x, np.ones((x.shape[0], 1))]).T).T[:, :3]
-# get_removed_list = lambda list, remove_value: [value for value in list if value != remove_value]
+get_removed_list = lambda list, remove_value: [value for value in list if value != remove_value]
 
 def get_tenon_idx(motor_result, motor_lib):
     
@@ -352,7 +353,8 @@ class InterferenceRemoval:
                 queue.append(child_node)
             if current_link.axis is None or np.linalg.norm(current_link.axis[1]) == 0:
                 continue
-
+            
+            print("Doing interference for " + current_link.name)
             father_link = self.father_link_dict[current_link.name]
             father_link_value = self.mesh_group.link_value_dict[father_link]
             current_link_value = self.mesh_group.link_value_dict[current_link.name]
@@ -371,7 +373,8 @@ class InterferenceRemoval:
             cur_idx += 1
 
             # Sample joint angles and implement the interference removal
-            for i in range(rotation_num):  
+            #for i in range(rotation_num):  
+            for i in tqdm.tqdm(range(rotation_num)):
                 if i < negative_num:
                     joint_angle = -i * angle_resolution
                 else:
@@ -411,36 +414,41 @@ class InterferenceRemoval:
                 
                 #### Now consider the non-removal voxels and remove the child link voxels instead
                 # Find the indices where value = father_link_value and non_removal = 1 and also in transformed_indices
-                transformed_indices_rounded = np.round(transformed_indices).astype(int)
-                condition_values = values == father_link_value
-                condition_non_removal = non_removal == 1
-                condition_in_transformed = np.array(
-                    [tuple(idx) in map(tuple, transformed_indices_rounded) for idx in expanded_indices]
-                )
-                final_condition = np.logical_and(condition_values, np.logical_and(condition_non_removal, condition_in_transformed))
-                father_link_non_removal_indices = expanded_indices[final_condition]
+                if "BODY" not in current_link.name:
+                    
+                    condition_values = values == father_link_value
+                    condition_non_removal = non_removal == 1
 
-                if father_link_non_removal_indices.shape[0] > 0:
-                    # Transform the indices back to the original indices
-                    H_inv_matrix = self.rotate_around_axis(motor_direct, -joint_angle, self.mesh_group.position_to_index(motor_position.reshape(-1, 3)))
-                    child_remove_indices = apply_transform(father_link_non_removal_indices.reshape(-1, 3), H_inv_matrix)
-                    child_remove_indices = np.round(child_remove_indices).astype(int)
+                    # transformed_indices_rounded = np.round(transformed_indices).astype(int)
+                    # condition_in_transformed = np.array(
+                    #     [tuple(idx) in map(tuple, transformed_indices_rounded) for idx in expanded_indices]
+                    # )
+                    # final_condition = np.logical_and(condition_values, np.logical_and(condition_non_removal, condition_in_transformed))
+                    final_condition = np.logical_and(condition_values, condition_non_removal)
+                    
+                    father_link_non_removal_indices = expanded_indices[final_condition]
 
-                    child_remove_indices = np.clip(
-                        child_remove_indices, 
-                        [0, 0, 0],  # Minimum bounds for each axis (x, y, z)
-                        [
-                            self.mesh_group.voxel_data.shape[0] - 1,  # Max bound for x-axis
-                            self.mesh_group.voxel_data.shape[1] - 1,  # Max bound for y-axis
-                            self.mesh_group.voxel_data.shape[2] - 1   # Max bound for z-axis
-                        ]
-                    )
+                    if father_link_non_removal_indices.shape[0] > 0:
+                        # Transform the indices back to the original indices
+                        H_inv_matrix = self.rotate_around_axis(motor_direct, -joint_angle, self.mesh_group.position_to_index(motor_position.reshape(-1, 3)))
+                        child_remove_indices = apply_transform(father_link_non_removal_indices.reshape(-1, 3), H_inv_matrix)
+                        child_remove_indices = np.round(child_remove_indices).astype(int)
 
-                    # Remove the child link voxels if the value is not in the other_link_values and non_removal is 0
-                    mask_voxel_data = self.mesh_group.voxel_data[child_remove_indices[:, 0], child_remove_indices[:, 1], child_remove_indices[:, 2]] == current_link_value
-                    mask_voxel_no_removal = self.mesh_group.voxel_no_removal[child_remove_indices[:, 0], child_remove_indices[:, 1], child_remove_indices[:, 2]] == 0
-                    valid_indices = np.where(mask_voxel_data & mask_voxel_no_removal)[0]
-                    self.mesh_group.voxel_data[child_remove_indices[valid_indices, 0], child_remove_indices[valid_indices, 1], child_remove_indices[valid_indices, 2]] = 0
+                        child_remove_indices = np.clip(
+                            child_remove_indices, 
+                            [0, 0, 0],  # Minimum bounds for each axis (x, y, z)
+                            [
+                                self.mesh_group.voxel_data.shape[0] - 1,  # Max bound for x-axis
+                                self.mesh_group.voxel_data.shape[1] - 1,  # Max bound for y-axis
+                                self.mesh_group.voxel_data.shape[2] - 1   # Max bound for z-axis
+                            ]
+                        )
+
+                        # Remove the child link voxels if the value is not in the other_link_values and non_removal is 0
+                        mask_voxel_data = self.mesh_group.voxel_data[child_remove_indices[:, 0], child_remove_indices[:, 1], child_remove_indices[:, 2]] == current_link_value
+                        mask_voxel_no_removal = self.mesh_group.voxel_no_removal[child_remove_indices[:, 0], child_remove_indices[:, 1], child_remove_indices[:, 2]] == 0
+                        valid_indices = np.where(mask_voxel_data & mask_voxel_no_removal)[0]
+                        self.mesh_group.voxel_data[child_remove_indices[valid_indices, 0], child_remove_indices[valid_indices, 1], child_remove_indices[valid_indices, 2]] = 0
 
 
             # interference removal for the second motor
@@ -488,45 +496,49 @@ class InterferenceRemoval:
                                                                                                                 0)
                     
                     #### Now consider the non-removal voxels and remove the child link voxels instead
-                    transformed_indices_rounded = np.round(transformed_indices).astype(int)
-                    condition_values = values == father_link_value
-                    condition_non_removal = non_removal == 1
-                    condition_in_transformed = np.array(
-                        [tuple(idx) in map(tuple, transformed_indices_rounded) for idx in expanded_indices]
-                    )
-                    final_condition = np.logical_and(condition_values, np.logical_and(condition_non_removal, condition_in_transformed))
-                    father_link_non_removal_indices = expanded_indices[final_condition]
-                    
-                    if father_link_non_removal_indices.shape[0] > 0:
-                        # Transform the indices back to the original indices
-                        H_inv_matrix = self.rotate_around_axis(motor_direct, -joint_angle, self.mesh_group.position_to_index(motor_position.reshape(-1, 3)))
-                        child_remove_indices = apply_transform(father_link_non_removal_indices.reshape(-1, 3), H_inv_matrix)
-                        child_remove_indices = np.round(child_remove_indices).astype(int)
-                        child_remove_indices = np.clip(
-                            child_remove_indices, 
-                            [0, 0, 0],  # Minimum bounds for each axis (x, y, z)
-                            [
-                                self.mesh_group.voxel_data.shape[0] - 1,  # Max bound for x-axis
-                                self.mesh_group.voxel_data.shape[1] - 1,  # Max bound for y-axis
-                                self.mesh_group.voxel_data.shape[2] - 1   # Max bound for z-axis
-                            ]
-                        )
+                    if "BODY" not in current_link.name:
+                        condition_values = values == father_link_value
+                        condition_non_removal = non_removal == 1
 
-                        # Remove the child link voxels if the value is not in the other_link_values and non_removal is 0
-                        mask_voxel_data = self.mesh_group.voxel_data[child_remove_indices[:, 0], child_remove_indices[:, 1], child_remove_indices[:, 2]] == current_link_value
-                        mask_voxel_no_removal = self.mesh_group.voxel_no_removal[child_remove_indices[:, 0], child_remove_indices[:, 1], child_remove_indices[:, 2]] == 0
-                        valid_indices = np.where(mask_voxel_data & mask_voxel_no_removal)[0]
-                        self.mesh_group.voxel_data[child_remove_indices[valid_indices, 0], child_remove_indices[valid_indices, 1], child_remove_indices[valid_indices, 2]] = 0
+                        # transformed_indices_rounded = np.round(transformed_indices).astype(int)
+                        # condition_in_transformed = np.array(
+                        #     [tuple(idx) in map(tuple, transformed_indices_rounded) for idx in expanded_indices]
+                        # )
+                        # final_condition = np.logical_and(condition_values, np.logical_and(condition_non_removal, condition_in_transformed))
+                        final_condition = np.logical_and(condition_values, condition_non_removal)
+
+                        father_link_non_removal_indices = expanded_indices[final_condition]
+                        
+                        if father_link_non_removal_indices.shape[0] > 0:
+                            # Transform the indices back to the original indices
+                            H_inv_matrix = self.rotate_around_axis(motor_direct, -joint_angle, self.mesh_group.position_to_index(motor_position.reshape(-1, 3)))
+                            child_remove_indices = apply_transform(father_link_non_removal_indices.reshape(-1, 3), H_inv_matrix)
+                            child_remove_indices = np.round(child_remove_indices).astype(int)
+                            child_remove_indices = np.clip(
+                                child_remove_indices, 
+                                [0, 0, 0],  # Minimum bounds for each axis (x, y, z)
+                                [
+                                    self.mesh_group.voxel_data.shape[0] - 1,  # Max bound for x-axis
+                                    self.mesh_group.voxel_data.shape[1] - 1,  # Max bound for y-axis
+                                    self.mesh_group.voxel_data.shape[2] - 1   # Max bound for z-axis
+                                ]
+                            )
+
+                            # Remove the child link voxels if the value is not in the other_link_values and non_removal is 0
+                            mask_voxel_data = self.mesh_group.voxel_data[child_remove_indices[:, 0], child_remove_indices[:, 1], child_remove_indices[:, 2]] == current_link_value
+                            mask_voxel_no_removal = self.mesh_group.voxel_no_removal[child_remove_indices[:, 0], child_remove_indices[:, 1], child_remove_indices[:, 2]] == 0
+                            valid_indices = np.where(mask_voxel_data & mask_voxel_no_removal)[0]
+                            self.mesh_group.voxel_data[child_remove_indices[valid_indices, 0], child_remove_indices[valid_indices, 1], child_remove_indices[valid_indices, 2]] = 0
 
                 cur_idx += 1
 
-        # Remove interference for motors. In this version, this step is finished in Joint Connect Optimization
-        # for motor_param in self.motor_param_result:
-        #     def condition_remove(pts):
-        #         return is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0, 0.5)
-        #     self.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_group.link_value_dict.keys()), "Unoccupied"),
-        #                                 target_group_name="Unoccupied",
-        #                                 condition_func=condition_remove)
+        # Remove interference for motors. In this version, this step is should have been finished in Joint Connect Optimization. But there is a bug somewhere in the code, so we need to do it again here.
+        for motor_param in self.motor_param_result:
+            def condition_remove(pts):
+                return is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0, 0.5)
+            self.mesh_group.move_voxels(initial_group_names=get_removed_list(list(self.mesh_group.link_value_dict.keys()), "Unoccupied"),
+                                        target_group_name="Unoccupied",
+                                        condition_func=condition_remove)
 
             
 
