@@ -322,6 +322,9 @@ def auto_design_function(args, mapdl_object=None):
                 fea_start_time = time.time()
                 max_iteration = 2 # The maximum number of searching iterations for the FEA analysis to determine the best relative density of the voxels
                 for stl_file in stl_files:
+                    if "BODY" in stl_file: # Skip the body part for quick testing
+                        continue
+
                     log.log_txt("*******Do FEA analysis for: " + stl_file)
                     # More parameters can be set in the function stl_force_relative_density_fea_opt
                     success_flag, best_relative_density = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, max_iteration=max_iteration, display_fea_result=args.visualize, display_force_result=False, mapdl_object=mapdl_object)
@@ -331,6 +334,11 @@ def auto_design_function(args, mapdl_object=None):
                         log.log_txt("Failure Code 4. The mesh is not feasible in FEA. Re-optimizing with a larger model... Scale the model by " + str(enlarge_scale))
                         exit_code = 4
                         break
+                    else:
+                        file_name = os.path.basename(stl_file).split('.')[0]
+                        log.log_txt("best_relative_density: " + str(best_relative_density))
+                        log.log_variable('best_relative_density_' + file_name, best_relative_density)
+
                     time.sleep(3)
                 
                 fea_end_time = time.time()

@@ -17,7 +17,7 @@ sys.path.append(os.path.normpath(os.path.join(project_path, 'metamaterial_fillin
 
 from auto_design import auto_design_function
 from quadruped_pose_to_pkl import Quadruped_Mesh_Transformer
-
+from metamaterial_filling.script.pyansys_fea.mapdl_msh_analysis import MapdlFea
 
 def quadruped_dataset_auto_design(args):
     # Find all stl files that contains "neutral" and "smoothed" in the dataset_path
@@ -56,13 +56,21 @@ def quadruped_dataset_auto_design(args):
     # Do auto design
     print("Start auto design ...")
     result_folder = args.result_folder
+    if args.do_fea_analysis:
+        mapdl_object = MapdlFea()
+    else:
+        mapdl_object = None
+
     for i in tqdm.tqdm(range(len(joint_pkl_files))):
         print("Working on ", joint_pkl_files[i])
         args.joint_pkl_path = joint_pkl_files[i]
         args.stl_mesh_path = transformed_stl_files[i]
         args.result_folder = result_folder  # Update the result folder every time because it will be changed in the auto_design_function
 
-        auto_design_function(args)
+        auto_design_function(args, mapdl_object)
+
+    if args.do_fea_analysis:
+        mapdl_object.shutdown()
 
 
 if __name__=="__main__":
@@ -77,9 +85,9 @@ if __name__=="__main__":
     parser.add_argument('--joint_limitation', type=float, default=0.785, help='The limitation of the joint. +-joint_limitation. (rad)')
 
     parser.add_argument('--max_trial_round', type=int, default=8, help='The maximum number of trial rounds.')
-    parser.add_argument('--genetic_generation', type=int, default=30, help='The number of generations for the genetic algorithm')
-    parser.add_argument('--do_fea_analysis', type=bool, default=False, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
-    parser.add_argument('--regenerate_if_fea_failed', type=bool, default=False, help='Regenerate the model if the FEA analysis failed or not. FEAs are expensive and strict.')
+    parser.add_argument('--genetic_generation', type=int, default=50, help='The number of generations for the genetic algorithm')
+    parser.add_argument('--do_fea_analysis', type=bool, default=True, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
+    parser.add_argument('--regenerate_if_fea_failed', type=bool, default=True, help='Regenerate the model if the FEA analysis failed or not. FEAs are expensive and strict.')
 
     parser.add_argument('--visualize', type=bool, default=False, help='Visualize the process or not. Need to close the windows to continue the process if turned on.')
     parser.add_argument('--disable_joint_setting_ui', type=bool, default=True, help='Disable the joint setting UI or not. To continuously handle different models, this need to be set True.')
