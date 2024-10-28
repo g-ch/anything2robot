@@ -158,6 +158,15 @@ class Mesh_Group:
             self.link_value_dict[link_name] = self.cur_link_value
             self.cur_link_value += 1
 
+    def get_link_type_value(self, link_name):
+        if link_name in self.link_value_dict.keys():
+            return self.link_value_dict[link_name]
+        else:
+            return None
+        
+    def get_all_link_types(self):
+        return list(self.link_value_dict.keys())
+
     def get_voxels(self, link_name, get_index=False):
         """
         Get the voxels
