@@ -23,7 +23,7 @@ from sklearn import svm
 from sklearn.exceptions import ConvergenceWarning
 import warnings
 import pyvista as pv
-
+import copy
 import math
 
 import multiprocessing
@@ -186,7 +186,9 @@ class General_GA(Improved_Generic_Algorithm):
         points_tensor = o3d.core.Tensor(all_points, dtype=o3d.core.Dtype.Float32)
         all_distances = self.scene.compute_signed_distance(points_tensor).numpy()
         all_distances = all_distances.reshape(-1, points.shape[0])
-        cost = np.mean(np.max(all_distances, axis=1)) # Take the maximum distance for each point and then take the mean
+        max_distances = np.max(all_distances, axis=1)
+
+        cost = (np.mean(max_distances) + np.max(max_distances)) * 0.5 # 0.5 and 0.5 are the weights for the mean and max respectively
 
         return cost
 
@@ -271,9 +273,11 @@ class General_GA(Improved_Generic_Algorithm):
                     parts = motor_relations[i].split('_')
                     father_index = parts.index("father")
                     link_name = "_".join(parts[:father_index])
+                    father_link_name = "_".join(parts[father_index+1:])
 
                     for j in range(len(motor_positions)):
-                        if j != child_id and j != i and link_name not in motor_relations[j]: # Check collision with other motors that are not on the same link.
+                        if j != child_id and j != i and link_name not in motor_relations[j] and father_link_name in motor_relations[j]:
+                            # print("Checking collision between ", motor_relations[i], " and ", motor_relations[j])
                             cylinder_other = {'center': motor_positions[j],
                                             'direct': motor_directs[j],
                                             'height': self.motor_type_params[motor_types[j]][0],
@@ -319,7 +323,7 @@ class General_GA(Improved_Generic_Algorithm):
             elif len(cur_node.val.axis) == 3:
                 motor2_position = motor_positions[cur_idx] # The position of the second motor because cur_idx has been += 1
                 
-                motors_middle_point = (motor_position + motor2_position) * 0.5 * 0.5
+                motors_middle_point = (motor_position + motor2_position) * 0.5 * 0.8 # This error is usually larger than the error of the 2-axis motor
                 motor_position_cost.append(np.linalg.norm(motors_middle_point - np.array(cur_node.val.axis[0])))
 
                 # cost_motor_position += 0.5 * self.get_position_cost(np.linalg.norm(motor2_pos - np.array(cur_node.val.axis[0])), sigmoidal=False)
@@ -327,7 +331,7 @@ class General_GA(Improved_Generic_Algorithm):
 
         max_motor_position_cost = np.max(motor_position_cost)
         avg_motor_position_cost = np.mean(motor_position_cost)
-        cost_motor_position = (max_motor_position_cost*0.5 + avg_motor_position_cost*0.5) * 0.4
+        cost_motor_position = (max_motor_position_cost*0.5 + avg_motor_position_cost*0.5) * 0.6
 
         # Occupancy Cost
         cost_motor_occupancy = self.get_occupancy_cost(motor_positions, motor_directs, motor_types) # *10
@@ -537,8 +541,10 @@ class Joint_Connect_Opt:
         self.motor_params_results = motor_params_results
         self.motor_shell_thickness = 1.5
 
+        self.father_dict_ori = copy.deepcopy(self.mesh_decomp.father_link_dict)
+
         self.father_dict = self.mesh_decomp.father_link_dict
-        for link_name in self.father_dict:
+        for link_name in self.father_dict:  # NOTE: This self.father_dict changed to a string dict here!!!!!. TODO: Use a nicer way.
             self.father_dict[link_name] = self.father_dict[link_name].name
 
     '''
@@ -656,31 +662,38 @@ class Joint_Connect_Opt:
 
             # If the link has only two joints, find the joint farthest from the motor and add 100 points belonging to class 1 to help SVM
             if len(cur_node.val.joints) == 2:
-                farthest_dist = 0
-                farthest_joint = None
-                for joint_name, joint_position in cur_node.val.joints.items():
-                    dist = np.linalg.norm(motor_param[:3] - joint_position)
-                    if dist > farthest_dist:
-                        farthest_dist = dist
-                        farthest_joint = joint_position
 
-                if farthest_joint is not None: 
-                    farthest_joint = np.array(farthest_joint)
-                    oppsite_joint = motor_param[:3] + (motor_param[:3] - farthest_joint)
+                joint_names = list(cur_node.val.joints.keys())                
+                father_link_joint_names = self.father_dict_ori[cur_link_name].joints.keys()
 
-                    farthest_joint = np.tile(farthest_joint, (100, 1))
-                    # classify_voxels = np.vstack((classify_voxels, farthest_joint))
-                    # classify_voxels_values = np.hstack((classify_voxels_values, np.ones(100)))
+                for joint_name in joint_names:
+                    if joint_name in father_link_joint_names:
+                        father_joint_position = cur_node.val.joints[joint_name]
+                    else:
+                        child_joint_position = cur_node.val.joints[joint_name]
 
-                    classify_voxels = farthest_joint
-                    classify_voxels_values = np.ones(100)
-                    
-                    oppsite_joint = np.tile(oppsite_joint, (100, 1))
-                    # classify_voxels = np.vstack((classify_voxels, oppsite_joint))
-                    # classify_voxels_values = np.hstack((classify_voxels_values, np.zeros(100)))
+                child_to_father_vector = father_joint_position - child_joint_position
 
-                    classify_voxels = oppsite_joint
-                    classify_voxels_values = np.zeros(100)
+                # if cur_node.val.joints[joint_names[0]][2] > cur_node.val.joints[joint_names[1]][2]:
+                #     top_joint_position = cur_node.val.joints[joint_names[0]]
+                #     bottom_joint_position = cur_node.val.joints[joint_names[1]]
+                # else:
+                #     top_joint_position = cur_node.val.joints[joint_names[1]]
+                #     bottom_joint_position = cur_node.val.joints[joint_names[0]]
+
+                # child_to_father_vector = top_joint_position - bottom_joint_position
+
+                if np.linalg.norm(child_to_father_vector) > 0:
+                    child_to_father_vector /= np.linalg.norm(child_to_father_vector)
+
+                    father_side_point = (motor_param[:3] + motor_param[3:6]) / 2 + child_to_father_vector
+                    child_side_point = (motor_param[:3] + motor_param[3:6]) / 2 - child_to_father_vector
+
+                    child_side_voxels = np.tile(child_side_point, (100, 1))
+                    father_side_voxels = np.tile(father_side_point, (100, 1))
+
+                    classify_voxels = np.vstack((child_side_voxels, father_side_voxels))
+                    classify_voxels_values = np.hstack((np.ones(100), np.zeros(100)))
 
 
             # Check if classify_voxels_values has both 0 and 1, otherwise, randomly select 100 points in the existing class and use motor_param[:3] + (motor_param[:3]-point) to add 100 points to the other class
@@ -729,14 +742,14 @@ class Joint_Connect_Opt:
                 svm_result = clf.predict(projected_pts)
                 # margin = motor_param[6] * 0.2
                 # svm_result = svm_predict_with_margin(clf, projected_pts, margin)
-                return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell_thickness * 2), 
+                return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell_thickness * 1.732), 
                                       svm_result == 1)
             def condition_father_link_radical(pts):
                 projected_pts = np.dot(pts - motor_param[:3], np.array([x_direct, y_direct, motor_direct]))[:, :2]
                 svm_result = clf.predict(projected_pts)
                 # margin = motor_param[6] * 0.2
                 # svm_result = svm_predict_with_margin(clf, projected_pts, margin)
-                return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell_thickness * 2), 
+                return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell_thickness * 1.732), 
                                       svm_result == 0)
 
             def condition_child_link_top(pts):
@@ -865,9 +878,9 @@ class Joint_Connect_Opt:
             # pv.plot(two_motors_link_end_positions_dict[link_name], point_size=30)
             # pv.plot(added_voxels, point_size=20)
 
-            all_voxels = np.vstack((two_motors_link_start_positions_dict[link_name], two_motors_link_end_positions_dict[link_name], added_voxels))
-            all_voxels = np.unique(all_voxels, axis=0)
-            pv.plot(all_voxels, point_size=30)
+            # all_voxels = np.vstack((two_motors_link_start_positions_dict[link_name], two_motors_link_end_positions_dict[link_name], added_voxels))
+            # all_voxels = np.unique(all_voxels, axis=0)
+            # pv.plot(all_voxels, point_size=30)
             
             non_removal_indices = self.mesh_decomp.mesh_group.position_to_index(added_voxels)
             self.mesh_decomp.mesh_group.voxel_no_removal[non_removal_indices[:,0], non_removal_indices[:,1], non_removal_indices[:,2]] = 1
