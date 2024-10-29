@@ -30,6 +30,8 @@ import multiprocessing
 
 get_removed_list = lambda list, remove_value: [value for value in list if value != remove_value]
 
+display_count_test = 0
+
 def set_diff_numpy(A, B):
     # Create an array of shape (A.shape[0], B.shape[0]) where each element in A is compared with each in B
     # This results in a boolean array where True indicates that an element of A exists in B
@@ -163,7 +165,6 @@ class General_GA(Improved_Generic_Algorithm):
                 ortho1 /= np.linalg.norm(ortho1)
             ortho2 = np.cross(axis_dir, ortho1)
 
-
             rho_values = np.arange(r, r+0.001, r)
             theta_values = np.arange(0, 2 * np.pi, np.pi / 4)
             z_values = np.arange(0, h+0.001, h)
@@ -177,64 +178,15 @@ class General_GA(Improved_Generic_Algorithm):
             unique_points = np.unique(transformed_points, axis=0)
             return unique_points
 
-        # cost = 0
-
-        # # Conduct BFS for cost
-        # queue = [self.joint_tree]
-        # cur_idx = 0
-        # while queue:
-        #     cur_node = queue.pop(0)
-        #     for child_node in cur_node.children:
-        #         queue.append(child_node)
-        #     if cur_node.val.axis is None or np.linalg.norm(cur_node.val.axis[1]) == 0:
-        #         continue
-        #     motor_position = motor_poses[cur_idx]
-        #     motor_type = int(motor_types[cur_idx])
-        #     motor_direct = np.array(cur_node.val.axis[1])
-
-        #     target_mesh = o3d.io.read_triangle_mesh("./urdf/lynel/tmp/" + self.father_link_dict[cur_node.val.name].name + '_ideal.stl')
-        #     target_mesh.scale(100, center=(0, 0, 0))
-        #     cur_scene = o3d.t.geometry.RaycastingScene()
-        #     _ = cur_scene.add_triangles(o3d.t.geometry.TriangleMesh.from_legacy(target_mesh))
-
-        #     points = sample_points_in_cylinder(motor_position, motor_direct, self.motor_type_params[motor_type][1], self.motor_type_params[motor_type][0])
-        #     cur_idx += 1
-
-        #     # If the joint has 2 axis, then it has 2 motors connected by a fixed-sized connector
-        #     if len(cur_node.val.axis) == 3:
-        #         motor2_pos = motor_position - self.connector_params[0] * np.array(cur_node.val.axis[1]) + self.connector_params[1] * np.array(cur_node.val.axis[2])
-        #         motor2_direct = np.array(cur_node.val.axis[2])
-        #         motor2_type = motor_type
-        #         points = np.vstack((points, sample_points_in_cylinder(motor2_pos, motor2_direct, self.motor_type_params[motor2_type][1], self.motor_type_params[motor2_type][0])))
-        #         cur_idx += 1
-            
-        #     points_tensor = o3d.core.Tensor(points, dtype=o3d.core.Dtype.Float32)
-        #     all_distances = cur_scene.compute_signed_distance(points_tensor).numpy()
-            
-        #     # axis = o3d.geometry.TriangleMesh.create_coordinate_frame(size=10)
-        #     # pcd = o3d.geometry.PointCloud()
-        #     # pcd.points = o3d.utility.Vector3dVector(points)
-        #     # o3d.visualization.draw_geometries([target_mesh, axis, pcd])
-            
-        #     cost += np.mean(all_distances)
-
-
-
         all_points = np.empty((0, 3), dtype=np.float32)
         for i in range(len(motor_poses)):
             points = sample_points_in_cylinder(motor_poses[i], motor_directs[i], self.motor_type_params[motor_types[i]][1], self.motor_type_params[motor_types[i]][0])
             all_points = np.vstack((all_points, points))
+        
         points_tensor = o3d.core.Tensor(all_points, dtype=o3d.core.Dtype.Float32)
         all_distances = self.scene.compute_signed_distance(points_tensor).numpy()
         all_distances = all_distances.reshape(-1, points.shape[0])
         cost = np.mean(np.max(all_distances, axis=1))
-        
-
-        # cost = 0
-        # for i in range(len(motor_poses)):
-        #     points_tensor = o3d.core.Tensor(np.array(motor_poses[i]).reshape(-1, 3), dtype=o3d.core.Dtype.Float32)
-        #     all_distances = self.scene.compute_signed_distance(points_tensor).numpy()
-        #     cost += np.max(all_distances)
 
         return cost
 
@@ -243,19 +195,26 @@ class General_GA(Improved_Generic_Algorithm):
             return (np.exp(distance) - 1)
         return distance
 
-    def check_constraint(self, motor_positions, motor_directs, motor_types):
-        # 1. Check the collision between motors
+    def check_constraint(self, motor_positions, motor_directs, motor_types, motor_relations, margin=1):
+        # 1. Check the collision between motors. NOTE: This can be improved. The collision is checked twice for each pair of motors.
         for i in range(len(motor_positions)):
             for j in range(i+1, len(motor_positions)):
-                if i != j:
+                child_name = father_name = motor_relations[i] # Initialize the father and child names with the current motor name
+                if "child" in motor_relations[i]:
+                    father_name = motor_relations[i].replace("child", "father")
+                elif "father" in motor_relations[i]:
+                    child_name = motor_relations[i].replace("father", "child")
+
+                # Ignore checking for father and child motors in a two-motor joint because they are connected with standard connectors
+                if i != j and (father_name not in motor_relations[j] and child_name not in motor_relations[j]):
                     cylinder1 = {'center': motor_positions[i], 
                                 'direct': motor_directs[i], 
-                                'height': self.motor_type_params[motor_types[i]][0], 
-                                'radius': self.motor_type_params[motor_types[i]][1]}
+                                'height': self.motor_type_params[motor_types[i]][0] + margin, 
+                                'radius': self.motor_type_params[motor_types[i]][1] + margin/2.0}
                     cylinder2 = {'center': motor_positions[j], 
                                 'direct': motor_directs[j],
-                                'height': self.motor_type_params[motor_types[j]][0],
-                                'radius': self.motor_type_params[motor_types[j]][1]}
+                                'height': self.motor_type_params[motor_types[j]][0] + margin,
+                                'radius': self.motor_type_params[motor_types[j]][1] + margin/2.0}
                     flag_collision, _ = check_collision(cylinder1, cylinder2)
                     if flag_collision:
                         return True
@@ -282,12 +241,31 @@ class General_GA(Improved_Generic_Algorithm):
                     father_motor_axis = motor_directs[i]
                     # Rotate center_child_bias by angle degrees along the axis of the father_motor_axis
                     center_child_rotated = rotate_point_along_axis(center_child_bias, father_motor_axis, angle)
-                    center_child_rebiased = center_child_rotated + motor_positions[i] 
+                    center_child_rebiased = center_child_rotated + motor_positions[i]
+                    axis_child = motor_directs[child_id]
+                    rotated_axis_child = rotate_point_along_axis(axis_child, father_motor_axis, angle)
+
 
                     cylinder_child = {'center': center_child_rebiased,
-                                        'direct': motor_directs[child_id],
+                                        'direct': rotated_axis_child,
                                         'height': self.motor_type_params[motor_types[child_id]][0],
                                         'radius': self.motor_type_params[motor_types[child_id]][1]}
+                    
+                    ### CODE FOR VISUALIZATION
+                    # global display_count_test
+                    # display_count_test += 1
+                    # motor_positions_i_base = motor_positions[i] - motor_directs[i] * self.motor_type_params[motor_types[i]][0] / 2
+                    # motor_positions_i_top = motor_positions[i] + motor_directs[i] * self.motor_type_params[motor_types[i]][0] / 2
+                    # motor_positions_i_z_biased_by_1 = motor_positions[i] + np.array([0, 0, 1])
+                    # motor_positions_i_y_biased_by_1 = motor_positions[i] + np.array([0, 1, 0])
+                    # motor_positions_i_x_biased_by_1 = motor_positions[i] + np.array([1, 0, 0])
+                    # child_base = center_child_rebiased - rotated_axis_child * self.motor_type_params[motor_types[child_id]][0] / 2
+                    # child_top = center_child_rebiased + rotated_axis_child * self.motor_type_params[motor_types[child_id]][0] / 2
+
+                    # points_to_display = np.array([motor_positions[i], center_child_rebiased, motor_positions_i_base, motor_positions_i_top, motor_positions_i_z_biased_by_1, motor_positions_i_y_biased_by_1, motor_positions_i_x_biased_by_1, child_base, child_top])
+                    # if display_count_test < 5:
+                    #     pv.plot(points_to_display, point_size=10)
+
                     
                     # Get link name
                     parts = motor_relations[i].split('_')
@@ -310,17 +288,20 @@ class General_GA(Improved_Generic_Algorithm):
     def get_costs(self, genome): 
         motor_positions, motor_directs, motor_types, motor_relations = self.get_motor_params(genome)
 
-        if self.check_constraint(motor_positions, motor_directs, motor_types):
+        if self.check_constraint(motor_positions, motor_directs, motor_types, motor_relations, margin=1 ):
             return 0, 0, 1e6
         
         two_degree_rotation_interference_cost = self.check_two_degree_rotation_interference_cost(motor_positions, motor_directs, motor_types, motor_relations)
         if two_degree_rotation_interference_cost > 1e6:
             return 0, 0, 8e5
 
-        cost_motor_position = 0
-        cost_motor_occupancy = 0
+        # Occupancy Cost
+        cost_motor_occupancy = 10 * self.get_occupancy_cost(motor_positions, 
+                                             motor_directs, 
+                                             motor_types)
 
-        # Conduct BFS for cost
+        # Conduct BFS for positional cost
+        cost_motor_position = 0
         queue = [self.joint_tree]
         cur_idx = 0
         while queue:
@@ -337,7 +318,7 @@ class General_GA(Improved_Generic_Algorithm):
 
             # Positional Cost
             ## Linear Positional Cost
-            cost_motor_position += 10 * np.linalg.norm(motor_position - np.array(cur_node.val.axis[0]))
+            cost_motor_position += 10 * np.linalg.norm(motor_position - np.array(cur_node.val.axis[0])) #10
             ## Sigmoidal Positional Cost
             # cost_motor_position += 10 * self.get_position_cost(np.linalg.norm(motor_position - np.array(cur_node.val.axis[0])), sigmoidal=False)
 
@@ -351,12 +332,7 @@ class General_GA(Improved_Generic_Algorithm):
 
                 # cost_motor_position += 0.5 * self.get_position_cost(np.linalg.norm(motor2_pos - np.array(cur_node.val.axis[0])), sigmoidal=False)
                 cur_idx += 1
-        
-        # Occupancy Cost
-        cost_motor_occupancy += 10 * self.get_occupancy_cost(motor_positions, 
-                                             motor_directs, 
-                                             motor_types)
-        
+  
         return cost_motor_position, cost_motor_occupancy, two_degree_rotation_interference_cost
 
 
@@ -559,7 +535,7 @@ class Joint_Connect_Opt:
         self.mesh_decomp = mesh_decomp
         self.mesh = mesh_decomp.mesh
         self.motor_params_results = motor_params_results
-        self.motor_shell = 2
+        self.motor_shell_thickness = 1.5
 
         self.father_dict = self.mesh_decomp.father_link_dict
         for link_name in self.father_dict:
@@ -693,12 +669,18 @@ class Joint_Connect_Opt:
                     oppsite_joint = motor_param[:3] + (motor_param[:3] - farthest_joint)
 
                     farthest_joint = np.tile(farthest_joint, (100, 1))
-                    classify_voxels = np.vstack((classify_voxels, farthest_joint))
-                    classify_voxels_values = np.hstack((classify_voxels_values, np.ones(100)))
+                    # classify_voxels = np.vstack((classify_voxels, farthest_joint))
+                    # classify_voxels_values = np.hstack((classify_voxels_values, np.ones(100)))
+
+                    classify_voxels = farthest_joint
+                    classify_voxels_values = np.ones(100)
                     
                     oppsite_joint = np.tile(oppsite_joint, (100, 1))
-                    classify_voxels = np.vstack((classify_voxels, oppsite_joint))
-                    classify_voxels_values = np.hstack((classify_voxels_values, np.zeros(100)))
+                    # classify_voxels = np.vstack((classify_voxels, oppsite_joint))
+                    # classify_voxels_values = np.hstack((classify_voxels_values, np.zeros(100)))
+
+                    classify_voxels = oppsite_joint
+                    classify_voxels_values = np.zeros(100)
 
 
             # Check if classify_voxels_values has both 0 and 1, otherwise, randomly select 100 points in the existing class and use motor_param[:3] + (motor_param[:3]-point) to add 100 points to the other class
@@ -747,22 +729,22 @@ class Joint_Connect_Opt:
                 svm_result = clf.predict(projected_pts)
                 # margin = motor_param[6] * 0.2
                 # svm_result = svm_predict_with_margin(clf, projected_pts, margin)
-                return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell), 
+                return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell_thickness), 
                                       svm_result == 1)
             def condition_father_link_radical(pts):
                 projected_pts = np.dot(pts - motor_param[:3], np.array([x_direct, y_direct, motor_direct]))[:, :2]
                 svm_result = clf.predict(projected_pts)
                 # margin = motor_param[6] * 0.2
                 # svm_result = svm_predict_with_margin(clf, projected_pts, margin)
-                return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell), 
+                return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell_thickness), 
                                       svm_result == 0)
 
             def condition_child_link_top(pts):
-                return np.logical_and(is_points_in_shell_top(pts, motor_param[:3], motor_param[3:6], motor_param[6], 1.0, self.motor_shell), 
-                                      is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 1.0, self.motor_shell))
+                return np.logical_and(is_points_in_shell_top(pts, motor_param[:3], motor_param[3:6], motor_param[6], self.motor_shell_thickness, self.motor_shell_thickness), 
+                                      is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], self.motor_shell_thickness, self.motor_shell_thickness))
             def condition_father_link_top(pts):
-                return np.logical_and(is_points_in_shell_top(pts, motor_param[3:6], motor_param[:3], motor_param[6], 1.0, self.motor_shell), 
-                                      is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 1.0, self.motor_shell))
+                return np.logical_and(is_points_in_shell_top(pts, motor_param[3:6], motor_param[:3], motor_param[6], self.motor_shell_thickness, self.motor_shell_thickness), 
+                                      is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], self.motor_shell_thickness, self.motor_shell_thickness))
 
             def condition_remove(pts):
                 return is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0, 0.5)
@@ -879,9 +861,9 @@ class Joint_Connect_Opt:
             added_voxels = self.connect_voxels_in_link(self.mesh_decomp.mesh_group, start_idxs, end_idxs, link_name)
 
             print("Link Name: ", link_name)
-            pv.plot(two_motors_link_start_positions_dict[link_name], point_size=10)
-            pv.plot(two_motors_link_end_positions_dict[link_name], point_size=30)
-            pv.plot(added_voxels, point_size=20)
+            # pv.plot(two_motors_link_start_positions_dict[link_name], point_size=10)
+            # pv.plot(two_motors_link_end_positions_dict[link_name], point_size=30)
+            # pv.plot(added_voxels, point_size=20)
 
             all_voxels = np.vstack((two_motors_link_start_positions_dict[link_name], two_motors_link_end_positions_dict[link_name], added_voxels))
             all_voxels = np.unique(all_voxels, axis=0)

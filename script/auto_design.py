@@ -391,9 +391,9 @@ if __name__=="__main__":
 
     parser.add_argument('--result_folder', type=str, default=os.path.normpath(project_path + '/result'), help='The folder to save the results.')
 
-    parser.add_argument('--expected_x', type=float, default=22, help='The expected x-axis length of the model. (cm)')
+    parser.add_argument('--expected_x', type=float, default=30, help='The expected x-axis length of the model. (cm)')
     parser.add_argument('--voxel_size', type=float, default=1, help='The size of the voxel. (cm)')
-    parser.add_argument('--voxel_density', type=float, default=1.5e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
+    parser.add_argument('--voxel_density', type=float, default=1.2e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
     parser.add_argument('--joint_limitation', type=float, default=0.785, help='The limitation of the joint. +-joint_limitation. (rad)')
 
     parser.add_argument('--max_trial_round', type=int, default=5, help='The maximum number of trial rounds.')

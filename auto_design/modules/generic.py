@@ -142,7 +142,8 @@ class Generic_Algorithm():
         cost_log = []
 
         # Run GA
-        for generation in range(self.generation_num):
+        valid_count = 0
+        for generation in range(200):  # 200 is a maximum number of generations
             # Record the result in log list
             if generation in log_list:
                 log_result.append(min(population, key=lambda genome : self.fitness_function(genome)))
@@ -165,9 +166,15 @@ class Generic_Algorithm():
             best_individuals.append(fittest_individual)
 
             # 打印一下variance
-            print(f"Generation {generation}, Best Fitness {self.fitness_function(fittest_individual)}")
+            best_individual_fitness = self.fitness_function(fittest_individual)
+            print(f"Generation {generation}, Best Fitness {best_individual_fitness}")
 
             cost_log.append(self.get_costs(fittest_individual))
+
+            if best_individual_fitness < 1e5:  # If there is a valid solution
+                valid_count += 1
+            if valid_count > self.generation_num: # When valid_count is larger than setted generation_num, break the loop
+                break
 
         # Results
         best_individual = min(best_individuals, key=lambda genome : self.fitness_function(genome))
