@@ -559,7 +559,7 @@ class Joint_Connect_Opt:
         self.mesh_decomp = mesh_decomp
         self.mesh = mesh_decomp.mesh
         self.motor_params_results = motor_params_results
-        self.motor_shell = 1.5
+        self.motor_shell = 2
 
         self.father_dict = self.mesh_decomp.father_link_dict
         for link_name in self.father_dict:
@@ -594,7 +594,7 @@ class Joint_Connect_Opt:
         
         # Remove current_link_key from the all_link_keys_list
         other_link_keys_value_list.remove(current_link_key_value)
-        other_link_keys_value_list.remove(0)  # Remove the empty space value
+        # other_link_keys_value_list.remove(0)  # Remove the empty space value
 
         for i in range(start_idxs.shape[0]):
             added_path = a_star_search(mesh_group.voxel_data, (start_idxs[i,0], start_idxs[i,1], start_idxs[i,2]), end_idxs, collision_values=other_link_keys_value_list)
@@ -766,7 +766,7 @@ class Joint_Connect_Opt:
 
             def condition_remove(pts):
                 return is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0, 0.5)
-           
+            
         
             if len(cur_node.val.axis) == 2:  # One DOF axis
 
@@ -878,8 +878,15 @@ class Joint_Connect_Opt:
 
             added_voxels = self.connect_voxels_in_link(self.mesh_decomp.mesh_group, start_idxs, end_idxs, link_name)
 
-            # pv.plot(added_voxels, point_size=20)
+            print("Link Name: ", link_name)
+            pv.plot(two_motors_link_start_positions_dict[link_name], point_size=10)
+            pv.plot(two_motors_link_end_positions_dict[link_name], point_size=30)
+            pv.plot(added_voxels, point_size=20)
 
+            all_voxels = np.vstack((two_motors_link_start_positions_dict[link_name], two_motors_link_end_positions_dict[link_name], added_voxels))
+            all_voxels = np.unique(all_voxels, axis=0)
+            pv.plot(all_voxels, point_size=30)
+            
             non_removal_indices = self.mesh_decomp.mesh_group.position_to_index(added_voxels)
             self.mesh_decomp.mesh_group.voxel_no_removal[non_removal_indices[:,0], non_removal_indices[:,1], non_removal_indices[:,2]] = 1
 

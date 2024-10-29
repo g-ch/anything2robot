@@ -418,14 +418,8 @@ class InterferenceRemoval:
                     
                     condition_values = values == father_link_value
                     condition_non_removal = non_removal == 1
-
-                    # transformed_indices_rounded = np.round(transformed_indices).astype(int)
-                    # condition_in_transformed = np.array(
-                    #     [tuple(idx) in map(tuple, transformed_indices_rounded) for idx in expanded_indices]
-                    # )
-                    # final_condition = np.logical_and(condition_values, np.logical_and(condition_non_removal, condition_in_transformed))
                     final_condition = np.logical_and(condition_values, condition_non_removal)
-                    
+
                     father_link_non_removal_indices = expanded_indices[final_condition]
 
                     if father_link_non_removal_indices.shape[0] > 0:
@@ -499,12 +493,6 @@ class InterferenceRemoval:
                     if "BODY" not in current_link.name:
                         condition_values = values == father_link_value
                         condition_non_removal = non_removal == 1
-
-                        # transformed_indices_rounded = np.round(transformed_indices).astype(int)
-                        # condition_in_transformed = np.array(
-                        #     [tuple(idx) in map(tuple, transformed_indices_rounded) for idx in expanded_indices]
-                        # )
-                        # final_condition = np.logical_and(condition_values, np.logical_and(condition_non_removal, condition_in_transformed))
                         final_condition = np.logical_and(condition_values, condition_non_removal)
 
                         father_link_non_removal_indices = expanded_indices[final_condition]
