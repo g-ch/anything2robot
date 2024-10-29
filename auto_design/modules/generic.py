@@ -167,9 +167,11 @@ class Generic_Algorithm():
 
             # 打印一下variance
             best_individual_fitness = self.fitness_function(fittest_individual)
-            print(f"Generation {generation}, Best Fitness {best_individual_fitness}")
+            costs = self.get_costs(fittest_individual)
 
-            cost_log.append(self.get_costs(fittest_individual))
+            print(f"Generation {generation}, Best Fitness {best_individual_fitness}, Costs {costs}")
+
+            cost_log.append(costs)
 
             if best_individual_fitness < 1e5:  # If there is a valid solution
                 valid_count += 1

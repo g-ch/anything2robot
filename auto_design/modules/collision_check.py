@@ -78,6 +78,68 @@ def check_overlap(equation1, equation2):
     # Check for overlap
     return max(min(solutions1), min(solutions2)) <= min(max(solutions1), max(solutions2))
 
+
+def project_rectangle(vertices, axis):
+    """ Project a rectangle's vertices onto an axis and return the min and max values. """
+    projections = [np.dot(vertex, axis) for vertex in vertices]
+    return min(projections), max(projections)
+
+def is_separating_axis(axis, vertices1, vertices2):
+    """ Check if an axis is a separating axis for two rectangles. """
+    min1, max1 = project_rectangle(vertices1, axis)
+    min2, max2 = project_rectangle(vertices2, axis)
+    # Check if projections on the axis overlap
+    return max1 < min2 or max2 < min1
+
+def rectangles_overlap(rect1, rect2):
+    """
+    Determine if two 3D rectangles overlap using the Separating Axis Theorem.
+    
+    Parameters:
+    - rect1: A dictionary containing 'center', 'length', 'width', and 'normal' vectors of the first rectangle.
+    - rect2: A dictionary containing 'center', 'length', 'width', and 'normal' vectors of the second rectangle.
+    
+    Returns:
+    - bool: True if the rectangles overlap, False otherwise.
+    """
+    
+    # Extract rectangle properties
+    centers = [rect1['center'], rect2['center']]
+    lengths = [rect1['length'], rect2['length']]
+    widths = [rect1['width'], rect2['width']]
+    directions = [rect1['direction'], rect2['direction']]
+    normals = [rect1['normal'], rect2['normal']]
+
+    # Calculate vertices for each rectangle
+    def calculate_vertices(center, length, width, direction, normal):
+        d = direction / np.linalg.norm(direction) * (length / 2)
+        w = np.cross(normal, direction)  # perpendicular width direction
+        w = w / np.linalg.norm(w) * (width / 2)
+        # 4 vertices from center ±d ±w
+        return [center + d + w, center + d - w, center - d + w, center - d - w]
+
+    vertices1 = calculate_vertices(centers[0], lengths[0], widths[0], directions[0], normals[0])
+    vertices2 = calculate_vertices(centers[1], lengths[1], widths[1], directions[1], normals[1])
+
+    # Axes to test (normals and cross-products of edges)
+    axes_to_test = [
+        normals[0], normals[1],
+        np.cross(directions[0], directions[1]),
+        np.cross(directions[0], normals[1]),
+        np.cross(normals[0], directions[1])
+    ]
+
+    # Test each axis for separation
+    for axis in axes_to_test:
+        if np.linalg.norm(axis) == 0:
+            continue  # skip zero vectors from cross-products
+        axis = axis / np.linalg.norm(axis)  # normalize the axis
+        if is_separating_axis(axis, vertices1, vertices2):
+            return False  # Separating axis found, no overlap
+
+    return True  # No separating axis found, rectangles overlap
+
+
 def check_collision(cylinder1, cylinder2):
     """Checks if two cylinders are colliding.
 
@@ -107,10 +169,12 @@ def check_collision(cylinder1, cylinder2):
 
     # Infinite cylinder collision check
     # No Collision Possible If the distance between two infinite cylinders is larger than the sum of their radius
-    distance = distance_between_point_and_line(c1, c2, c2 + d2) 
-    if distance > r1 + r2:
+    distance1 = distance_between_point_and_line(c1, c2, c2 + d2) 
+    distance2 = distance_between_point_and_line(c2, c1, c1 + d1) #CHG. Only determine distance1 is not enough
+    if distance1 > r1 + r2 and distance2 > r1 + r2:
+        info['quick_check_passed'] = False
         return False, info
-    
+
     # Finite cylinder collision check
     if info['parallel']:
         if abs(np.dot(c2 - c1, d1)) <= (h1 + h2) / 2:
@@ -119,9 +183,19 @@ def check_collision(cylinder1, cylinder2):
             return False, info
     
     elif info['coplane']:
-        #TODO: check the coplane case
-        # Find the four corners of the rectangle
-        return False, info
+        #TODO: check the coplane case> which can be simplified to 2D problem
+        # CHG. UPDATE: Check if the rectangles overlap
+        plane_norm = np.cross(d1, d2)
+        plane_norm = plane_norm / np.linalg.norm(plane_norm)
+
+        rect1 = {'center': c1, 'length': h1, 'width': 2 * r1, 'direction': d1, 'normal': plane_norm}
+        rect2 = {'center': c2, 'length': h2, 'width': 2 * r2, 'direction': d2, 'normal': plane_norm}
+
+        if rectangles_overlap(rect1, rect2):
+            return True, info
+        else:
+            return False, info
+
     else:
         # Find the common normal vector
         A = np.array([
@@ -182,4 +256,3 @@ def check_collision(cylinder1, cylinder2):
                 off_test2 = end_test(info_on['TP1'], TP2, cylinder1, cylinder2)
             
             return off_test1 or off_test2, info
-        

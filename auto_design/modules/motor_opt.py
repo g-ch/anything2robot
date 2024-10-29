@@ -186,7 +186,7 @@ class General_GA(Improved_Generic_Algorithm):
         points_tensor = o3d.core.Tensor(all_points, dtype=o3d.core.Dtype.Float32)
         all_distances = self.scene.compute_signed_distance(points_tensor).numpy()
         all_distances = all_distances.reshape(-1, points.shape[0])
-        cost = np.mean(np.max(all_distances, axis=1))
+        cost = np.mean(np.max(all_distances, axis=1)) # Take the maximum distance for each point and then take the mean
 
         return cost
 
@@ -215,7 +215,7 @@ class General_GA(Improved_Generic_Algorithm):
                                 'direct': motor_directs[j],
                                 'height': self.motor_type_params[motor_types[j]][0] + margin,
                                 'radius': self.motor_type_params[motor_types[j]][1] + margin/2.0}
-                    flag_collision, _ = check_collision(cylinder1, cylinder2)
+                    flag_collision, __ = check_collision(cylinder1, cylinder2)
                     if flag_collision:
                         return True
         
@@ -231,7 +231,7 @@ class General_GA(Improved_Generic_Algorithm):
 
                 # Rotate the center of the child motor by +/- 30 degrees, etc, along the axis of the father motor
                 angle_to_check = [30, -30, 40, -40, 50, -50, 60, -60] # 30 and -30 is the minimum angle to check, the bigger the lower the cost
-                cost_list = [2e6, 2e6, 100, 100, 50, 50, 5, 5]
+                cost_list = [2e6, 2e6, 0.8, 0.8, 0.4, 0.4, 0.2, 0.2]
 
                 count = 0
                 for angle in angle_to_check:
@@ -278,7 +278,7 @@ class General_GA(Improved_Generic_Algorithm):
                                             'direct': motor_directs[j],
                                             'height': self.motor_type_params[motor_types[j]][0],
                                             'radius': self.motor_type_params[motor_types[j]][1]}
-                            flag_collision, _ = check_collision(cylinder_child, cylinder_other)
+                            flag_collision, __ = check_collision(cylinder_child, cylinder_other)
                             if flag_collision:
                                 return cost_list[count-1]
                             
@@ -295,15 +295,10 @@ class General_GA(Improved_Generic_Algorithm):
         if two_degree_rotation_interference_cost > 1e6:
             return 0, 0, 8e5
 
-        # Occupancy Cost
-        cost_motor_occupancy = 10 * self.get_occupancy_cost(motor_positions, 
-                                             motor_directs, 
-                                             motor_types)
-
         # Conduct BFS for positional cost
-        cost_motor_position = 0
         queue = [self.joint_tree]
         cur_idx = 0
+        motor_position_cost = []
         while queue:
             cur_node = queue.pop(0)
             for child_node in cur_node.children:
@@ -316,23 +311,27 @@ class General_GA(Improved_Generic_Algorithm):
 
             cur_idx += 1
 
-            # Positional Cost
-            ## Linear Positional Cost
-            cost_motor_position += 10 * np.linalg.norm(motor_position - np.array(cur_node.val.axis[0])) #10
-            ## Sigmoidal Positional Cost
-            # cost_motor_position += 10 * self.get_position_cost(np.linalg.norm(motor_position - np.array(cur_node.val.axis[0])), sigmoidal=False)
-
-
-            # If the joint has 2 axis, then it has 2 motors connected by a fixed-sized connector
-            if len(cur_node.val.axis) == 3:
-                motor_idx = motor_type
-                motor2_pos = motor_position - self.connector_lib[motor_idx][0] * np.array(cur_node.val.axis[1]) + self.connector_lib[motor_idx][1] * np.array(cur_node.val.axis[2])
-                motor2_direct = np.array(cur_node.val.axis[2])
-                motor2_type = motor_type
+            if len(cur_node.val.axis) == 2:
+                ## Linear Positional Cost
+                motor_position_cost.append(np.linalg.norm(motor_position - np.array(cur_node.val.axis[0])))
+                ## Sigmoidal Positional Cost
+                # cost_motor_position += 10 * self.get_position_cost(np.linalg.norm(motor_position - np.array(cur_node.val.axis[0])), sigmoidal=False)
+            elif len(cur_node.val.axis) == 3:
+                motor2_position = motor_positions[cur_idx] # The position of the second motor because cur_idx has been += 1
+                
+                motors_middle_point = (motor_position + motor2_position) * 0.5 * 0.5
+                motor_position_cost.append(np.linalg.norm(motors_middle_point - np.array(cur_node.val.axis[0])))
 
                 # cost_motor_position += 0.5 * self.get_position_cost(np.linalg.norm(motor2_pos - np.array(cur_node.val.axis[0])), sigmoidal=False)
                 cur_idx += 1
-  
+
+        max_motor_position_cost = np.max(motor_position_cost)
+        avg_motor_position_cost = np.mean(motor_position_cost)
+        cost_motor_position = (max_motor_position_cost*0.5 + avg_motor_position_cost*0.5) * 0.4
+
+        # Occupancy Cost
+        cost_motor_occupancy = self.get_occupancy_cost(motor_positions, motor_directs, motor_types) # *10
+
         return cost_motor_position, cost_motor_occupancy, two_degree_rotation_interference_cost
 
 
@@ -459,6 +458,7 @@ class Motor_Opt:
         # Generate initial state where motors are put right at the position of relevant joints
         genome_result, cost_log, best_fitness = self.ga_runner.run_generic(self.ga_runner.initial_population)
         self.motor_results = self.ga_runner.from_genome_to_motor_results(genome_result)
+
         return self.motor_results, cost_log, best_fitness
 
     def create_motors(self, 
@@ -729,14 +729,14 @@ class Joint_Connect_Opt:
                 svm_result = clf.predict(projected_pts)
                 # margin = motor_param[6] * 0.2
                 # svm_result = svm_predict_with_margin(clf, projected_pts, margin)
-                return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell_thickness), 
+                return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell_thickness * 2), 
                                       svm_result == 1)
             def condition_father_link_radical(pts):
                 projected_pts = np.dot(pts - motor_param[:3], np.array([x_direct, y_direct, motor_direct]))[:, :2]
                 svm_result = clf.predict(projected_pts)
                 # margin = motor_param[6] * 0.2
                 # svm_result = svm_predict_with_margin(clf, projected_pts, margin)
-                return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell_thickness), 
+                return np.logical_and(is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0.0, self.motor_shell_thickness * 2), 
                                       svm_result == 0)
 
             def condition_child_link_top(pts):

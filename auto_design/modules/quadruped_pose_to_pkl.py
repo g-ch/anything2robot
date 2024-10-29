@@ -138,10 +138,10 @@ class Quadruped_Mesh_Transformer():
 
         # Adjust the joint positions:
         ## 1. Push the hip and shoulder joints down 
-        joint_dict["left_hip"] = joint_dict["left_hip"] * 0.5 + joint_dict["left_knee"] * 0.5
-        joint_dict["right_hip"] = joint_dict["right_hip"] * 0.5 + joint_dict["right_knee"] * 0.5
-        joint_dict["left_shoulder"] = joint_dict["left_shoulder"] * 0.5 + joint_dict["left_elbow"] * 0.5
-        joint_dict["right_shoulder"] = joint_dict["right_shoulder"] * 0.5 + joint_dict["right_elbow"] * 0.5
+        joint_dict["left_hip"] = joint_dict["left_hip"] * 0.6 + joint_dict["left_knee"] * 0.4
+        joint_dict["right_hip"] = joint_dict["right_hip"] * 0.6 + joint_dict["right_knee"] * 0.4
+        joint_dict["left_shoulder"] = joint_dict["left_shoulder"] * 0.6 + joint_dict["left_elbow"] * 0.4
+        joint_dict["right_shoulder"] = joint_dict["right_shoulder"] * 0.6 + joint_dict["right_elbow"] * 0.4
 
         joint_dict["left_knee"] = joint_dict["left_knee"] * 0.4 + joint_dict["left_ankle"] * 0.6
         joint_dict["right_knee"] = joint_dict["right_knee"] * 0.4 + joint_dict["right_ankle"] * 0.6
