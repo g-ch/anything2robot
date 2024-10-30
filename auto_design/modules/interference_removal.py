@@ -564,6 +564,15 @@ class InterferenceRemoval:
 
         self.ideal_mass = 0
 
+        if package_name in dir:
+            # Keep the string after the package name
+            written_in_dir = dir[dir.index(package_name) + len(package_name):]
+        else:
+            written_in_dir = dir
+
+        if written_in_dir[0] == '/':
+            written_in_dir = written_in_dir[1:]
+
         while node_queue:
             root_node = node_queue.pop(0)
             child_nodes = root_node.children
@@ -576,12 +585,12 @@ class InterferenceRemoval:
                 voxel_grid_to_mesh(voxel_positions=self.mesh_group.get_voxels("BODY"), dir=dir + 'BODY.stl', voxel_size=self.args.voxel_size)  #-np.array([[10,0,25]])
                 link_visual = {
                     "origin": {"xyz": "0 0 0", "rpy": "0 0 0"},
-                    "geometry": {"filename": "package://" + package_name + "/" + dir + "BODY.stl"},
+                    "geometry": {"filename": "package://" + package_name + "/" + written_in_dir + "BODY.stl"},
                     "material": "grey"
                 }
                 link_collision = {
                     "origin": {"xyz": "0 0 0", "rpy": "0 0 0"},
-                    "geometry": {"filename": "package://" + package_name + "/" + dir + "BODY.stl"}
+                    "geometry": {"filename": "package://" + package_name + "/" + written_in_dir + "BODY.stl"}
                 }
                 per_voxel_mass = self.args.voxel_density * (self.args.voxel_size ** 3)
                 part_mass = per_voxel_mass * self.mesh_group.get_voxels("BODY").shape[0]
@@ -611,12 +620,12 @@ class InterferenceRemoval:
 
             link_visual = {
                 "origin": {"xyz": ' '.join(map(str, visual_pos)), "rpy": '0 0 0'},
-                "geometry": {"filename": "package://" + package_name + "/" + dir + "" + cur_link.name + ".stl"},
+                "geometry": {"filename": "package://" + package_name + "/" + written_in_dir + "" + cur_link.name + ".stl"},
                 "material": "grey"
             }
             link_collision = {
                 "origin": {"xyz": ' '.join(map(str, visual_pos)), "rpy": '0 0 0'},
-                "geometry": {"filename": "package://" + package_name + "/" + dir + "" + cur_link.name + ".stl"}
+                "geometry": {"filename": "package://" + package_name + "/" + written_in_dir + "" + cur_link.name + ".stl"}
             }
 
             per_voxel_mass = self.args.voxel_density * (self.args.voxel_size ** 3)

@@ -13,11 +13,9 @@ import open3d as o3d
 import ast
 import os.path
 import argparse
-import tkinter as tk
 import pickle as pkl
 import threading
 from threading import Thread
-from tkinter import ttk, messagebox
 from plotly.subplots import make_subplots
 from dash import Dash, dcc, html, Input, Output
 #import requests
@@ -181,7 +179,6 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         self.nodes = {}
         self.current_link = None
 
-        
         self.setWindowTitle("Link Tree Constructor")
         self.setGeometry(100, 100, 800, 600)
         
@@ -364,6 +361,7 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
     def load_model(self):
         # Load STL file
         stl_file_path = self.args.stl_mesh_path
+        print(f"Loading STL file: {stl_file_path}")
         stl_mesh = pv.read(stl_file_path)
         # Get the bounds of the mesh
         self.mesh_bounds = stl_mesh.bounds
@@ -377,6 +375,9 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         self.sphere_actor = self.plotter.add_mesh(self.sphere, color="red")
         self.plotter.add_axes()
         self.plotter.show()
+
+        self.plotter.reset_camera()
+        self.plotter.render()
 
     def slider_position_updated(self):
         """ Update the sphere position based on the slider values """
@@ -1077,7 +1078,6 @@ class Custom_Mesh_Loader(Mesh_Loader):
         if os.path.exists(joint_path):
             print("Loading joint data from file...")
             with open(joint_path, 'rb') as f:
-                #linkLoader = LinkTreeGUI(tk.Tk(), self.mesh, self.args)
                 linkLoader = LinkTreeGUI(self.mesh, self.args)
                 print("GUI initialized.")
 
@@ -1098,7 +1098,6 @@ class Custom_Mesh_Loader(Mesh_Loader):
                 
         else:
             print("No joint data found. Please construct the link tree.")
-            # linkLoader = LinkTreeGUI(tk.Tk(), self.mesh, self.args)
             linkLoader = LinkTreeGUI(self.mesh, self.args, initialize_body=True)
             linkLoader.show()
         

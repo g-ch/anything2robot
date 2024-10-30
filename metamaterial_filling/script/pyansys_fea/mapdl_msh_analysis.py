@@ -16,7 +16,15 @@ class MapdlFea:
     def __init__(self):
         # Launch MAPDL
         exec_loc = '/root/ansys_inc/v232/ansys/bin/ansys232' # Change to the path of the Ansys executable in your system
-        self.mapdl = launch_mapdl(exec_loc)
+        exec_loc2 = '/ansys_inc/v232/ansys/bin/ansys232'
+
+        if os.path.exists(exec_loc):
+            self.mapdl = launch_mapdl(exec_loc)
+        elif os.path.exists(exec_loc2):
+            self.mapdl = launch_mapdl(exec_loc2)
+        else:
+            raise FileNotFoundError(f"Ansys executable not found. Please provide the correct path to the Ansys executable in the system.")
+        
         print(self.mapdl)
 
         self.inserted_indices_set = set()
