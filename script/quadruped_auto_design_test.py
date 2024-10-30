@@ -76,7 +76,7 @@ def quadruped_dataset_auto_design(args):
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
     
-    parser.add_argument('--dataset_path', type=str, default='/media/clarence/Clarence/anything2robot_data/standford_dogs/images/result', help='The path to the dataset.')
+    parser.add_argument('--dataset_path', type=str, default='/media/cc/DATA/anything2robot_data/standford_dogs/images/result', help='The path to the dataset.')
     parser.add_argument('--result_folder', type=str, default=os.path.normpath(project_path + '/result'), help='The folder to save the results.')
 
     parser.add_argument('--expected_x', type=float, default=22, help='The expected x-axis length of the model. (cm)')
