@@ -180,6 +180,9 @@ def do_static_fea(args, mapdl_object=None):
         print(f"Max displacement: {max_displacement}")
         return False, relative_density, args.material_young_modulus, von_mises, displacement_magnitude, nodes
 
+    if args.check_only:
+        return True, relative_density, args.material_young_modulus, von_mises, displacement_magnitude, nodes
+
 
     # Set the initial best values
     best_relative_density = relative_density
@@ -282,6 +285,8 @@ if __name__ == '__main__':
     parser.add_argument('--input_stl_path', type=str, default='data/FL.stl', help='Input STL file path')
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. Note FEA uses mm as the unit. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--output_folder', type=str, default='data/output', help='Output folder path')
+
+    parser.add_argument('--check_only', type=bool, default=False, help='Check only. If true, only solid body is considered.')
 
     #### Parameters for tetrahedralMeshing
     parser.add_argument('--mesh_desired_element_number', type=int, default=10000, help='Desired number of elements in the mesh')

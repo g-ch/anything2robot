@@ -82,18 +82,16 @@ def create_sphere(center, radius=1.0, color=[1, 0, 0]):
     return sphere
 
 
-def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=None, output_folder=None, max_iteration=None, max_allowd_stress=None, max_allowd_displacement=None, display_fea_result=None, display_force_result=None, mapdl_object=None):
+def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=None, output_folder=None, check_only=False, max_iteration=None, max_allowd_stress=None, max_allowd_displacement=None, display_fea_result=None, display_force_result=None, mapdl_object=None):
     parser = argparse.ArgumentParser(description="Static FEA Analysis for STL with given forces and fixed nodes")
     
     parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/BODY_UP.stl', help="Path to the mesh .stl file")
     parser.add_argument("--robot_result_file", type=str, default='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241010-134332_robot_result.pkl', help="Path to the robot result including applied torques")
 
-    # parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241016-212518_bad_example/BODY_UP.stl', help="Path to the mesh .stl file")
-    # parser.add_argument("--robot_result_file", type=str, default='/home/clarence/git/anything2robot/anything2robot/auto_design/results/gold_lynel20241016-212518_robot_result.pkl', help="Path to the robot result including applied torques")
-
-
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. Note FEA uses mm as the unit. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--output_folder', type=str, default='data/output', help='Output folder path')
+
+    parser.add_argument('--check_only', type=bool, default=check_only, help='Check only. If true, only solid body is considered.')
 
     parser.add_argument('--torque2force_num', type=int, default=4, help='Number of forces generated for each torque')
 
@@ -148,6 +146,8 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
         args.display_fea_result = display_fea_result
     if display_force_result is not None:
         args.display_force_result = display_force_result
+
+    print("check_only: ", args.check_only)
 
     # Clean the output folder
     if not os.path.exists(args.output_folder):
