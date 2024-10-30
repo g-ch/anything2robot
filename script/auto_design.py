@@ -22,6 +22,8 @@ from modules.mesh_decomp import Mesh_Decomp
 from modules.motor_opt import Motor_Opt, Joint_Connect_Opt, get_bounds
 from modules.interference_removal import InterferenceRemoval, RobotOptResult
 from modules.destruction_check import destruction_check, destruction_check_urdf_folder
+
+# Comment out the following two lines if you don't have Ansys installed
 from metamaterial_filling.script.user_stl_force_relative_density_fea_opt import stl_force_relative_density_fea_opt
 from metamaterial_filling.script.pyansys_fea.mapdl_msh_analysis import MapdlFea
 
@@ -398,7 +400,7 @@ if __name__=="__main__":
 
     parser.add_argument('--max_trial_round', type=int, default=5, help='The maximum number of trial rounds.')
     parser.add_argument('--genetic_generation', type=int, default=10, help='The number of generations for the genetic algorithm')
-    parser.add_argument('--do_fea_analysis', type=bool, default=False, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
+    parser.add_argument('--do_fea_analysis', type=bool, default=True, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
     parser.add_argument('--regenerate_if_fea_failed', type=bool, default=False, help='Regenerate the model if the FEA analysis failed or not. FEAs are expensive and strict.')
 
     parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not. Need to close the windows to continue the process if turned on.')
