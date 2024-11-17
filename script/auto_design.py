@@ -141,7 +141,7 @@ def design_one_round(args, mesh_loader, round, log, round_result_saving_folder, 
         log.log_variable('motor_opt_motor_results', motor_opt.motor_results)
         log.log_txt("Auto design best fitness: " + str(best_fitness))
         motor_opt_image_path = round_result_saving_folder + '/motor_opt_result.png'
-        motor_opt.render(save_only=save_only, save_path=motor_opt_image_path)
+        motor_opt.render(save_only=save_only, save_path=None)
 
         # Up scale the mesh if the avg motor cost is too high
         avg_motor_cost_this = best_fitness / len(motor_results)
@@ -174,10 +174,8 @@ def design_one_round(args, mesh_loader, round, log, round_result_saving_folder, 
                                                 motor_param_result=motor_results, 
                                                 link_tree=mesh_decomp.link_tree, 
                                                 father_link_dict=mesh_decomp.father_link_dict)
-        
-        joint_limits = np.vstack([np.array([-args.joint_limitation, args.joint_limitation]) for _ in range(2*len(motor_results))])
         # joint_limits = np.vstack([np.array([-0.785, 0.785]) for _ in range(2*len(motor_results))])
-        interference_removal.set_joint_limit(joint_limits)
+        interference_removal.set_joint_limit(args.joint_limitation, args.joint_limitation_from_champ)
         interference_removal.remove_interference()
         interference_removal_end_time = time.time()
 
@@ -420,6 +418,9 @@ if __name__=="__main__":
     
     parser.add_argument('--stl_mesh_path', type=str, default="/media/clarence/Clarence/anything2robot/result/n02115641_13839_neutral_res_e300_smoothed_scaled.stl")
     parser.add_argument('--joint_pkl_path', type=str, default="/media/clarence/Clarence/anything2robot/result/n02115641_13839_neutral_res_e300_smoothed_joints.pkl")
+    
+    # parser.add_argument('--stl_mesh_path', type=str, default="C:\\Users\\smogg\\OneDrive\\Desktop\\workspace\\anything2robot\\auto_design\\model\\given_models\\gold_lynel.stl")
+    # parser.add_argument('--joint_pkl_path', type=str, default="C:\\Users\\smogg\\OneDrive\\Desktop\\workspace\\anything2robot\\auto_design\\model\\given_models\\gold_lynel_joints.pkl")
 
     parser.add_argument('--result_folder', type=str, default=os.path.normpath(project_path + '/result'), help='The folder to save the results.')
 
@@ -427,6 +428,7 @@ if __name__=="__main__":
     parser.add_argument('--voxel_size', type=float, default=1, help='The size of the voxel. (cm)')
     parser.add_argument('--voxel_density', type=float, default=1.2e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
     parser.add_argument('--joint_limitation', type=float, default=0.785, help='The limitation of the joint. +-joint_limitation. (rad)')
+    parser.add_argument('--joint_limitation_from_champ', type=bool, default=True, help='Use champ controller or not. This will affect joint limits.')
 
     parser.add_argument('--max_trial_round', type=int, default=8, help='The maximum number of trial rounds.')
     parser.add_argument('--genetic_generation', type=int, default=10, help='The number of generations for the genetic algorithm')
