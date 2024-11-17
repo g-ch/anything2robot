@@ -351,16 +351,16 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         print("Input mesh is watertight. Conitnue...")
 
     if unit == 'm':
-        voxel_size = 0.01
+        voxel_size = 0.005
         checking_distance = 0.2
     else:
-        voxel_size = 10
+        voxel_size = 5
         checking_distance = 200
 
     voxels, min_bound, max_bound, voxel_size = voxelize_mesh(mesh, voxel_size)
-    tenon_center_top_bias = 15 # mm
+    tenon_center_top_bias = [10, 20, 30]  # Check 3 different heights
     checking_angle_interval = np.pi / 24
-    safe_angle_range = np.pi # 180 degrees
+    safe_angle_range = np.pi  # 180 degrees
 
     # Find the best orientation for each tenon
     tenon_best_orientation_angles = []
@@ -370,12 +370,20 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         tenon_root_direction = link.tenon_pos[i][3:6]
         tenon_root_direction_norm = np.linalg.norm(tenon_root_direction)
 
-        if unit == 'm':
-            tenon_root_point_biased = tenon_root_point + tenon_root_direction_norm * 0.001 * tenon_center_top_bias
-        else:
-            tenon_root_point_biased = tenon_root_point + tenon_root_direction_norm * tenon_center_top_bias
+        hit_nums = []
+        for k in range(len(tenon_center_top_bias)):
+            if unit == 'm':
+                tenon_root_point_biased = tenon_root_point + tenon_root_direction_norm * 0.001 * tenon_center_top_bias[k]
+            else:
+                tenon_root_point_biased = tenon_root_point + tenon_root_direction_norm * tenon_center_top_bias[k]
 
-        hit_nums, vectors, angles = check_perpendicular_rays_occupancy(tenon_root_point_biased, tenon_root_direction, voxel_size, checking_distance, checking_angle_interval, voxels, min_bound, max_bound)
+            hit_nums_this, vectors, angles = check_perpendicular_rays_occupancy(tenon_root_point_biased, tenon_root_direction, voxel_size, checking_distance, checking_angle_interval, voxels, min_bound, max_bound)
+
+            if len(hit_nums) == 0:
+                hit_nums = hit_nums_this
+            else:
+                for l in range (len(hit_nums)):
+                    hit_nums[l] += hit_nums_this[l]
 
         # check if results and vectors have the same length
         if len(hit_nums) != len(vectors):
@@ -414,12 +422,12 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         tenon_best_orientation_vectors.append(vectors[best_direction_index])
 
         # Visulize the best direction vectors using pyvista
-        if preview:
-            import pyvista as pv
-            p = pv.Plotter()
-            p.add_mesh(mesh, color='grey')
-            p.add_arrows(tenon_root_point, tenon_root_point + vectors[best_direction_index], mag=1, color='red')
-            p.show()
+        # if preview:
+        #     import pyvista as pv
+        #     p = pv.Plotter()
+        #     p.add_mesh(mesh, color='grey')
+        #     p.add_arrows(tenon_root_point, tenon_root_point + vectors[best_direction_index], mag=1, color='red')
+        #     p.show()
 
         # Print the best direction and free adjacent direction number
         print(f"Tenon {i} best direction: {vectors[best_direction_index]}")
@@ -485,6 +493,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     for i in range(len(link.tenon_pos)):
 
         ##### Transform the tenon mesh #####
+        ###TODO: Match the tenon id with the motorlib. Currently we only have tenons for two types of motors.  box mesh parameters should be changed accordingly
         tenon_file_name = 'motor_' + str(link.tenon_idx[i]) + '_' + link.tenon_type[i] + '.stl'
 
         tenon_file_path = os.path.join(tenon_file_folder, tenon_file_name)
@@ -511,10 +520,10 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         # Define the box parameters for assembling interference removal
         normal_vector = [1, 0, 0]
         width_direction = [0, 0, 1]
-        box_height = 100
+        box_height = 150
         if link.tenon_idx[i] == 0:
             face_length = 78
-            face_width = 600
+            face_width = 60
             face_center = [0,0,face_width/2]
         else:
             face_length = 54
@@ -574,6 +583,15 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
             scales_vis.append(1.0)
 
         visualize_meshes(stls_to_visualize, transformation_matrices_vis, scales_vis)
+
+    ###### Do mesh based assembling interference removal to clear place for motor insertion ######
+    for file in final_transformed_box_files:
+        #replaced_stl_save_path
+        try:
+            mesh_difference(replaced_stl_save_path, file, replaced_stl_save_path)
+        except Exception as e:
+            print(f"Error in mesh difference: {e}")
+            continue
 
     ###### Generate a smaller model for the shell ######
     # smaller_model_stl_name = input_stl_path.split('/')[-1].split('.')[0] + '_smaller.stl'
@@ -642,8 +660,6 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
             raise ValueError('The smaller model is not watertight or has more than one piece after fixing')
         
 
-        
-
     ########## Generate the final model ##########
     tilt_angle = 30 # degrees
     out_stl_name = output_stl_name
@@ -673,8 +689,6 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     thickness = round(thickness / 0.1) * 0.1
 
     plates_num = int(width / (thickness + interval) / 2)
-
-
 
     # TEST CODE to getsolid model with tenon. No shell or filling
     # thickness = None

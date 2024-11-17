@@ -1,10 +1,13 @@
 import numpy as np
 import trimesh
 
+import numpy as np
+import trimesh
+
 def create_box(face_center, face_length, face_width, normal_vector, width_direction, box_height):
     """
     Create a 3D box mesh using the center point of one face, face dimensions, normal vector,
-    width direction vector, and height.
+    width direction vector, and height. Ensures proper face orientation for CGAL.
     
     Parameters:
         face_center (array-like): The center point of the given face [x, y, z].
@@ -15,7 +18,7 @@ def create_box(face_center, face_length, face_width, normal_vector, width_direct
         box_height (float): The height of the box.
     
     Returns:
-        trimesh.Trimesh: The generated box mesh.
+        trimesh.Trimesh: The generated box mesh, with corrected face orientation.
     
     Raises:
         ValueError: If the width_direction and normal_vector are not orthogonal.
@@ -76,8 +79,12 @@ def create_box(face_center, face_length, face_width, normal_vector, width_direct
 
     # Create the box mesh
     box_mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
-    
+
+    # box_mesh.rezero()  # Center the mesh at the origin
+    box_mesh.fix_normals()  # Fix normals if needed
+
     return box_mesh
+
 
 if __name__ == "__main__":
     # Example usage
@@ -92,3 +99,6 @@ if __name__ == "__main__":
 
     # Save the mesh to an STL file
     mesh.export('box_mesh.stl')
+
+    mesh.show()
+
