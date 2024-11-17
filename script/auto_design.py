@@ -413,11 +413,8 @@ def auto_design_function(args, mapdl_object=None):
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
 
-    # parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel.stl'), help='The path to the stl mesh file.')
-    # parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
-    
-    parser.add_argument('--stl_mesh_path', type=str, default="/media/clarence/Clarence/anything2robot/result/n02115641_13839_neutral_res_e300_smoothed_scaled.stl")
-    parser.add_argument('--joint_pkl_path', type=str, default="/media/clarence/Clarence/anything2robot/result/n02115641_13839_neutral_res_e300_smoothed_joints.pkl")
+    parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel.stl'), help='The path to the stl mesh file.')
+    parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
     
     # parser.add_argument('--stl_mesh_path', type=str, default="C:\\Users\\smogg\\OneDrive\\Desktop\\workspace\\anything2robot\\auto_design\\model\\given_models\\gold_lynel.stl")
     # parser.add_argument('--joint_pkl_path', type=str, default="C:\\Users\\smogg\\OneDrive\\Desktop\\workspace\\anything2robot\\auto_design\\model\\given_models\\gold_lynel_joints.pkl")
@@ -435,8 +432,8 @@ if __name__=="__main__":
     parser.add_argument('--do_fea_analysis', type=bool, default=True, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
     parser.add_argument('--regenerate_if_fea_failed', type=bool, default=False, help='Regenerate the model if the FEA analysis failed or not. FEAs are expensive and strict.')
 
-    parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not. Need to close the windows to continue the process if turned on.')
-    parser.add_argument('--disable_joint_setting_ui', type=bool, default=False, help='Disable the joint setting UI or not')
+    parser.add_argument('--visualize', type=bool, default=False, help='Visualize the process or not. Need to close the windows to continue the process if turned on.')
+    parser.add_argument('--disable_joint_setting_ui', type=bool, default=True, help='Disable the joint setting UI or not')
     parser.add_argument('--joint_setting_standard_scale', type=bool, default=False, help='Scale the model to a standard scale for easier joint setting in the UI or not')
 
     ### No need to set model_name. This is a temporary value. It will be removed in the future.
