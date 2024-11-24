@@ -326,12 +326,12 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     # Check and read pkl file
     robot_result = pkl.load(open(pkl_result_path, 'rb'))
 
-    # for link_name in robot_result.link_dict:
-    #     print("Link name: ", link_name)
-    #     print("Link Tenon Positions: ", robot_result.link_dict[link_name].tenon_pos)
-    #     print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
-    #     print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
-    #     print("Link tenon_idx: ", robot_result.link_dict[link_name].tenon_idx)
+    for link_name in robot_result.link_dict:
+        print("Link name: ", link_name)
+        print("Link Tenon Positions: ", robot_result.link_dict[link_name].tenon_pos)
+        print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
+        print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
+        print("Link tenon_idx: ", robot_result.link_dict[link_name].tenon_idx)
 
 
     # Get the link name from the input stl path and get the corresponding link class from the robot result
@@ -521,7 +521,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         normal_vector = [1, 0, 0]
         width_direction = [0, 0, 1]
         box_height = 150
-        if link.tenon_idx[i] == 0:
+        if link.tenon_idx[i] == 1:
             face_length = 78
             face_width = 60
             face_center = [0,0,face_width/2]
@@ -585,6 +585,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         visualize_meshes(stls_to_visualize, transformation_matrices_vis, scales_vis)
 
     ###### Do mesh based assembling interference removal to clear place for motor insertion ######
+    print("Doing mesh based assembling interference removal...")
     for file in final_transformed_box_files:
         #replaced_stl_save_path
         try:
@@ -720,7 +721,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/urdf/gold_lynel20241008-182954_good/gold_lynel20241008-182954/BODY.stl', help='Input STL file path')
+    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/result/gold_lynel_20241124-161201_good/result_round1/urdf/FL_UP.stl', help='Input STL file path')
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--relative_density', type=float, default=0.1, help='Relative density of the metamaterial given by FEA results')
     
@@ -733,7 +734,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_stl_name', type=str, default='20241008-163714_BODY_final_output_with_shell.stl', help='Output STL file path')
     parser.add_argument('--use_existing_shell', type=bool, default=False, help='Whether to use the existing shell file')
     
-    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/auto_design/results/gold_lynel20241008-182958_robot_result.pkl', help='Pickle file path for the tenon position results')
+    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/result/gold_lynel_20241124-161201_good/result_round1/robot_result.pkl', help='Pickle file path for the tenon position results')
     parser.add_argument('--tenon_file_folder', type=str, default=project_dir+'/metamaterial_filling/tenon', help='Folder for the tenon files')
                         
     parser.add_argument('--preview', type=bool, default=True, help='Whether to visualize the transformed tenons and the link')
