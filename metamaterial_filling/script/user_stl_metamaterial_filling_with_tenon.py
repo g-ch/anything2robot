@@ -503,15 +503,15 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         tenon_file_name_transformed = tenon_file_name.replace('.stl', '_' + str(i) + '_transformed.stl')
         file_save_path = os.path.join(output_folder, tenon_file_name_transformed)
 
-        biased_tenon_distance = biased_tenon_distance
+        biased_tenon_distance_this = biased_tenon_distance
         if unit == 'm':
-            biased_tenon_distance = biased_tenon_distance * 0.001
+            biased_tenon_distance_this = biased_tenon_distance * 0.001
         
         # Transform the tenon and save the transformed tenon file considering the best orientation
-        transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_distance=biased_tenon_distance, tenon_orientation_vector=tenon_best_orientation_vectors[i])
+        transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_distance=biased_tenon_distance_this, tenon_orientation_vector=tenon_best_orientation_vectors[i])
 
         # # Use the following to test the tenon without considering the best orientation
-        # transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_distance=biased_tenon_distance, tenon_orientation_vector=None)
+        # transform_tenon_and_save(link, tenon_mesh, i, unit=unit, save_path=file_save_path, biased_tenon_distance=biased_tenon_distance_this, tenon_orientation_vector=None)
 
         transformed_tenon_files.append(file_save_path)
         print(f"Transformed tenon file saved at {file_save_path}")
@@ -532,7 +532,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
         box_save_path = file_save_path.replace('.stl', '_box.stl')
         box_mesh = create_box(face_center, face_length, face_width, normal_vector, width_direction, box_height)
-        transform_tenon_and_save(link, box_mesh, i, unit=unit, save_path=box_save_path, biased_tenon_distance=biased_tenon_distance, tenon_orientation_vector=tenon_best_orientation_vectors[i])
+        transform_tenon_and_save(link, box_mesh, i, unit=unit, save_path=box_save_path, biased_tenon_distance=biased_tenon_distance_this, tenon_orientation_vector=tenon_best_orientation_vectors[i])
         assembling_interference_removal_box_files.append(box_save_path)
 
     # Transform again based on the placement and rotation for the replaced model
@@ -571,17 +571,20 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
     ##### Preview the transformed tenons and the link  #####
     if preview:
-        stls_to_visualize = [replaced_stl_save_path] + final_transformed_tenon_files + final_transformed_box_files
+
         eye_transformation_matrix = np.eye(4)
         transformation_matrices_vis = [eye_transformation_matrix]
         scales_vis = [1.0]
         for i in range (len(final_transformed_tenon_files)):
             transformation_matrices_vis.append(eye_transformation_matrix)
             scales_vis.append(1.0)
-        for i in range (len(final_transformed_box_files)):
-            transformation_matrices_vis.append(eye_transformation_matrix)
-            scales_vis.append(1.0)
+        # Preview the boxes
+        # for i in range (len(final_transformed_box_files)):
+        #     transformation_matrices_vis.append(eye_transformation_matrix)
+        #     scales_vis.append(1.0)
+        # stls_to_visualize = [replaced_stl_save_path] + final_transformed_tenon_files + final_transformed_box_files
 
+        stls_to_visualize = [replaced_stl_save_path] + final_transformed_tenon_files
         visualize_meshes(stls_to_visualize, transformation_matrices_vis, scales_vis)
 
     ###### Do mesh based assembling interference removal to clear place for motor insertion ######
@@ -721,7 +724,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/result/gold_lynel_20241124-161201_good/result_round1/urdf/FL_UP.stl', help='Input STL file path')
+    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/result/gold_lynel_20241124-222350_good/result_round1/urdf/FL_UP.stl', help='Input STL file path')
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--relative_density', type=float, default=0.1, help='Relative density of the metamaterial given by FEA results')
     
@@ -729,12 +732,12 @@ if __name__ == '__main__':
     parser.add_argument('--shell_generation_voxel_resolution', type=float, default=0.5, help='Voxel resolution for shell generation. mm')
     
     parser.add_argument('--plate_interval', type=float, default=8, help='Interval between plates. mm')
-    parser.add_argument('--biased_tenon_distance', type=float, default=0, help='Biased length for the tenon. mm')
+    parser.add_argument('--biased_tenon_distance', type=float, default=2, help='Biased length for the tenon. mm')
 
     parser.add_argument('--output_stl_name', type=str, default='20241008-163714_BODY_final_output_with_shell.stl', help='Output STL file path')
     parser.add_argument('--use_existing_shell', type=bool, default=False, help='Whether to use the existing shell file')
     
-    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/result/gold_lynel_20241124-161201_good/result_round1/robot_result.pkl', help='Pickle file path for the tenon position results')
+    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/result/gold_lynel_20241124-222350_good/result_round1/robot_result.pkl', help='Pickle file path for the tenon position results')
     parser.add_argument('--tenon_file_folder', type=str, default=project_dir+'/metamaterial_filling/tenon', help='Folder for the tenon files')
                         
     parser.add_argument('--preview', type=bool, default=True, help='Whether to visualize the transformed tenons and the link')
