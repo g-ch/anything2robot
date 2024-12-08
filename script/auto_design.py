@@ -418,12 +418,12 @@ if __name__=="__main__":
     # parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel.stl'), help='The path to the stl mesh file.')
     # parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
     
-    parser.add_argument('--stl_mesh_path', type=str, default="/media/clarence/Clarence/anything2robot/result/n02115641_13839_neutral_res_e300_smoothed_scaled.stl")
-    parser.add_argument('--joint_pkl_path', type=str, default="/media/clarence/Clarence/anything2robot/result/n02115641_13839_neutral_res_e300_smoothed_joints.pkl")
+    parser.add_argument('--stl_mesh_path', type=str, default="/home/cc/git/anything2robot/result/n02093859_276_neutral_res_e300_smoothed_scaled.stl")
+    parser.add_argument('--joint_pkl_path', type=str, default="/home/cc/git/anything2robot/result/n02093859_276_neutral_res_e300_smoothed_joints.pkl")
 
     parser.add_argument('--result_folder', type=str, default=os.path.normpath(project_path + '/result'), help='The folder to save the results.')
 
-    parser.add_argument('--expected_x', type=float, default=50, help='The expected x-axis length of the model. (cm)')
+    parser.add_argument('--expected_x', type=float, default=22, help='The expected x-axis length of the model. (cm)')
     parser.add_argument('--voxel_size', type=float, default=1, help='The size of the voxel. (cm)')
     parser.add_argument('--voxel_density', type=float, default=1.2e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
     parser.add_argument('--joint_limitation', type=float, default=0.785, help='The limitation of the joint. +-joint_limitation. (rad)')
