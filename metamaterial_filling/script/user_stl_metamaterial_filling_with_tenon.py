@@ -324,7 +324,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
     voxels, min_bound, max_bound, voxel_size = voxelize_mesh(mesh, voxel_size)
 
-    tenon_center_top_bias = [5, 10, 15, 20, 25, 30]  # Check different heights. mm
+    tenon_center_top_bias = [5, 10, 20, 30]  # Check different heights. mm
     checking_angle_interval = np.pi / 24
     safe_angle_range = np.pi 
 
@@ -333,16 +333,16 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     tenon_best_orientation_vectors = []
     for i in range(len(link.tenon_pos)): # For each tenon
         tenon_root_point = link.tenon_pos[i][:3]
-        tenon_root_direction = link.tenon_pos[i][3:6]        
-        tenon_root_direction_norm = np.linalg.norm(tenon_root_direction)
+        tenon_root_direction = link.tenon_pos[i][3:6]
+        tenon_root_direction = tenon_root_direction / np.linalg.norm(tenon_root_direction)        
 
         # Calculate the hit numbers for different heights
         hit_nums = []
         for k in range(len(tenon_center_top_bias)):
             if unit == 'm':
-                tenon_root_point_biased = tenon_root_point + tenon_root_direction_norm * 0.001 * tenon_center_top_bias[k]
+                tenon_root_point_biased = tenon_root_point + tenon_root_direction * tenon_center_top_bias[k] * 0.001
             else:
-                tenon_root_point_biased = tenon_root_point + tenon_root_direction_norm * tenon_center_top_bias[k]
+                tenon_root_point_biased = tenon_root_point + tenon_root_direction * tenon_center_top_bias[k]
 
             hit_nums_this, vectors, angles = check_perpendicular_rays_occupancy(tenon_root_point_biased, tenon_root_direction, voxel_size, checking_distance, checking_angle_interval, voxels, min_bound, max_bound)
 
@@ -702,7 +702,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/result/gold_lynel_20241201-134522_good/result_round1/urdf/BODY.stl', help='Input STL file path')
+    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/result/gold_lynel_20241201-134522_good/result_round1/urdf/RL_UP.stl', help='Input STL file path')
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--relative_density', type=float, default=0.1, help='Relative density of the metamaterial given by FEA results')
 
