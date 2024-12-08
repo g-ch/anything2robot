@@ -27,13 +27,13 @@ import math
 from format_transform.off_to_stl import off_to_stl
 
 from visualization.assemble_vis import get_rotation_matrix, visualize_meshes, transform_trimesh, get_rotation_matrix_from_angle
-
+from visualization.mesh_and_vectors_vis import plot_mesh_with_arrows_and_colorbar
 
 from skimage import measure
 import trimesh
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import open3d as o3d
+import pyvista as pv
 import time
 
 '''
@@ -61,19 +61,30 @@ def voxelize_mesh(trimesh_mesh, voxel_size):
     voxel_indices = np.array([voxel.grid_index for voxel in voxel_grid.get_voxels()])
     
     # Calculate the bounds of the voxel grid
-    min_bound = voxel_indices.min(axis=0) * voxel_size + voxel_grid.origin
+    min_bound = voxel_grid.origin
     max_bound = voxel_indices.max(axis=0) * voxel_size + voxel_grid.origin
 
     # Create a 3D array to hold the voxels
-    shape = ((max_bound - min_bound) / voxel_size).astype(int) + 1
+    shape = ((max_bound - min_bound) / voxel_size).astype(int) + 2
     voxels = np.zeros(shape, dtype=bool)
 
     # Set the corresponding voxels to True, clamping to avoid out-of-bounds errors
     for idx in voxel_indices:
-        grid_idx = ((idx * voxel_size + voxel_grid.origin) - min_bound) / voxel_size
-        grid_idx = np.clip(grid_idx.astype(int), 0, np.array(shape) - 1)
-        voxels[tuple(grid_idx)] = True
+        # grid_idx = ((idx * voxel_size + voxel_grid.origin) - min_bound) / voxel_size
+        # grid_idx = np.clip(grid_idx.astype(int), 0, np.array(shape) - 1)
+        voxels[tuple(idx)] = True
 
+    # Show all the points in the voxel grid as a 3D scatter plot
+    # points = np.argwhere(voxels)
+    # points = points * voxel_size + min_bound
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter(points[:, 0], points[:, 1], points[:, 2], c='b', marker='o')
+    # ax.set_xlabel('X')
+    # ax.set_ylabel('Y')
+    # ax.set_zlabel('Z')
+    # plt.show()
+                    
     return voxels, min_bound, max_bound, voxel_size
 
 
@@ -114,17 +125,18 @@ def is_point_occupied(point, voxels, min_bound, max_bound, voxel_size):
     vectors: The list of perpendicular vectors
     angles: The angles of the perpendicular vectors
 '''
-def generate_perpendicular_vectors(direction, angle_interval):
+def generate_perpendicular_vectors(direction, angle_interval, angle_range=np.pi*2):
     # Ensure direction is a unit vector
     direction = direction / np.linalg.norm(direction)
+    angle_half_range = angle_range / 2
     
     # Find two vectors perpendicular to the direction
     if np.allclose(direction, [1, 0, 0]) or np.allclose(direction, [-1, 0, 0]):
         v1 = np.array([0, 1, 0])
-        angles = np.arange(0, 2 * np.pi, angle_interval) - np.pi / 2
+        angles = np.arange(-angle_half_range, angle_half_range, angle_interval) - np.pi / 2
     else:
         v1 = np.cross(direction, [1, 0, 0])
-        angles = np.arange(0, 2 * np.pi, angle_interval)
+        angles = np.arange(-angle_half_range, angle_half_range, angle_interval)
     
     v1 = v1 / np.linalg.norm(v1)
     v2 = np.cross(direction, v1)
@@ -139,7 +151,7 @@ def generate_perpendicular_vectors(direction, angle_interval):
     # print(f"Direction: {direction}")
     # print(f"Perpendicular vectors: {vectors}")
     
-    return vectors, angles
+    return normalized_vectors, angles
 
 
 '''
@@ -158,8 +170,7 @@ def generate_perpendicular_vectors(direction, angle_interval):
     vectors: The list of vectors along the rays
 '''
 def check_perpendicular_rays_occupancy(point, direction, voxel_size, checking_distance, angle_interval, voxels, min_bound, max_bound):
-    vectors, angles = generate_perpendicular_vectors(direction, angle_interval)
-    
+    vectors, angles = generate_perpendicular_vectors(direction, angle_interval, angle_range=np.pi*2)
     results = []    
     for vec in vectors:
         hit_num = 0
@@ -176,51 +187,6 @@ def check_perpendicular_rays_occupancy(point, direction, voxel_size, checking_di
     
     return results, vectors, angles
 
-'''
-@Description: Visualize the mesh, occupied voxels, and direction vectors
-@Input:
-    mesh: The trimesh mesh to visualize
-    voxels: The 3D array of voxels
-    voxel_size: The size of the voxels
-    min_bound: The minimum bounds of the voxel grid
-    start_point: The starting point of the direction vectors
-    direction_vectors: The list of direction vectors
-    results: The list of whether the rays hit an occupied voxel
-'''
-def visualize_mesh_voxels_vectors(mesh, voxels, voxel_size, min_bound, start_point, direction_vectors, results):
-    # Create a figure and a 3D axis
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    
-    # Plot the mesh
-    ax.add_collection3d(Poly3DCollection(mesh.triangles, alpha=0.2, color='gray'))
-    
-    # Plot the occupied voxels
-    occupied_voxel_coords = np.array(np.nonzero(voxels)).T * voxel_size + min_bound
-    for voxel in occupied_voxel_coords:
-        # Plot the voxel as a small cube
-        ax.bar3d(voxel[0], voxel[1], voxel[2], voxel_size, voxel_size, voxel_size, color='blue', alpha=0.5)
-
-    # Plot the direction vectors
-    for vec, hit in zip(direction_vectors, results):
-        end_point = start_point + vec  # Calculate the end point of the vector
-        
-        # Choose color based on whether the direction is occupied
-        color = 'red' if hit else 'green'
-        
-        # Plot the vector
-        ax.quiver(
-            start_point[0], start_point[1], start_point[2], 
-            vec[0], vec[1], vec[2], 
-            color=color, length=1.0, normalize=True
-        )
-    
-    # Set the limits for better visualization
-    ax.set_xlim(min_bound[0], min_bound[0] + voxel_size * voxels.shape[0])
-    ax.set_ylim(min_bound[1], min_bound[1] + voxel_size * voxels.shape[1])
-    ax.set_zlim(min_bound[2], min_bound[2] + voxel_size * voxels.shape[2])
-    
-    plt.show()
 
 
 '''
@@ -326,13 +292,12 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     # Check and read pkl file
     robot_result = pkl.load(open(pkl_result_path, 'rb'))
 
-    for link_name in robot_result.link_dict:
-        print("Link name: ", link_name)
-        print("Link Tenon Positions: ", robot_result.link_dict[link_name].tenon_pos)
-        print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
-        print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
-        print("Link tenon_idx: ", robot_result.link_dict[link_name].tenon_idx)
-
+    # for link_name in robot_result.link_dict:
+    #     print("Link name: ", link_name)
+    #     print("Link Tenon Positions: ", robot_result.link_dict[link_name].tenon_pos)
+    #     print("Link Torques: ", robot_result.link_dict[link_name].applied_torque)
+    #     print("Link tenon_type: ", robot_result.link_dict[link_name].tenon_type)
+    #     print("Link tenon_idx: ", robot_result.link_dict[link_name].tenon_idx)
 
     # Get the link name from the input stl path and get the corresponding link class from the robot result
     link_name = input_stl_path.split('/')[-1].split('.')[0]
@@ -351,25 +316,27 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         print("Input mesh is watertight. Conitnue...")
 
     if unit == 'm':
-        voxel_size = 0.005
+        voxel_size = 0.002
         checking_distance = 0.2
     else:
-        voxel_size = 5
+        voxel_size = 2
         checking_distance = 200
 
     voxels, min_bound, max_bound, voxel_size = voxelize_mesh(mesh, voxel_size)
-    tenon_center_top_bias = [10, 20, 30]  # Check 3 different heights
+
+    tenon_center_top_bias = [5, 10, 15, 20, 25, 30]  # Check different heights. mm
     checking_angle_interval = np.pi / 24
-    safe_angle_range = np.pi  # 180 degrees
+    safe_angle_range = np.pi 
 
     # Find the best orientation for each tenon
     tenon_best_orientation_angles = []
     tenon_best_orientation_vectors = []
     for i in range(len(link.tenon_pos)): # For each tenon
         tenon_root_point = link.tenon_pos[i][:3]
-        tenon_root_direction = link.tenon_pos[i][3:6]
+        tenon_root_direction = link.tenon_pos[i][3:6]        
         tenon_root_direction_norm = np.linalg.norm(tenon_root_direction)
 
+        # Calculate the hit numbers for different heights
         hit_nums = []
         for k in range(len(tenon_center_top_bias)):
             if unit == 'm':
@@ -390,12 +357,12 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
             raise ValueError('Results and vectors have different lengths')
 
         # if preview:
-        #     visualize_mesh_voxels_vectors(mesh, voxels, voxel_size, min_bound, tenon_root_point, vectors, hit_results)
+        #     visualize_mesh_voxels_vectors(mesh, voxels, voxel_size, min_bound, tenon_root_point, vectors, hit_nums)
 
-        # Find the best direction. The best direction is the one whose adjacent directions are all free or the one with the most free voxels along the direction
+        # Find the best direction. 
         adjacent_free_score_list = []
         range_min = int(- safe_angle_range / checking_angle_interval / 2)
-        range_max = - range_min
+        range_max = -range_min
         
         for j, hit_num in enumerate(hit_nums):
             adjacent_free_score = 0    
@@ -410,7 +377,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
                 
                 if hit_nums[seq] > 0:
                     # Use a V shape to calculate the score
-                    adjacent_free_score += (range_max + 1 - abs(k)) * hit_nums[seq]
+                    adjacent_free_score += (range_max + 1 - abs(k)) * hit_nums[seq]  
 
             adjacent_free_score_list.append(adjacent_free_score)
 
@@ -422,18 +389,20 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         tenon_best_orientation_vectors.append(vectors[best_direction_index])
 
         # Visulize the best direction vectors using pyvista
-        # if preview:
-        #     import pyvista as pv
-        #     p = pv.Plotter()
-        #     p.add_mesh(mesh, color='grey')
-        #     p.add_arrows(tenon_root_point, tenon_root_point + vectors[best_direction_index], mag=1, color='red')
-        #     p.show()
+        if preview:
+            root_points_array =np.tile(tenon_root_point_biased, (len(vectors)+1, 1))
+            vectors.append(tenon_root_direction)
+            vectors_array = np.array(vectors) * checking_distance
+            end_points_array = root_points_array + vectors_array
+            adjacent_free_score_list.append(0)
+            adjacent_free_score_array = np.array(adjacent_free_score_list)
+            plot_mesh_with_arrows_and_colorbar(mesh, root_points_array, end_points_array, adjacent_free_score_array, colormap_name='viridis')
 
-        # Print the best direction and free adjacent direction number
-        print(f"Tenon {i} best direction: {vectors[best_direction_index]}")
-        print(f"Tenon {i} best direction angle: {angles[best_direction_index]}")
-        print(f"Tenon {i} free adjacent direction number: {adjacent_free_num_array[best_direction_index]}")
-        
+            p = pv.Plotter()
+            p.add_mesh(mesh, color='grey')
+            p.add_arrows(tenon_root_point, tenon_root_point + vectors[best_direction_index], mag=1, color='red')
+            p.show()
+
     # Free the memory for the voxels
     voxels = None #CHG
 
@@ -532,7 +501,12 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
         box_save_path = file_save_path.replace('.stl', '_box.stl')
         box_mesh = create_box(face_center, face_length, face_width, normal_vector, width_direction, box_height)
+        
         transform_tenon_and_save(link, box_mesh, i, unit=unit, save_path=box_save_path, biased_tenon_distance=biased_tenon_distance_this, tenon_orientation_vector=tenon_best_orientation_vectors[i])
+        
+        # # Use the following to test the tenon without considering the best orientation
+        # transform_tenon_and_save(link, box_mesh, i, unit=unit, save_path=box_save_path, biased_tenon_distance=biased_tenon_distance_this, tenon_orientation_vector=None)
+
         assembling_interference_removal_box_files.append(box_save_path)
 
     # Transform again based on the placement and rotation for the replaced model
@@ -571,7 +545,6 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
     ##### Preview the transformed tenons and the link  #####
     if preview:
-
         eye_transformation_matrix = np.eye(4)
         transformation_matrices_vis = [eye_transformation_matrix]
         scales_vis = [1.0]
@@ -579,12 +552,12 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
             transformation_matrices_vis.append(eye_transformation_matrix)
             scales_vis.append(1.0)
         # Preview the boxes
-        # for i in range (len(final_transformed_box_files)):
-        #     transformation_matrices_vis.append(eye_transformation_matrix)
-        #     scales_vis.append(1.0)
-        # stls_to_visualize = [replaced_stl_save_path] + final_transformed_tenon_files + final_transformed_box_files
+        for i in range (len(final_transformed_box_files)):
+            transformation_matrices_vis.append(eye_transformation_matrix)
+            scales_vis.append(1.0)
+        stls_to_visualize = [replaced_stl_save_path] + final_transformed_tenon_files + final_transformed_box_files
+        # stls_to_visualize = [replaced_stl_save_path] + final_transformed_tenon_files
 
-        stls_to_visualize = [replaced_stl_save_path] + final_transformed_tenon_files
         visualize_meshes(stls_to_visualize, transformation_matrices_vis, scales_vis)
 
     ###### Do mesh based assembling interference removal to clear place for motor insertion ######
@@ -603,65 +576,69 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     smaller_stl_save_path = os.path.join(output_folder, smaller_model_stl_name)
     smaller_stl_points_bin = smaller_stl_save_path.replace('.stl', '_points.bin')
 
-    # Remove the smaller_model for shell file if it exists and we are not using the existing model. For quick testing.
-    do_smaller_generation = True
-    if os.path.exists(smaller_stl_save_path):
-        if use_existing_shell:
-            print(f"Using existing shell file at {smaller_stl_save_path}")
-            do_smaller_generation = False
-        else:
-            os.remove(smaller_stl_points_bin)
-            os.remove(smaller_stl_save_path)
+    # In Test mode, shell and metamaterial filling are not generated but tenon is added for quick testing
+    TEST_MODE_NO_SHELL_NO_INNER = True
 
-    if do_smaller_generation:
-        print("Generating the smaller model for shell...")
-        # Use gnome-terminal to run the command
-        shell_thickness = shell_thickness
-        shell_generation_voxel_resolution = shell_generation_voxel_resolution
-        subprocess.run(['gnome-terminal', '--', 'bash', '-c', f'cd {cmake_build_dir}; ./innerPointsCalculation {replaced_stl_save_path} {smaller_stl_points_bin} {shell_thickness} {shell_generation_voxel_resolution}']) #; exec bash
+    if not TEST_MODE_NO_SHELL_NO_INNER:
+        # Remove the smaller_model for shell file if it exists and we are not using the existing model. For quick testing.
+        do_smaller_generation = True
+        if os.path.exists(smaller_stl_save_path):
+            if use_existing_shell:
+                print(f"Using existing shell file at {smaller_stl_save_path}")
+                do_smaller_generation = False
+            else:
+                os.remove(smaller_stl_points_bin)
+                os.remove(smaller_stl_save_path)
 
-        # Wait for the process to finish
-        while not os.path.exists(smaller_stl_points_bin):
-            time.sleep(1)
+        if do_smaller_generation:
+            print("Generating the smaller model for shell...")
+            # Use gnome-terminal to run the command
+            shell_thickness = shell_thickness
+            shell_generation_voxel_resolution = shell_generation_voxel_resolution
+            subprocess.run(['gnome-terminal', '--', 'bash', '-c', f'cd {cmake_build_dir}; ./innerPointsCalculation {replaced_stl_save_path} {smaller_stl_points_bin} {shell_thickness} {shell_generation_voxel_resolution}']) #; exec bash
 
-        time.sleep(3)
+            # Wait for the process to finish
+            while not os.path.exists(smaller_stl_points_bin):
+                time.sleep(1)
+
+            time.sleep(3)
+            
+            print(f"smaller model point bin file generated at {smaller_stl_points_bin}")
+
+            # Do marching cubes to generate the smaller model
+            generate_mesh_from_points(smaller_stl_points_bin, shell_generation_voxel_resolution, smaller_stl_save_path)
+
+            print(f"smaller model generated at {smaller_stl_save_path}")
+
+        # Check if the smaller model has only one piece and is water-tight using open3d
+        mesh_to_check = trimesh.load(smaller_stl_save_path)
         
-        print(f"smaller model point bin file generated at {smaller_stl_points_bin}")
-
-        # Do marching cubes to generate the smaller model
-        generate_mesh_from_points(smaller_stl_points_bin, shell_generation_voxel_resolution, smaller_stl_save_path)
-
-        print(f"smaller model generated at {smaller_stl_save_path}")
-
-    # Check if the smaller model has only one piece and is water-tight using open3d
-    mesh_to_check = trimesh.load(smaller_stl_save_path)
-    
-    # Check if the mesh is watertight
-    is_watertight = mesh_to_check.is_watertight
-    print(f"Is the smaller model watertight: {is_watertight}")
-
-    # Check if the mesh has only one piece
-    mesh_pieces = mesh_to_check.split()
-    print(f"Number of pieces in the smaller model: {len(mesh_pieces)}")
-
-    # If not watertight or has more than one piece, do the following to fix the mesh
-    if not is_watertight or len(mesh_pieces) > 1:
-        print("Fixing the mesh...")
-        trimesh.repair.fill_holes(mesh_to_check)
-        trimesh.repair.fix_inversion(mesh_to_check)
-        trimesh.repair.fix_winding(mesh_to_check)
-        trimesh.repair.fix_normals(mesh_to_check)
-
         # Check if the mesh is watertight
         is_watertight = mesh_to_check.is_watertight
-        print(f"Is the smaller model watertight after fixing: {is_watertight}")
+        print(f"Is the smaller model watertight: {is_watertight}")
 
         # Check if the mesh has only one piece
         mesh_pieces = mesh_to_check.split()
-        print(f"Number of pieces in the smaller model after fixing: {len(mesh_pieces)}")
+        print(f"Number of pieces in the smaller model: {len(mesh_pieces)}")
 
+        # If not watertight or has more than one piece, do the following to fix the mesh
         if not is_watertight or len(mesh_pieces) > 1:
-            raise ValueError('The smaller model is not watertight or has more than one piece after fixing')
+            print("Fixing the mesh...")
+            trimesh.repair.fill_holes(mesh_to_check)
+            trimesh.repair.fix_inversion(mesh_to_check)
+            trimesh.repair.fix_winding(mesh_to_check)
+            trimesh.repair.fix_normals(mesh_to_check)
+
+            # Check if the mesh is watertight
+            is_watertight = mesh_to_check.is_watertight
+            print(f"Is the smaller model watertight after fixing: {is_watertight}")
+
+            # Check if the mesh has only one piece
+            mesh_pieces = mesh_to_check.split()
+            print(f"Number of pieces in the smaller model after fixing: {len(mesh_pieces)}")
+
+            if not is_watertight or len(mesh_pieces) > 1:
+                raise ValueError('The smaller model is not watertight or has more than one piece after fixing')
         
 
     ########## Generate the final model ##########
@@ -695,8 +672,9 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     plates_num = int(width / (thickness + interval) / 2)
 
     # TEST CODE to getsolid model with tenon. No shell or filling
-    # thickness = None
-    # interval = None
+    if TEST_MODE_NO_SHELL_NO_INNER:
+        thickness = None
+        interval = None
 
 
     # Generate the final model
@@ -724,20 +702,20 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/result/gold_lynel_20241124-222350_good/result_round1/urdf/FL_UP.stl', help='Input STL file path')
+    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/result/gold_lynel_20241201-134522_good/result_round1/urdf/BODY.stl', help='Input STL file path')
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--relative_density', type=float, default=0.1, help='Relative density of the metamaterial given by FEA results')
-    
+
     parser.add_argument('--shell_thickness', type=float, default=1.5, help='Thickness of the shell. mm')
     parser.add_argument('--shell_generation_voxel_resolution', type=float, default=0.5, help='Voxel resolution for shell generation. mm')
     
     parser.add_argument('--plate_interval', type=float, default=8, help='Interval between plates. mm')
-    parser.add_argument('--biased_tenon_distance', type=float, default=2, help='Biased length for the tenon. mm')
+    parser.add_argument('--biased_tenon_distance', type=float, default=2.5, help='Biased length for the tenon. mm')
 
     parser.add_argument('--output_stl_name', type=str, default='20241008-163714_BODY_final_output_with_shell.stl', help='Output STL file path')
     parser.add_argument('--use_existing_shell', type=bool, default=False, help='Whether to use the existing shell file')
     
-    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/result/gold_lynel_20241124-222350_good/result_round1/robot_result.pkl', help='Pickle file path for the tenon position results')
+    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/result/gold_lynel_20241201-134522_good/result_round1/robot_result.pkl', help='Pickle file path for the tenon position results')
     parser.add_argument('--tenon_file_folder', type=str, default=project_dir+'/metamaterial_filling/tenon', help='Folder for the tenon files')
                         
     parser.add_argument('--preview', type=bool, default=True, help='Whether to visualize the transformed tenons and the link')

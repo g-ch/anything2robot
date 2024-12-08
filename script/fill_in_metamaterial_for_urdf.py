@@ -19,13 +19,19 @@ from metamaterial_filling.script.user_stl_metamaterial_filling_with_tenon import
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Fill in the metamaterial for every stl file in the given urdf file folder.')
-    parser.add_argument('--urdf_folder_name', type=str, default='gold_lynel20241010-134328_good', help='The folder of the urdf file.')
-    parser.add_argument('--opt_result_pkl_name', type=str, default='gold_lynel20241010-134332_robot_result.pkl', help='The pickle file name for the optimization result.')
+    # parser.add_argument('--urdf_folder_name', type=str, default='gold_lynel20241010-134328_good', help='The folder of the urdf file.')
+    # parser.add_argument('--opt_result_pkl_name', type=str, default='gold_lynel20241010-134332_robot_result.pkl', help='The pickle file name for the optimization result.')
+
+    parser.add_argument('--urdf_folder', type=str, default=project_dir + '/result/gold_lynel_20241201-134522_good/result_round1/urdf', help='Input STL files folder path')
+    parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/result/gold_lynel_20241201-134522_good/result_round1/robot_result.pkl', help='Pickle file path for the tenon position results')
 
     args = parser.parse_args()
 
-    urdf_folder = project_dir + "/urdf/" + args.urdf_folder_name
-    opt_result_pkl_path = project_dir + "/auto_design/results/" + args.opt_result_pkl_name
+    # urdf_folder = project_dir + "/urdf/" + args.urdf_folder_name
+    # opt_result_pkl_path = project_dir + "/auto_design/results/" + args.opt_result_pkl_name
+
+    urdf_folder = args.urdf_folder
+    opt_result_pkl_path = args.pkl_result_path
 
     print("Working on metamaterial for urdf files in the folder: ", urdf_folder)
     print("Using the optimization result: ", opt_result_pkl_path)
