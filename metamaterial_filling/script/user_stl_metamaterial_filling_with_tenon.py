@@ -14,6 +14,7 @@ project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__
 sys.path.append(project_dir + '/metamaterial_filling/script')
 sys.path.append(project_dir + '/auto_design/modules')
 sys.path.append(project_dir + '/auto_design')
+sys.path.append(project_dir)
 
 
 from metamaterial.sixFoldPlatesFillingWithShellTenon import SixFoldPlatesFillingWithShellTenon
@@ -35,6 +36,8 @@ import matplotlib.pyplot as plt
 import open3d as o3d
 import pyvista as pv
 import time
+
+from script.motor_param_lib import MotorParameterLib
 
 '''
 @Description: Voxelize a trimesh mesh with a given voxel size
@@ -389,19 +392,19 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         tenon_best_orientation_vectors.append(vectors[best_direction_index])
 
         # Visulize the best direction vectors using pyvista
-        if preview:
-            root_points_array =np.tile(tenon_root_point_biased, (len(vectors)+1, 1))
-            vectors.append(tenon_root_direction)
-            vectors_array = np.array(vectors) * checking_distance
-            end_points_array = root_points_array + vectors_array
-            adjacent_free_score_list.append(0)
-            adjacent_free_score_array = np.array(adjacent_free_score_list)
-            plot_mesh_with_arrows_and_colorbar(mesh, root_points_array, end_points_array, adjacent_free_score_array, colormap_name='viridis')
+        # if preview:
+        #     root_points_array =np.tile(tenon_root_point_biased, (len(vectors)+1, 1))
+        #     vectors.append(tenon_root_direction)
+        #     vectors_array = np.array(vectors) * checking_distance
+        #     end_points_array = root_points_array + vectors_array
+        #     adjacent_free_score_list.append(0)
+        #     adjacent_free_score_array = np.array(adjacent_free_score_list)
+        #     plot_mesh_with_arrows_and_colorbar(mesh, root_points_array, end_points_array, adjacent_free_score_array, colormap_name='viridis')
 
-            p = pv.Plotter()
-            p.add_mesh(mesh, color='grey')
-            p.add_arrows(tenon_root_point, tenon_root_point + vectors[best_direction_index], mag=1, color='red')
-            p.show()
+        #     p = pv.Plotter()
+        #     p.add_mesh(mesh, color='grey')
+        #     p.add_arrows(tenon_root_point, tenon_root_point + vectors[best_direction_index], mag=1, color='red')
+        #     p.show()
 
     # Free the memory for the voxels
     voxels = None #CHG
@@ -490,14 +493,20 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         normal_vector = [1, 0, 0]
         width_direction = [0, 0, 1]
         box_height = 150
-        if link.tenon_idx[i] == 1:
-            face_length = 78
-            face_width = 60
-            face_center = [0,0,face_width/2]
-        else:
-            face_length = 54
-            face_width = 50
-            face_center = [0,0,face_width/2]
+
+        motor_param = MotorParameterLib() # Get the motor parameters
+        face_length = motor_param.motor_lib[link.tenon_idx[i]][1] * 20 + 2 # from cm to mm and radius to diameter
+        face_width = motor_param.motor_lib[link.tenon_idx[i]][0] * 10  + motor_param.tenon_height * 10 + 10 # from cm to mm. Add margin for tenon
+        face_center = [0,0,face_width/2]
+
+        # if link.tenon_idx[i] == 1:
+        #     face_length = 78
+        #     face_width = 60
+        #     face_center = [0,0,face_width/2]
+        # else:
+        #     face_length = 54
+        #     face_width = 50
+        #     face_center = [0,0,face_width/2]
 
         box_save_path = file_save_path.replace('.stl', '_box.stl')
         box_mesh = create_box(face_center, face_length, face_width, normal_vector, width_direction, box_height)
@@ -702,7 +711,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/result/gold_lynel_20241201-134522_good/result_round1/urdf/RL_UP.stl', help='Input STL file path')
+    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/result/gold_lynel_20241201-134522_good/result_round1/urdf/BODY.stl', help='Input STL file path')
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
     parser.add_argument('--relative_density', type=float, default=0.1, help='Relative density of the metamaterial given by FEA results')
 
