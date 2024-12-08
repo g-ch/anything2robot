@@ -60,7 +60,7 @@ if __name__ == '__main__':
 
         input_stl_path = urdf_folder + "/" + stl_file
         unit = "m"
-        biased_tenon_length = 0
+        biased_tenon_length = 2.5
         use_existing_shell = False
         pkl_result_path = opt_result_pkl_path
         tenon_file_folder = project_dir + "/metamaterial_filling/tenon"
