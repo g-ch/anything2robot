@@ -7,7 +7,11 @@ def repair_mesh(mesh, output_path):
     mesh = trimesh.load_mesh(mesh)
 
     # Analyze the mesh for errors
-    print("Is the mesh watertight?", mesh.is_watertight)
+    if not mesh.is_watertight:
+        print("Attempting to repair the mesh...")
+    else:
+        print("No repair needed. Mesh is already watertight.")
+        return
 
     # Convert the Trimesh object to vertex and face arrays
     vertices = mesh.vertices
@@ -40,8 +44,8 @@ def repair_mesh(mesh, output_path):
 
 if __name__ == '__main__':
     # Example usage
-    input_path = '/media/clarence/Clarence/lynel/Gold_Lynel_0819082531.stl'
-    output_path = '/media/clarence/Clarence/lynel/Gold_Lynel_0819082531_fixed.stl'
+    input_path = '/home/clarence/git/anything2robot/anything2robot/metamaterial_filling/data/output/BODY_replaced.stl'
+    output_path = '/home/clarence/git/anything2robot/anything2robot/metamaterial_filling/data/output/BODY_replaced_repaired.stl'
 
     repair_mesh(input_path, output_path)
 

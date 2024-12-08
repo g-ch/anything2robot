@@ -9,6 +9,7 @@ import argparse
 import subprocess
 import sys
 import pickle as pkl
+import shutil
 
 project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_dir + '/metamaterial_filling/script')
@@ -21,6 +22,8 @@ from metamaterial.sixFoldPlatesFillingWithShellTenon import SixFoldPlatesFilling
 from metamaterial.generateMeshFromPoints import generate_mesh_from_points
 from mesh_operations.mesh_difference import mesh_difference
 from mesh_operations.create_box import create_box
+from mesh_operations.create_cylinder import create_cylinder
+from mesh_operations.repair_mesh import repair_mesh
 
 import time
 import numpy as np
@@ -407,7 +410,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         #     p.show()
 
     # Free the memory for the voxels
-    voxels = None #CHG
+    voxels = None
 
     ###### Replace and scale the stl ######
     replaced_stl_name = input_stl_path.split('/')[-1].split('.')[0] + '_replaced.stl'
@@ -461,13 +464,12 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     
     # Transform the tenons and save the transformed tenon files
     transformed_tenon_files = []
-    assembling_interference_removal_box_files = []                                        
+    assembling_interference_removal_box_files = [] # Use box to remove the interference during assembling
+    assembling_interference_removal_cylinder_files = [] # use cylinder to refine the space for the motor                                  
     for i in range(len(link.tenon_pos)):
 
         ##### Transform the tenon mesh #####
-        ###TODO: Match the tenon id with the motorlib. Currently we only have tenons for two types of motors.  box mesh parameters should be changed accordingly
         tenon_file_name = 'motor_' + str(link.tenon_idx[i]) + '_' + link.tenon_type[i] + '.stl'
-
         tenon_file_path = os.path.join(tenon_file_folder, tenon_file_name)
         tenon_mesh = trimesh.load(tenon_file_path)
 
@@ -490,33 +492,35 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
         ##### Transform the box mesh for assembling interference removal  #####
         # Define the box parameters for assembling interference removal
-        normal_vector = [1, 0, 0]
-        width_direction = [0, 0, 1]
+        box_normal_vector = [1, 0, 0] # initial direction of the box before transformation
+        box_width_direction = [0, 0, 1]
         box_height = 150
 
         motor_param = MotorParameterLib() # Get the motor parameters
-        face_length = motor_param.motor_lib[link.tenon_idx[i]][1] * 20 + 2 # from cm to mm and radius to diameter
-        face_width = motor_param.motor_lib[link.tenon_idx[i]][0] * 10  + motor_param.tenon_height * 10 + 10 # from cm to mm. Add margin for tenon
-        face_center = [0,0,face_width/2]
-
-        # if link.tenon_idx[i] == 1:
-        #     face_length = 78
-        #     face_width = 60
-        #     face_center = [0,0,face_width/2]
-        # else:
-        #     face_length = 54
-        #     face_width = 50
-        #     face_center = [0,0,face_width/2]
+        box_face_length = motor_param.motor_lib[link.tenon_idx[i]][1] * 20 + 2 # from cm to mm and radius to diameter
+        box_face_width = motor_param.motor_lib[link.tenon_idx[i]][0] * 10  + motor_param.tenon_height * 10 + 10 # from cm to mm. Add margin for tenon
+        box_face_center = [0,0,box_face_width/2]
 
         box_save_path = file_save_path.replace('.stl', '_box.stl')
-        box_mesh = create_box(face_center, face_length, face_width, normal_vector, width_direction, box_height)
+        box_mesh = create_box(box_face_center, box_face_length, box_face_width, box_normal_vector, box_width_direction, box_height)
+
+        # define a cylinder to refine the space for the motor
+        cylinder_face_center = [0, 0, biased_tenon_distance_this]
+        cylinder_radius = motor_param.motor_lib[link.tenon_idx[i]][1] * 10  # from cm to mm
+        cylinder_normal_vector = [0, 0, 1]
+        cylinder_height = motor_param.motor_lib[link.tenon_idx[i]][0] * 10  + motor_param.tenon_height * 10
+        cylinder_mesh = create_cylinder(cylinder_face_center, cylinder_radius, cylinder_normal_vector, cylinder_height)
         
+        # Transform the box and cylinder meshes to the right position in the stl file using the "link" result from Pickle file
         transform_tenon_and_save(link, box_mesh, i, unit=unit, save_path=box_save_path, biased_tenon_distance=biased_tenon_distance_this, tenon_orientation_vector=tenon_best_orientation_vectors[i])
-        
+        transform_tenon_and_save(link, cylinder_mesh, i, unit=unit, save_path=box_save_path.replace('.stl', '_cylinder.stl'), biased_tenon_distance=biased_tenon_distance_this, tenon_orientation_vector=tenon_best_orientation_vectors[i])
+
         # # Use the following to test the tenon without considering the best orientation
         # transform_tenon_and_save(link, box_mesh, i, unit=unit, save_path=box_save_path, biased_tenon_distance=biased_tenon_distance_this, tenon_orientation_vector=None)
+        # transform_tenon_and_save(link, cylinder_mesh, i, unit=unit, save_path=box_save_path.replace('.stl', '_cylinder.stl'), biased_tenon_distance=biased_tenon_distance_this, tenon_orientation_vector=None)
 
         assembling_interference_removal_box_files.append(box_save_path)
+        assembling_interference_removal_cylinder_files.append(box_save_path.replace('.stl', '_cylinder.stl'))
 
     # Transform again based on the placement and rotation for the replaced model
     second_transformation_matrix = np.eye(4)
@@ -528,6 +532,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
     final_transformed_tenon_files = []
     final_transformed_box_files = []
+    final_transformed_cylinder_files = []
     for i in range(len(transformed_tenon_files)):
         # Transform the tenon
         transformed_tenon_file_path = transformed_tenon_files[i]
@@ -549,8 +554,19 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
         final_transformed_box_files.append(transformed_box_file_save_path)
 
-    print(f"Final transformed tenon files: {final_transformed_tenon_files}")
-    print(f"Final transformed box files: {final_transformed_box_files}")
+        # Transform the cylinder mesh for assembling interference removal
+        transformed_cylinder_file_path = assembling_interference_removal_cylinder_files[i]
+        transformed_cylinder_mesh = trimesh.load(transformed_cylinder_file_path)
+
+        transformed_cylinder_file_save_path = transformed_cylinder_file_path.replace('.stl', '_second_transformed.stl')
+        transformed_cylinder_mesh = transform_trimesh(transformed_cylinder_mesh, second_transformation_matrix)
+        transform_trimesh(transformed_cylinder_mesh, third_transformation_matrix, save_path=transformed_cylinder_file_save_path)
+
+        final_transformed_cylinder_files.append(transformed_cylinder_file_save_path)
+
+    # print(f"Final transformed tenon files: {final_transformed_tenon_files}")
+    # print(f"Final transformed box files: {final_transformed_box_files}")
+    # print(f"Final transformed cylinder files: {final_transformed_cylinder_files}")
 
     ##### Preview the transformed tenons and the link  #####
     if preview:
@@ -560,24 +576,45 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         for i in range (len(final_transformed_tenon_files)):
             transformation_matrices_vis.append(eye_transformation_matrix)
             scales_vis.append(1.0)
-        # Preview the boxes
-        for i in range (len(final_transformed_box_files)):
+        # Preview the boxes and cylinders
+        for i in range (len(final_transformed_box_files) + len(final_transformed_cylinder_files)):
             transformation_matrices_vis.append(eye_transformation_matrix)
             scales_vis.append(1.0)
-        stls_to_visualize = [replaced_stl_save_path] + final_transformed_tenon_files + final_transformed_box_files
+        stls_to_visualize = [replaced_stl_save_path] + final_transformed_tenon_files + final_transformed_box_files + final_transformed_cylinder_files
         # stls_to_visualize = [replaced_stl_save_path] + final_transformed_tenon_files
 
         visualize_meshes(stls_to_visualize, transformation_matrices_vis, scales_vis)
 
     ###### Do mesh based assembling interference removal to clear place for motor insertion ######
-    print("Doing mesh based assembling interference removal...")
-    for file in final_transformed_box_files:
-        #replaced_stl_save_path
-        try:
-            mesh_difference(replaced_stl_save_path, file, replaced_stl_save_path)
-        except Exception as e:
-            print(f"Error in mesh difference: {e}")
+    print("Doing mesh based assembling interference removal with cylinders...")
+    for file in final_transformed_cylinder_files:
+        # Back up the replaced stl file
+        shutil.copy(replaced_stl_save_path, replaced_stl_save_path.replace('.stl', '_backup.stl'))
+        # Do mesh difference
+        success = mesh_difference(replaced_stl_save_path, file, replaced_stl_save_path)
+        if not success:
+            # Restore the replaced stl file
+            print("Restoring the replaced stl file...")
+            shutil.copy(replaced_stl_save_path.replace('.stl', '_backup.stl'), replaced_stl_save_path)
             continue
+
+    print("Doing mesh based assembling interference removal with boxes...")
+    for file in final_transformed_box_files:
+        # Back up the replaced stl file
+        shutil.copy(replaced_stl_save_path, replaced_stl_save_path.replace('.stl', '_backup.stl'))
+        # Do mesh difference
+        success = mesh_difference(replaced_stl_save_path, file, replaced_stl_save_path)
+        if not success:
+            # Restore the replaced stl file
+            print("Restoring the replaced stl file...")
+            shutil.copy(replaced_stl_save_path.replace('.stl', '_backup.stl'), replaced_stl_save_path)
+            continue
+    
+    print("Mesh based assembling interference removal done.")
+
+    # Repair the mesh caused by the mesh difference
+    print("Repairing the mesh...")
+    repair_mesh(replaced_stl_save_path, replaced_stl_save_path)
 
     ###### Generate a smaller model for the shell ######
     # smaller_model_stl_name = input_stl_path.split('/')[-1].split('.')[0] + '_smaller.stl'
@@ -680,7 +717,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
     plates_num = int(width / (thickness + interval) / 2)
 
-    # TEST CODE to getsolid model with tenon. No shell or filling
+    # TEST CODE to getsolid model with tenon. No shell or filling. Comment out the following line to get the final model
     if TEST_MODE_NO_SHELL_NO_INNER:
         thickness = None
         interval = None
