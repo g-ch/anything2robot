@@ -26,42 +26,7 @@ from modules.destruction_check import destruction_check, destruction_check_urdf_
 # Comment out the following two lines if you don't have Ansys installed
 from metamaterial_filling.script.user_stl_force_relative_density_fea_opt import stl_force_relative_density_fea_opt
 from metamaterial_filling.script.pyansys_fea.mapdl_msh_analysis import MapdlFea
-
-'''
-Motor parameter library. This is used to store the motor parameters that is used in the optimization process.
-'''
-class MotorParameterLib:
-    def __init__(self):
-        self.tenon_height = 1.5 # cm. Tenon is the connection part between the motor and the link.
-
-        # Height (cm), Radius (cm), Max Torque (N*M) 
-        self.motor_lib = [        
-                          [2.25, 2.15, 0.9], # GIM3505. SITAIWEI
-                          [3.42, 2.65, 2.5], # MG4005V2. K-Tech
-                          [3.65, 3.8, 12],   # DM6006. DAMIAO Tech 
-                          [4.0, 4.8, 20], # DM8006. DAMIAO Tech
-                          [6.2, 5.56, 120], # DM10010. DAMIAO Tech
-                         ]  
-        
-        # TODO: CONSIDER MOTOR WEIGHT
-
-        # This is the connector length between two motors in a 2 DOF joint. L shape. Unit: cm
-        self.connector_lib = []
-        for i in range(len(self.motor_lib)):
-            # connector_length is radius + height/2 + 0.5. 0.5 is a margin.
-            connector_length = self.motor_lib[i][1] + self.motor_lib[i][0]/2 + 0.5
-            self.connector_lib.append([connector_length, connector_length])
-
-        # Add self.tenon_height to the motor height to consider the tenon height
-        for i in range(len(self.motor_lib)):
-            self.motor_lib[i][0] += self.tenon_height
-    
-    def get_motor_lib(self):
-        return self.motor_lib
-    
-    def get_connector_lib(self):
-        return self.connector_lib
-
+from motor_param_lib import MotorParameterLib
 
 '''
 This class is used to log the process of the optimization. The log contains a txt file and a pkl file to store the variables.
@@ -141,7 +106,7 @@ def design_one_round(args, mesh_loader, round, log, round_result_saving_folder, 
         log.log_variable('motor_opt_motor_results', motor_opt.motor_results)
         log.log_txt("Auto design best fitness: " + str(best_fitness))
         motor_opt_image_path = round_result_saving_folder + '/motor_opt_result.png'
-        motor_opt.render(save_only=save_only, save_path=motor_opt_image_path)
+        motor_opt.render(save_only=save_only, save_path=None)
 
         # Up scale the mesh if the avg motor cost is too high
         avg_motor_cost_this = best_fitness / len(motor_results)
@@ -174,10 +139,8 @@ def design_one_round(args, mesh_loader, round, log, round_result_saving_folder, 
                                                 motor_param_result=motor_results, 
                                                 link_tree=mesh_decomp.link_tree, 
                                                 father_link_dict=mesh_decomp.father_link_dict)
-        
-        joint_limits = np.vstack([np.array([-args.joint_limitation, args.joint_limitation]) for _ in range(2*len(motor_results))])
         # joint_limits = np.vstack([np.array([-0.785, 0.785]) for _ in range(2*len(motor_results))])
-        interference_removal.set_joint_limit(joint_limits)
+        interference_removal.set_joint_limit(args.joint_limitation, args.joint_limitation_from_champ)
         interference_removal.remove_interference()
         interference_removal_end_time = time.time()
 
@@ -415,8 +378,8 @@ def auto_design_function(args, mapdl_object=None):
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
 
-    # parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel.stl'), help='The path to the stl mesh file.')
-    # parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
+    parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel.stl'), help='The path to the stl mesh file.')
+    parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
     
     parser.add_argument('--stl_mesh_path', type=str, default="/home/cc/git/anything2robot/result/n02093859_276_neutral_res_e300_smoothed_scaled.stl")
     parser.add_argument('--joint_pkl_path', type=str, default="/home/cc/git/anything2robot/result/n02093859_276_neutral_res_e300_smoothed_joints.pkl")
@@ -427,10 +390,11 @@ if __name__=="__main__":
     parser.add_argument('--voxel_size', type=float, default=1, help='The size of the voxel. (cm)')
     parser.add_argument('--voxel_density', type=float, default=1.2e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
     parser.add_argument('--joint_limitation', type=float, default=0.785, help='The limitation of the joint. +-joint_limitation. (rad)')
+    parser.add_argument('--joint_limitation_from_champ', type=bool, default=True, help='Use champ controller or not. This will affect joint limits.')
 
     parser.add_argument('--max_trial_round', type=int, default=8, help='The maximum number of trial rounds.')
     parser.add_argument('--genetic_generation', type=int, default=10, help='The number of generations for the genetic algorithm')
-    parser.add_argument('--do_fea_analysis', type=bool, default=True, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
+    parser.add_argument('--do_fea_analysis', type=bool, default=False, help='Do FEA analysis or not. If true, please make sure you have Ansys installed.')
     parser.add_argument('--regenerate_if_fea_failed', type=bool, default=False, help='Regenerate the model if the FEA analysis failed or not. FEAs are expensive and strict.')
 
     parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not. Need to close the windows to continue the process if turned on.')

@@ -18,7 +18,7 @@ python3 -m pip install --user open3d==0.18.0 scikit-learn==1.3.2 scikit-image
 
 - Install UI related libs
 ```
-pip install -U kaleido vtk pyvista trimesh
+pip install -U kaleido==0.2.1 vtk pyvista trimesh
 mamba install conda-forge::qt anaconda::pyqt conda-forge::pyvistaqt
 ```
 
@@ -37,7 +37,7 @@ pip install meshio[all]
 
 - Install pinochhio
 ```
-python -m pip install pin
+conda install conda-forge::pinocchio==2.7.0
 ```
 
 - Install Ansys 2023 R2 (Note: Student edition can't be installed in Ubuntu. Make sure you have the license). To install Ansys on ubuntu, first, install the dependencies shown below. Then follow the official instructions of Ansys to install it in Ubuntu. __NOTE__: Use the default ```/root/ansys_inc``` folder to install. Install only MAPDL is sufficient. Finally, install PyAnsy. 

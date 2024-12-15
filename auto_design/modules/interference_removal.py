@@ -305,8 +305,29 @@ class InterferenceRemoval:
                 self.link_motor_dict[current_link.name].append((motor2_pos, motor2_direct, motor_radius))
                 cur_idx += 1
 
-    def set_joint_limit(self, joint_limits):
-        self.joint_limits = joint_limits
+    def set_joint_limit(self, joint_limits, joint_limitation_from_champ):
+
+        self.joint_limits = {}
+        
+        if joint_limitation_from_champ:
+            for link_name in self.link_motor_dict.keys():
+                self.joint_limits[link_name] = []
+                for motor_idx in range(len(self.link_motor_dict[link_name])):
+                    if link_name == "FL_LOW" or link_name == "RL_LOW":
+                        self.joint_limits[link_name].append(np.array([0, 3.14]))
+                    elif link_name == "FR_LOW" or link_name == "RR_LOW":
+                        self.joint_limits[link_name].append(np.array([-3.14, 0]))
+                    elif (link_name == "FL_UP" or link_name == "RL_UP") and motor_idx == 0:
+                        self.joint_limits[link_name].append(np.array([-0.52-joint_limits, -0.52+joint_limits]))
+                    elif (link_name == "FR_UP" or link_name == "RR_UP") and motor_idx == 0:
+                        self.joint_limits[link_name].append(np.array([0.52-joint_limits, 0.52+joint_limits]))
+                    else:
+                        self.joint_limits[link_name].append(np.array([-joint_limits, joint_limits]))
+        else:    
+            for link_name in self.link_motor_dict.keys():
+                self.joint_limits[link_name] = []
+                for _ in range(len(self.link_motor_dict[link_name])):
+                    self.joint_limits[link_name].append(np.array([-joint_limits, joint_limits]))
 
     def rotate_around_axis(self, axis, theta, pos):
 
@@ -360,9 +381,9 @@ class InterferenceRemoval:
             current_link_value = self.mesh_group.link_value_dict[current_link.name]
             rotation_num = 10
 
-            angle_resolution = abs(self.joint_limits[cur_idx, 0] - self.joint_limits[cur_idx, 1]) / rotation_num
-            negative_num = round(abs(self.joint_limits[cur_idx, 0]) / angle_resolution)
-            positive_num = round(abs(self.joint_limits[cur_idx, 1]) / angle_resolution)
+            angle_resolution = abs(self.joint_limits[current_link.name][0][0] - self.joint_limits[current_link.name][0][1]) / rotation_num
+            angle_center = (self.joint_limits[current_link.name][0][0] + self.joint_limits[current_link.name][0][1]) / 2.0
+            negative_num = round(abs(angle_center - self.joint_limits[current_link.name][0][0]) / angle_resolution)
 
             other_link_values = [value for value in self.mesh_group.link_value_dict.values() if value != father_link_value]
 
@@ -376,9 +397,9 @@ class InterferenceRemoval:
             #for i in range(rotation_num):  
             for i in tqdm.tqdm(range(rotation_num)):
                 if i < negative_num:
-                    joint_angle = -i * angle_resolution
+                    joint_angle = -i * angle_resolution + angle_center
                 else:
-                    joint_angle = (i - negative_num) * angle_resolution
+                    joint_angle = (i - negative_num) * angle_resolution + angle_center
 
             # for joint_angle in np.linspace(self.joint_limits[cur_idx, 0], self.joint_limits[cur_idx, 1], rotation_num):
 

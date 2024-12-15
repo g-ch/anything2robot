@@ -15,7 +15,7 @@ import open3d as o3d
 from readInnerPointsBin import read_inner_points_bin
 from sklearn.cluster import DBSCAN
 import trimesh
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 
 from collections import deque
