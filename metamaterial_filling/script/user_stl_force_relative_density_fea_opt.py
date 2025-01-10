@@ -117,7 +117,7 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
     ### Optimization parameters
     parser.add_argument("--max_allowd_stress", type=float, default=3, help="Maximum allowed von Mises stress. MPa")
     parser.add_argument("--max_allowd_displacement", type=float, default=5, help="Maximum allowed displacement. mm")
-    parser.add_argument("--max_iteration", type=int, default=1, help="Maximum number of iterations")
+    parser.add_argument("--max_iteration", type=int, default=5, help="Maximum number of iterations")
     parser.add_argument("--initial_relative_density", type=float, default=0.2, help="Initial relative density of the metamaterial structure")
     parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate for the gradient descent")
 
@@ -309,7 +309,7 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
     args.forces_nodes = force_nodes_pos_list
     args.forces = forces_list
 
-    success_flag, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes = do_static_fea(args, mapdl_object)
+    success_flag, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes, recorded_relative_density, recorded_von_mises, recorded_displacement_magnitude = do_static_fea(args, mapdl_object)
 
     # Store the FEA result
     fea_result = FEA_Opt_Result(input_stl_name_no_ext)
@@ -327,7 +327,7 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
     
     print("FEA result is saved to ", pkl_file_path)
 
-    return success_flag, best_relative_density
+    return success_flag, best_relative_density, recorded_relative_density, recorded_von_mises, recorded_displacement_magnitude
 
 
 if __name__ == "__main__":

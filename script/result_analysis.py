@@ -322,11 +322,11 @@ class DatasetResultAnalysis:
         print(f"Valid num: {valid_num}")
         print(f"Valid rate: {valid_rate}")
         print(f"Success rate: {success_rate}")
-        print(f"Failure code 1 num: {failure_code_1_num} The motor cost is too high.")
-        print(f"Failure code 2 num: {failure_code_2_num} The mesh is destroyed after interference removal.")
-        print(f"Failure code 3 num: {failure_code_3_num} The mesh is not watertight after interference removal.")
-        print(f"Failure code 4 num: {failure_code_4_num} The mesh is not feasible in FEA.")
-        print(f"Failure codes round: {failure_codes_round}")
+        # print(f"Failure code 1 num: {failure_code_1_num} The motor cost is too high.")
+        # print(f"Failure code 2 num: {failure_code_2_num} The mesh is destroyed after interference removal.")
+        # print(f"Failure code 3 num: {failure_code_3_num} The mesh is not watertight after interference removal.")
+        # print(f"Failure code 4 num: {failure_code_4_num} The mesh is not feasible in FEA.")
+        # print(f"Failure codes round: {failure_codes_round}")
         print(f"Success rate round: {growing_success_rate_rounds}")
 
         failure_codes_num = [failure_code_1_num, failure_code_2_num, failure_code_3_num, failure_code_4_num]
@@ -351,11 +351,11 @@ if __name__ == '__main__':
     # dataset_result_folder = "/media/clarence/Clarence/anything2robot_data/standford_dogs/result_2024_10_27_dog100_no_fea"
     dataset_result_analysis = DatasetResultAnalysis(dataset_result_folder)
 
-    ######## Success rate
+    ######## Success rate and time consumption
     valid_rate, success_rate, failure_codes_num, failure_codes_round, growing_success_rate_rounds = dataset_result_analysis.get_success_rate(log_csv_path = dataset_result_folder + '/result_log.csv')
-    
-    ######## Time consumption
+ 
     avg_time_consumption_rounds, max_time_consumption_rounds, min_time_consumption_rounds, time_consumption_each_success_part = dataset_result_analysis.get_time_consumption()
+    
     avg_time_each_success_part = np.mean(time_consumption_each_success_part, axis=0)
     std_dev_time_each_success_part = np.std(time_consumption_each_success_part, axis=0)
     print(f"Average time consumption each success part: {avg_time_each_success_part}")
@@ -402,4 +402,12 @@ if __name__ == '__main__':
     ax1.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
     ax1.axis('equal')
     plt.show()
-    
+
+    # Plot the reason of failure in a pie chart
+    labels = ['Motor cost too high', 'Mesh destroyed in interference removal', 'FEA not feasible']
+    sizes = [failure_codes_num[0], failure_codes_num[1]+failure_codes_num[2], failure_codes_num[3]]
+    fig1, ax1 = plt.subplots()
+    ax1.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
+    ax1.axis('equal')
+    plt.show()
+

@@ -160,6 +160,10 @@ def do_static_fea(args, mapdl_object=None):
     mesh_file_path_no_ext = mesh_file_path.replace('.msh', '')
     print(f'Mesh file path: {mesh_file_path_no_ext}')
 
+    recorded_relative_density = []
+    recorded_von_mises = []
+    recorded_displacement_magnitude = []
+
     # Check if using fully filled structure (relative_density=1) can meet the target
     relative_density = 1.0
 
@@ -170,6 +174,11 @@ def do_static_fea(args, mapdl_object=None):
 
     max_stress, max_displacement,von_mises, displacement_magnitude, nodes  = mapdl_object.static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=args.material_young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
     
+    # Record
+    recorded_relative_density.append(relative_density)
+    recorded_von_mises.append(max_stress)
+    recorded_displacement_magnitude.append(max_displacement)
+    
     stress_to_allowed_value =  max_stress - args.max_allowd_stress
     displacement_to_allowed_value = max_displacement- args.max_allowd_displacement
 
@@ -178,10 +187,10 @@ def do_static_fea(args, mapdl_object=None):
         print(f'The best von Mises stress and displacement are:')
         print(f"Max von Mises stress: {max_stress}")
         print(f"Max displacement: {max_displacement}")
-        return False, relative_density, args.material_young_modulus, von_mises, displacement_magnitude, nodes
+        return False, relative_density, args.material_young_modulus, von_mises, displacement_magnitude, nodes, recorded_relative_density, recorded_von_mises, recorded_displacement_magnitude
 
     if args.check_only:
-        return True, relative_density, args.material_young_modulus, von_mises, displacement_magnitude, nodes
+        return True, relative_density, args.material_young_modulus, von_mises, displacement_magnitude, nodes, recorded_relative_density, recorded_von_mises, recorded_displacement_magnitude
 
 
     # Set the initial best values
@@ -196,6 +205,11 @@ def do_static_fea(args, mapdl_object=None):
 
     max_stress, max_displacement, von_mises, displacement_magnitude, nodes  = mapdl_object.static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
     
+    # Record
+    recorded_relative_density.append(relative_density)
+    recorded_von_mises.append(max_stress)
+    recorded_displacement_magnitude.append(max_displacement)
+
     stress_to_allowed_value =  max_stress - args.max_allowd_stress
     displacement_to_allowed_value = max_displacement- args.max_allowd_displacement 
 
@@ -213,6 +227,11 @@ def do_static_fea(args, mapdl_object=None):
         
         young_modulus = get_equivalent_young_modulus(args.material_young_modulus, relative_density_new, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)        
         max_stress_new, max_displacement_new, von_mises, displacement_magnitude, nodes  = mapdl_object.static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
+
+        # Record
+        recorded_relative_density.append(relative_density)
+        recorded_von_mises.append(max_stress)
+        recorded_displacement_magnitude.append(max_displacement)
 
         stress_to_allowed_value_new = max_stress_new - args.max_allowd_stress
         displacement_to_allowed_value_new = max_displacement_new - args.max_allowd_displacement
@@ -274,7 +293,7 @@ def do_static_fea(args, mapdl_object=None):
     if mapdl_created_in_this_function:
         mapdl_object.shutdown()
 
-    return True, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes
+    return True, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes, recorded_relative_density, recorded_von_mises, recorded_displacement_magnitude
 
 
 if __name__ == '__main__':
