@@ -48,6 +48,7 @@ class ResultOneRound:
             self.interference_removal_time = self.try_to_get_item_from_log_dict('interference_removal_time')
             self.result_saving_time = self.try_to_get_item_from_log_dict('result_saving_time')
             self.destruction_check_time = self.try_to_get_item_from_log_dict('destruction_check_time')
+            self.fea_time = self.try_to_get_item_from_log_dict('fea_time')
 
         # Find a txt file in the folder that contains "round"
         for file in os.listdir(round_folder_path):
@@ -191,8 +192,9 @@ class DatasetResultAnalysis:
                 model_name_dict[name_this] = model_result
 
         self.model_results = list(model_name_dict.values())
-    
-    def get_success_rate(self, log_csv_path=None):
+
+
+    def get_success_rate(self, log_csv_path=None, max_round_num=8):
         valid_num = 0
         success_num = 0
         failure_code_1_num = 0
@@ -200,25 +202,36 @@ class DatasetResultAnalysis:
         failure_code_3_num = 0
         failure_code_4_num = 0
 
+        failure_codes_round = np.zeros((max_round_num, 4)) # 4 failure codes: 1, 2, 3, 4
+        success_rate_round = np.ones(max_round_num)
+
         log_dict = {}
         for model_result in self.model_results:
             if model_result.valid_flag:
                 valid_num += 1
                 if model_result.success_flag:
                     success_num += 1
-                else:
-                    for code in model_result.failure_codes:
-                        if code == 1:
-                            failure_code_1_num += 1
-                        elif code == 2:
-                            failure_code_2_num += 1
-                        elif code == 3:
-                            failure_code_3_num += 1
-                        elif code == 4:
-                            failure_code_4_num += 1
-            
+                
+                round = 0
+                for code in model_result.failure_codes: 
+                    if code == 1:
+                        failure_code_1_num += 1
+                    elif code == 2:
+                        failure_code_2_num += 1
+                    elif code == 3:
+                        failure_code_3_num += 1
+                    elif code == 4:
+                        failure_code_4_num += 1
+
+                    failure_codes_round[round, code-1] += 1
+                    round += 1
+
             log_dict[model_result.model_name] = [model_result.valid_flag, model_result.success_flag, model_result.success_round_id, model_result.failure_codes]
-        
+
+        for i in range(max_round_num):
+            if valid_num > 0:
+                success_rate_round[i] = (valid_num - failure_codes_round[i].sum()) / valid_num
+
         # Save the log to a csv file if log_csv_path is provided
         if log_csv_path is not None:
             if log_csv_path.endswith('.csv'):
@@ -237,14 +250,16 @@ class DatasetResultAnalysis:
         print(f"Valid num: {valid_num}")
         print(f"Valid rate: {valid_rate}")
         print(f"Success rate: {success_rate}")
-        print(f"Failure code 1 num: {failure_code_1_num}")
-        print(f"Failure code 2 num: {failure_code_2_num}")
-        print(f"Failure code 3 num: {failure_code_3_num}")
-        print(f"Failure code 4 num: {failure_code_4_num}")
+        print(f"Failure code 1 num: {failure_code_1_num} The motor cost is too high.")
+        print(f"Failure code 2 num: {failure_code_2_num} The mesh is destroyed after interference removal.")
+        print(f"Failure code 3 num: {failure_code_3_num} The mesh is not watertight after interference removal.")
+        print(f"Failure code 4 num: {failure_code_4_num} The mesh is not feasible in FEA.")
+        print(f"Failure codes round: {failure_codes_round}")
+        print(f"Success rate round: {success_rate_round}")
 
         failure_codes_num = [failure_code_1_num, failure_code_2_num, failure_code_3_num, failure_code_4_num]
 
-        return valid_rate, success_rate, failure_codes_num
+        return valid_rate, success_rate, failure_codes_num, failure_codes_round
 
 
 if __name__ == '__main__':

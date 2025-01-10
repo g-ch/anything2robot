@@ -6,7 +6,6 @@ import time
 # Add dependencies path
 import sys
 import trimesh
-import time
 
 project_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_path)
