@@ -194,6 +194,78 @@ class DatasetResultAnalysis:
         self.model_results = list(model_name_dict.values())
 
 
+    def get_time_consumption(self, max_round_num=8):        
+        total_time_consumption_rounds = np.zeros(max_round_num)
+        max_time_consumption_rounds = np.zeros(max_round_num)
+        min_time_consumption_rounds = np.ones(max_round_num) * 1e10
+        number_of_samples_each_round = np.zeros(max_round_num)
+
+        total_success_result_num = 0
+        for model_result in self.model_results:
+            if not model_result.valid_flag:
+                continue
+
+            max_round_id = model_result.success_round_id
+            if max_round_id is None:
+                max_round_id = model_result.round_num
+            else:
+                total_success_result_num += 1
+            
+            for i in range(max_round_id):
+                #time_this_round = model_result.result_all_rounds[i].decompose_time + model_result.result_all_rounds[i].motor_opt_time + model_result.result_all_rounds[i].joint_connect_time + model_result.result_all_rounds[i].interference_removal_time + model_result.result_all_rounds[i].result_saving_time + model_result.result_all_rounds[i].destruction_check_time + model_result.result_all_rounds[i].fea_time
+                
+                time_this_round = 0
+                time_this_round = self.add_if_not_none(time_this_round, model_result.result_all_rounds[i].decompose_time)
+                time_this_round = self.add_if_not_none(time_this_round, model_result.result_all_rounds[i].motor_opt_time)
+                time_this_round = self.add_if_not_none(time_this_round, model_result.result_all_rounds[i].joint_connect_time)
+                time_this_round = self.add_if_not_none(time_this_round, model_result.result_all_rounds[i].interference_removal_time)
+                time_this_round = self.add_if_not_none(time_this_round, model_result.result_all_rounds[i].result_saving_time)
+                time_this_round = self.add_if_not_none(time_this_round, model_result.result_all_rounds[i].destruction_check_time)
+                time_this_round = self.add_if_not_none(time_this_round, model_result.result_all_rounds[i].fea_time)
+                
+                total_time_consumption_rounds[i] += time_this_round
+                if time_this_round > max_time_consumption_rounds[i]:
+                    max_time_consumption_rounds[i] = time_this_round
+                if time_this_round < min_time_consumption_rounds[i]:
+                    min_time_consumption_rounds[i] = time_this_round
+                number_of_samples_each_round[i] += 1
+        
+        avg_time_consumption_rounds = total_time_consumption_rounds / number_of_samples_each_round
+        print(f"Average time consumption rounds: {avg_time_consumption_rounds}")
+        print(f"Max time consumption rounds: {max_time_consumption_rounds}")
+        print(f"Min time consumption rounds: {min_time_consumption_rounds}")
+
+        time_consumption_each_success_part = np.zeros((total_success_result_num, 5))
+        seq = 0
+        for model_result in self.model_results:
+            if not model_result.valid_flag:
+                continue
+            if not model_result.success_flag:
+                continue
+            
+            time_consumption_each_success_part[seq, 0] = model_result.success_round_data.decompose_time
+            time_consumption_each_success_part[seq, 1] = model_result.success_round_data.motor_opt_time
+            time_consumption_each_success_part[seq, 2] = model_result.success_round_data.joint_connect_time
+            time_consumption_each_success_part[seq, 3] = model_result.success_round_data.interference_removal_time + model_result.success_round_data.result_saving_time + model_result.success_round_data.destruction_check_time
+            time_consumption_each_success_part[seq, 4] = model_result.success_round_data.fea_time
+            
+            seq += 1
+            if seq > total_success_result_num:
+                print("Error: seq > total_success_result_num")
+                break
+        
+        return avg_time_consumption_rounds, max_time_consumption_rounds, min_time_consumption_rounds, time_consumption_each_success_part
+    
+    
+    def add_if_not_none(self, a, b):
+        if a is not None:
+            if b is not None:
+                return a + b
+            else:
+                return a
+        else:
+            return b
+
     def get_success_rate(self, log_csv_path=None, max_round_num=8):
         valid_num = 0
         success_num = 0
@@ -203,7 +275,7 @@ class DatasetResultAnalysis:
         failure_code_4_num = 0
 
         failure_codes_round = np.zeros((max_round_num, 4)) # 4 failure codes: 1, 2, 3, 4
-        success_rate_round = np.ones(max_round_num)
+        growing_success_rate_rounds = np.ones(max_round_num)
 
         log_dict = {}
         for model_result in self.model_results:
@@ -230,7 +302,7 @@ class DatasetResultAnalysis:
 
         for i in range(max_round_num):
             if valid_num > 0:
-                success_rate_round[i] = (valid_num - failure_codes_round[i].sum()) / valid_num
+                growing_success_rate_rounds[i] = (valid_num - failure_codes_round[i].sum()) / valid_num
 
         # Save the log to a csv file if log_csv_path is provided
         if log_csv_path is not None:
@@ -255,11 +327,11 @@ class DatasetResultAnalysis:
         print(f"Failure code 3 num: {failure_code_3_num} The mesh is not watertight after interference removal.")
         print(f"Failure code 4 num: {failure_code_4_num} The mesh is not feasible in FEA.")
         print(f"Failure codes round: {failure_codes_round}")
-        print(f"Success rate round: {success_rate_round}")
+        print(f"Success rate round: {growing_success_rate_rounds}")
 
         failure_codes_num = [failure_code_1_num, failure_code_2_num, failure_code_3_num, failure_code_4_num]
 
-        return valid_rate, success_rate, failure_codes_num, failure_codes_round
+        return valid_rate, success_rate, failure_codes_num, failure_codes_round, growing_success_rate_rounds
 
 
 if __name__ == '__main__':
@@ -275,8 +347,59 @@ if __name__ == '__main__':
     # print(model_result.valid_flag)
     # print(model_result.success_flag)
 
-    dataset_result_folder = '/home/cc/git/anything2robot/result'
+    dataset_result_folder = '/media/clarence/Clarence/anything2robot_data/result'
     # dataset_result_folder = "/media/clarence/Clarence/anything2robot_data/standford_dogs/result_2024_10_27_dog100_no_fea"
     dataset_result_analysis = DatasetResultAnalysis(dataset_result_folder)
-    dataset_result_analysis.get_success_rate(log_csv_path = dataset_result_folder + '/result_log.csv')
 
+    ######## Success rate
+    valid_rate, success_rate, failure_codes_num, failure_codes_round, growing_success_rate_rounds = dataset_result_analysis.get_success_rate(log_csv_path = dataset_result_folder + '/result_log.csv')
+    
+    ######## Time consumption
+    avg_time_consumption_rounds, max_time_consumption_rounds, min_time_consumption_rounds, time_consumption_each_success_part = dataset_result_analysis.get_time_consumption()
+    avg_time_each_success_part = np.mean(time_consumption_each_success_part, axis=0)
+    std_dev_time_each_success_part = np.std(time_consumption_each_success_part, axis=0)
+    print(f"Average time consumption each success part: {avg_time_each_success_part}")
+    print(f"Std dev time consumption each success part: {std_dev_time_each_success_part}")
+
+    growing_avg_time_consumption_rounds = np.zeros(growing_success_rate_rounds.shape)
+    growing_max_time_consumption_rounds = np.zeros(growing_success_rate_rounds.shape)
+    growing_min_time_consumption_rounds = np.zeros(growing_success_rate_rounds.shape)
+    for i in range(growing_avg_time_consumption_rounds.shape[0]):
+        for j in range(i+1):
+            growing_avg_time_consumption_rounds[i] += avg_time_consumption_rounds[j]
+            growing_max_time_consumption_rounds[i] += max_time_consumption_rounds[j]
+            growing_min_time_consumption_rounds[i] += min_time_consumption_rounds[j]
+
+    # Draw a bar plot of growing_success_rate_rounds and a line plot of growing_avg_time_consumption_rounds, growing_max_time_consumption_rounds, growing_min_time_consumption_rounds
+    round_num = growing_success_rate_rounds.shape[0]
+    fig, ax1 = plt.subplots()
+    ax2 = ax1.twinx()
+    ax1.bar(np.arange(round_num), growing_success_rate_rounds, color='b', alpha=0.5)
+    ax2.plot(np.arange(round_num), growing_avg_time_consumption_rounds, marker='o', color='r', label='Average time consumption')
+    ax2.plot(np.arange(round_num), growing_max_time_consumption_rounds, marker='s', color='g', label='Max time consumption')
+    ax2.plot(np.arange(round_num), growing_min_time_consumption_rounds,  marker='^', color='orange', label='Min time consumption')
+    
+    ax1.set_xlabel('Round')
+    ax1.set_ylabel('Success rate', color='b')
+    ax2.set_ylabel('Average time consumption', color='r')
+    ax2.legend()
+    plt.show()
+
+    # Plot the time consumption of each success part in a box plot
+    fig, ax = plt.subplots()
+    ax.boxplot(time_consumption_each_success_part, patch_artist=True)
+    ax.set_xticklabels(['Decompose', 'Motor opt', 'Joint connect', 'Interference removal', 'FEA'])
+    ax.set_ylabel('Time consumption (s)')
+    # Add grid
+    ax.yaxis.grid(True)
+    ax.xaxis.grid(True)
+    plt.show()
+
+    # Plot the average time consumption of each success part in a pie chart
+    labels = ['Decompose', 'Motor opt', 'Joint connect', 'Interference removal', 'FEA']
+    sizes = avg_time_each_success_part
+    fig1, ax1 = plt.subplots()
+    ax1.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
+    ax1.axis('equal')
+    plt.show()
+    
