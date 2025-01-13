@@ -82,7 +82,7 @@ def create_sphere(center, radius=1.0, color=[1, 0, 0]):
     return sphere
 
 
-def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=None, output_folder=None, check_only=False, max_iteration=None, max_allowd_stress=None, max_allowd_displacement=None, display_fea_result=None, display_force_result=None, mapdl_object=None):
+def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=None, output_folder=None, check_only=False, max_iteration=None, max_allowed_stress=None, max_allowed_displacement=None, display_fea_result=None, display_force_result=None, mapdl_object=None):
     parser = argparse.ArgumentParser(description="Static FEA Analysis for STL with given forces and fixed nodes")
     
     parser.add_argument("--input_stl_path", type=str, default='/home/clarence/git/anything2robot/anything2robot/urdf/gold_lynel20241010-134328_good/BODY_UP.stl', help="Path to the mesh .stl file")
@@ -115,8 +115,8 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
     parser.add_argument("--display_force_result", type=bool, default=True, help="Display the forces")
 
     ### Optimization parameters
-    parser.add_argument("--max_allowd_stress", type=float, default=3, help="Maximum allowed von Mises stress. MPa")
-    parser.add_argument("--max_allowd_displacement", type=float, default=5, help="Maximum allowed displacement. mm")
+    parser.add_argument("--max_allowed_stress", type=float, default=3, help="Maximum allowed von Mises stress. MPa")
+    parser.add_argument("--max_allowed_displacement", type=float, default=5, help="Maximum allowed displacement. mm")
     parser.add_argument("--max_iteration", type=int, default=5, help="Maximum number of iterations")
     parser.add_argument("--initial_relative_density", type=float, default=0.2, help="Initial relative density of the metamaterial structure")
     parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate for the gradient descent")
@@ -138,10 +138,10 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
         args.output_folder = output_folder
     if max_iteration is not None:
         args.max_iteration = max_iteration
-    if max_allowd_stress is not None:
-        args.max_allowd_stress = max_allowd_stress
-    if max_allowd_displacement is not None:
-        args.max_allowd_displacement = max_allowd_displacement
+    if max_allowed_stress is not None:
+        args.max_allowed_stress = max_allowed_stress
+    if max_allowed_displacement is not None:
+        args.max_allowed_displacement = max_allowed_displacement
     if display_fea_result is not None:
         args.display_fea_result = display_fea_result
     if display_force_result is not None:
@@ -314,9 +314,9 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
     # Store the FEA result
     fea_result = FEA_Opt_Result(input_stl_name_no_ext)
     
-    nodes_seq_stress_exceeded = np.where(von_mises > args.max_allowd_stress)[0]
+    nodes_seq_stress_exceeded = np.where(von_mises > args.max_allowed_stress)[0]
 
-    fea_result.set_result(success_flag, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes, args.max_allowd_stress, args.max_allowd_displacement, nodes_seq_stress_exceeded)
+    fea_result.set_result(success_flag, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes, args.max_allowed_stress, args.max_allowed_displacement, nodes_seq_stress_exceeded)
             
     # Serialize the object to a pkl file
     pkl_file_path = os.path.dirname(os.path.abspath(__file__)) + "/../" + args.output_folder + "/" + input_stl_name_no_ext + "_fea_result.pkl"

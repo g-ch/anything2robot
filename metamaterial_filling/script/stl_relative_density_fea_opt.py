@@ -179,8 +179,8 @@ def do_static_fea(args, mapdl_object=None):
     recorded_von_mises.append(max_stress)
     recorded_displacement_magnitude.append(max_displacement)
     
-    stress_to_allowed_value =  max_stress - args.max_allowd_stress
-    displacement_to_allowed_value = max_displacement- args.max_allowd_displacement
+    stress_to_allowed_value =  max_stress - args.max_allowed_stress
+    displacement_to_allowed_value = max_displacement- args.max_allowed_displacement
 
     if stress_to_allowed_value > 0 or displacement_to_allowed_value > 0:
         print(f'The metamaterial cannot be used with the given conditions. The best relative density is 1')
@@ -210,8 +210,8 @@ def do_static_fea(args, mapdl_object=None):
     recorded_von_mises.append(max_stress)
     recorded_displacement_magnitude.append(max_displacement)
 
-    stress_to_allowed_value =  max_stress - args.max_allowd_stress
-    displacement_to_allowed_value = max_displacement- args.max_allowd_displacement 
+    stress_to_allowed_value =  max_stress - args.max_allowed_stress
+    displacement_to_allowed_value = max_displacement- args.max_allowed_displacement 
 
     print(f"The maximum von Mises stress and displacement of relative_density={relative_density} are:")
     print(f"Max von Mises stress: {max_stress}")
@@ -233,8 +233,8 @@ def do_static_fea(args, mapdl_object=None):
         recorded_von_mises.append(max_stress)
         recorded_displacement_magnitude.append(max_displacement)
 
-        stress_to_allowed_value_new = max_stress_new - args.max_allowd_stress
-        displacement_to_allowed_value_new = max_displacement_new - args.max_allowd_displacement
+        stress_to_allowed_value_new = max_stress_new - args.max_allowed_stress
+        displacement_to_allowed_value_new = max_displacement_new - args.max_allowed_displacement
 
         print(f"The maximum von Mises stress and displacement of relative_density={relative_density_new} are:")
         print(f"Max von Mises stress: {max_stress_new}")
@@ -327,8 +327,8 @@ if __name__ == '__main__':
     parser.add_argument("--display_fea_result", type=bool, default=False, help="Display the models")
 
     ### Optimization parameters
-    parser.add_argument("--max_allowd_stress", type=float, default=500, help="Maximum allowed von Mises stress. MPa")
-    parser.add_argument("--max_allowd_displacement", type=float, default=2, help="Maximum allowed displacement. mm")
+    parser.add_argument("--max_allowed_stress", type=float, default=500, help="Maximum allowed von Mises stress. MPa")
+    parser.add_argument("--max_allowed_displacement", type=float, default=2, help="Maximum allowed displacement. mm")
     parser.add_argument("--max_iteration", type=int, default=5, help="Maximum number of iterations")
     parser.add_argument("--initial_relative_density", type=float, default=0.2, help="Initial relative density of the metamaterial structure")
     parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate for the gradient descent")
