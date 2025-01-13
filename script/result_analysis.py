@@ -347,7 +347,7 @@ if __name__ == '__main__':
     # print(model_result.valid_flag)
     # print(model_result.success_flag)
 
-    dataset_result_folder = '/media/clarence/Clarence/anything2robot_data/result'
+    dataset_result_folder = '/home/cc/git/anything2robot/result'
     # dataset_result_folder = "/media/clarence/Clarence/anything2robot_data/standford_dogs/result_2024_10_27_dog100_no_fea"
     dataset_result_analysis = DatasetResultAnalysis(dataset_result_folder)
 

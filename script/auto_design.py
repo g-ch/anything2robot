@@ -211,8 +211,9 @@ def design_one_round(args, mesh_loader, round, log, round_result_saving_folder, 
                     continue
 
                 log.log_txt("*******Do FEA analysis for: " + stl_file)
-                # More parameters can be set in the function stl_force_relative_density_fea_opt
-                success_flag, best_relative_density, recorded_relative_density, recorded_von_mises, recorded_displacement_magnitude = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, check_only=True, max_iteration=max_iteration, display_fea_result=args.visualize, display_force_result=False, mapdl_object=mapdl_object)
+                # More parameters can be set in the function stl_force_relative_density_fea_opt.
+                # Note: if check_only is set to True, the function will only check if the mesh is feasible in FEA. It will not do the optimization.
+                success_flag, best_relative_density, recorded_relative_density, recorded_von_mises, recorded_displacement_magnitude = stl_force_relative_density_fea_opt(stl_path_input=stl_file, robot_result_file=pkl_file_path, check_only=False, max_iteration=max_iteration, display_fea_result=args.visualize, display_force_result=False, mapdl_object=mapdl_object)
                 #exit()
 
                 if not success_flag:
