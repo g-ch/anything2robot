@@ -108,7 +108,7 @@ if __name__ == '__main__':
     parser.add_argument("--display_fea_result", type=bool, default=False, help="Display the models")
 
     ### Optimization parameters
-    parser.add_argument("--max_allowed_stress", type=float, default=500, help="Maximum allowed von Mises stress. MPa")
+    parser.add_argument("--max_allowed_stress_material", type=float, default=76, help="Maximum allowed von Mises stress. MPa")
     parser.add_argument("--max_allowed_displacement", type=float, default=2, help="Maximum allowed displacement. mm")
     parser.add_argument("--max_iteration", type=int, default=5, help="Maximum number of iterations")
     parser.add_argument("--initial_relative_density", type=float, default=0.2, help="Initial relative density of the metamaterial structure")
@@ -179,7 +179,7 @@ if __name__ == '__main__':
     # Check if using fully filled structure (relative_density=1) can meet the target
     relative_density = 1.0
     max_stress, max_displacement = static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=args.material_young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_end=args.fixed_end, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
-    stress_to_allowed =  max_stress - args.max_allowed_stress
+    stress_to_allowed =  max_stress - args.max_allowed_stress_material
     displacement_to_allowed = max_displacement- args.max_allowed_displacement
 
     if stress_to_allowed > 0 or displacement_to_allowed > 0:
@@ -198,7 +198,7 @@ if __name__ == '__main__':
     relative_density = args.initial_relative_density
     young_modulus = get_equivalent_young_modulus(args.material_young_modulus, relative_density, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)
     max_stress, max_displacement  = static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_end=args.fixed_end, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
-    stress_to_allowed =  max_stress - args.max_allowed_stress
+    stress_to_allowed =  max_stress - args.max_allowed_stress_material
     displacement_to_allowed = max_displacement- args.max_allowed_displacement 
 
     print(f"The maximum von Mises stress and displacement of relative_density={relative_density} are:")
@@ -215,7 +215,7 @@ if __name__ == '__main__':
         
         young_modulus = get_equivalent_young_modulus(args.material_young_modulus, relative_density_new, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)
         max_stress_new, max_displacement_new  = static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_end=args.fixed_end, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
-        stress_to_allowed_new = max_stress_new - args.max_allowed_stress
+        stress_to_allowed_new = max_stress_new - args.max_allowed_stress_material
         displacement_to_allowed_new = max_displacement_new - args.max_allowed_displacement
 
         print(f"The maximum von Mises stress and displacement of relative_density={relative_density_new} are:")

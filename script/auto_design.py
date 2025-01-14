@@ -205,7 +205,7 @@ def design_one_round(args, mesh_loader, round, log, round_result_saving_folder, 
         if args.do_fea_analysis:
             log.log_txt("Do FEA analysis...")
             fea_start_time = time.time()
-            max_iteration = 5 # The maximum number of searching iterations for the FEA analysis to determine the best relative density of the voxels
+            max_iteration = 2 # The maximum number of searching iterations for the FEA analysis to determine the best relative density of the voxels in addition to the first two iterations.
             for stl_file in stl_files:
                 if "BODY" in stl_file: # Skip the body part for quick testing
                     continue

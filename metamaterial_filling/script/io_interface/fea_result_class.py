@@ -6,7 +6,7 @@ self.young_modulus: The young's modulus of the optimized structure. Float
 self.von_mises: The von mises stress of the optimized structure. NumPy array. Shape: (num_nodes,)
 self.displacement_magnitude: The displacement magnitude of the optimized structure. NumPy array. Shape: (num_nodes,)
 self.nodes: The nodal coordinates of the optimized structure. NumPy array. Shape: (num_nodes, 3)
-self.max_allowed_stress: The maximum allowed stress in the structure. Float
+self.max_allowed_stress_material: The maximum allowed stress in the structure. Float
 self.max_allowed_displacement: The maximum allowed displacement in the structure. Float
 self.nodes_seq_exceeding_stress: Sequence of nodes that exceed the maximum allowed stress. List of integers.
 '''
@@ -23,12 +23,12 @@ class FEA_Opt_Result:
         self.displacement_magnitude = None
         self.nodes = None
 
-        self.max_allowed_stress = None
+        self.max_allowed_stress_material = None
         self.max_allowed_displacement = None
 
         self.nodes_seq_exceeding_stress = None
 
-    def set_result(self, success_flag, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes, max_allowed_stress, max_allowed_displacement, nodes_seq_exceeding_stress):
+    def set_result(self, success_flag, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes, max_allowed_stress_material, max_allowed_displacement, nodes_seq_exceeding_stress):
         self.success_flag = success_flag
         self.best_relative_density = best_relative_density
         self.young_modulus = young_modulus
@@ -36,19 +36,19 @@ class FEA_Opt_Result:
         self.displacement_magnitude = displacement_magnitude
         self.nodes = nodes
 
-        self.max_allowed_stress = max_allowed_stress
+        self.max_allowed_stress_material = max_allowed_stress_material
         self.max_allowed_displacement = max_allowed_displacement
 
         self.nodes_seq_exceeding_stress = nodes_seq_exceeding_stress
     
     def get_result(self):
-        return self.success_flag, self.best_relative_density, self.young_modulus, self.von_mises, self.displacement_magnitude, self.nodes, self.max_allowed_stress, self.max_allowed_displacement, self.nodes_seq_exceeding_stress
+        return self.success_flag, self.best_relative_density, self.young_modulus, self.von_mises, self.displacement_magnitude, self.nodes, self.max_allowed_stress_material, self.max_allowed_displacement, self.nodes_seq_exceeding_stress
 
     def show_result(self):
         print('success_flag:', self.success_flag)
         print('best_relative_density:', self.best_relative_density)
         print('young_modulus:', self.young_modulus)
-        print('max_allowed_stress:', self.max_allowed_stress)
+        print('max_allowed_stress_material:', self.max_allowed_stress_material)
         print('max_allowed_displacement:', self.max_allowed_displacement)
         print('nodes_seq_exceeding_stress:', self.nodes_seq_exceeding_stress)
 
