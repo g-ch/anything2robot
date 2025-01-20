@@ -273,8 +273,9 @@ class DatasetResultAnalysis:
         failure_code_2_num = 0
         failure_code_3_num = 0
         failure_code_4_num = 0
+        failure_code_others = 0
 
-        failure_codes_round = np.zeros((max_round_num, 4)) # 4 failure codes: 1, 2, 3, 4
+        failure_codes_round = np.zeros((max_round_num, 5)) # 4 failure codes: 1, 2, 3, 4, (5 is others)
         growing_success_rate_rounds = np.ones(max_round_num)
 
         log_dict = {}
@@ -294,6 +295,9 @@ class DatasetResultAnalysis:
                         failure_code_3_num += 1
                     elif code == 4:
                         failure_code_4_num += 1
+                    else:
+                        failure_code_others += 1
+                        code = 5 # others
 
                     failure_codes_round[round, code-1] += 1
                     round += 1
