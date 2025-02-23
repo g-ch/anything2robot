@@ -40,7 +40,7 @@ class ResultOneRound:
 
             self.decompose_voxel_num = self.try_to_get_item_from_log_dict('decompose_voxel_num')
             self.decompose_time = self.try_to_get_item_from_log_dict('decompose_time')
-            self.motor_opt_cost_log = self.try_to_get_item_from_log_dict('motor_opt_cost_log')
+            self.motor_opt_cost_log = self.try_to_get_item_from_log_dict('motor_opt_cost_log')  # Motor cost log: cost_motor_position, cost_motor_occupancy, two_degree_rotation_interference_cost
             self.motor_opt_time = self.try_to_get_item_from_log_dict('motor_opt_time')
             self.joint_connect_voxel_num = self.try_to_get_item_from_log_dict('joint_connect_voxel_num')
             self.joint_connect_time = self.try_to_get_item_from_log_dict('joint_connect_time')
@@ -168,6 +168,10 @@ class DatasetResultAnalysis:
 
         self.merge_results() # Merge results with the same model name
 
+    '''
+    This function is used to merge results with the same model name.
+    Used in initialize the DatasetResultAnalysis class.
+    '''
     def merge_results(self):
         # If two models have the same name, merge their results. If result is successful, keep the successful one. If both are failed, keep the valid one. If both are invalid, keep the one with more rounds.
         model_name_dict = {}
@@ -193,7 +197,10 @@ class DatasetResultAnalysis:
 
         self.model_results = list(model_name_dict.values())
 
-
+    '''
+    This function is used to get the time consumption of all rounds. Check return value for more details.
+    max_round_num is the maximum number of rounds to consider.
+    '''
     def get_time_consumption(self, max_round_num=8):        
         total_time_consumption_rounds = np.zeros(max_round_num)
         max_time_consumption_rounds = np.zeros(max_round_num)
@@ -256,7 +263,9 @@ class DatasetResultAnalysis:
         
         return avg_time_consumption_rounds, max_time_consumption_rounds, min_time_consumption_rounds, time_consumption_each_success_part
     
-    
+    '''
+    This function is used to add two numbers if they are not None.
+    '''
     def add_if_not_none(self, a, b):
         if a is not None:
             if b is not None:
@@ -265,7 +274,12 @@ class DatasetResultAnalysis:
                 return a
         else:
             return b
-
+        
+    '''
+    This function is used to get the success rate of all models.
+    log_csv_path is the path to save the log if provided.
+    max_round_num is the maximum number of rounds to consider.
+    '''
     def get_success_rate(self, log_csv_path=None, max_round_num=8):
         valid_num = 0
         success_num = 0
@@ -337,6 +351,58 @@ class DatasetResultAnalysis:
 
         return valid_rate, success_rate, failure_codes_num, failure_codes_round, growing_success_rate_rounds
 
+    '''
+    This function is used to get the motor cost of all rounds. The result is a map of round id to a list of motor costs of each success round.
+    max_round_num is the maximum number of rounds to consider.
+    '''
+    def get_motor_cost(self, max_round_num=8):
+        motor_position_cost_rounds_map = {}
+        motor_occupancy_cost_rounds_map = {}
+        two_degree_rotation_interference_cost_rounds_map = {}
+
+        for i in range(1, max_round_num+1):
+            motor_position_cost_rounds_map[i] = []
+            motor_occupancy_cost_rounds_map[i] = []
+            two_degree_rotation_interference_cost_rounds_map[i] = []
+
+        for model_result in self.model_results:
+            if not model_result.valid_flag:
+                continue
+            if not model_result.success_flag:
+                continue
+            
+            success_round_data = model_result.success_round_data
+            success_round_id = model_result.success_round_id
+            print(f"Model {model_result.model_name} success round id: {success_round_id}")
+
+            if success_round_id is None:
+                print(f"Model {model_result.model_name} has no success round id")
+                continue
+            
+            motor_cost_log = success_round_data.motor_opt_cost_log
+            if motor_cost_log is None:
+                print(f"Model {model_result.model_name} has no motor cost log")
+                continue
+            else:
+                print(f"****** {model_result.model_name} ******")
+                # print(motor_cost_log)
+
+                # Convert to numpy array for easier computation
+                cost_array = np.array(motor_cost_log)
+                # Sum along axis 1 to get total cost for each iteration
+                total_costs = np.sum(cost_array, axis=1)
+                min_cost = np.min(total_costs)
+                min_cost_idx = np.argmin(total_costs)
+                print(f"Minimum cost: {min_cost}")
+                print(f"Minimum cost index: {min_cost_idx}")
+
+                motor_position_cost_rounds_map[success_round_id].append(cost_array[min_cost_idx, 0])
+                motor_occupancy_cost_rounds_map[success_round_id].append(cost_array[min_cost_idx, 1])
+                two_degree_rotation_interference_cost_rounds_map[success_round_id].append(cost_array[min_cost_idx, 2])
+
+        return motor_position_cost_rounds_map, motor_occupancy_cost_rounds_map, two_degree_rotation_interference_cost_rounds_map
+            
+
 
 if __name__ == '__main__':
     # round_folder_path = '/media/clarence/Clarence/anything2robot/result/n02085782_2100_neutral_res_e300_smoothed_scaled_20241028-063017/result_round1'
@@ -351,9 +417,60 @@ if __name__ == '__main__':
     # print(model_result.valid_flag)
     # print(model_result.success_flag)
 
-    dataset_result_folder = '/home/cc/git/anything2robot/result'
-    # dataset_result_folder = "/media/clarence/Clarence/anything2robot_data/standford_dogs/result_2024_10_27_dog100_no_fea"
+    # dataset_result_folder = '/home/cc/git/anything2robot/result'
+    dataset_result_folder = "/media/clarence/Clarence/anything2robot_data/result"
     dataset_result_analysis = DatasetResultAnalysis(dataset_result_folder)
+    max_round_num = 8
+
+    motor_position_cost_rounds_map, motor_occupancy_cost_rounds_map, __ = dataset_result_analysis.get_motor_cost(max_round_num=max_round_num)
+
+    # Plot the average motor position cost and motor occupancy cost of each round in a bar plot. Add the     
+    motor_position_cost_rounds_avg = np.zeros(max_round_num)
+    motor_occupancy_cost_rounds_avg = np.zeros(max_round_num)
+    motor_position_cost_rounds_std = np.zeros(max_round_num)
+    motor_occupancy_cost_rounds_std = np.zeros(max_round_num)
+    for round_id in range(1, max_round_num+1):
+        # Turn the list into a numpy array
+        motor_position_cost_this_round = np.array(motor_position_cost_rounds_map[round_id])
+        motor_occupancy_cost_this_round = np.array(motor_occupancy_cost_rounds_map[round_id])
+        motor_position_cost_rounds_avg[round_id-1] = motor_position_cost_this_round.mean()
+        motor_occupancy_cost_rounds_avg[round_id-1] = motor_occupancy_cost_this_round.mean()
+        motor_position_cost_rounds_std[round_id-1] = motor_position_cost_this_round.std()
+        motor_occupancy_cost_rounds_std[round_id-1] = motor_occupancy_cost_this_round.std()
+
+    # Draw a bar plot of motor_position_cost_rounds_avg and motor_occupancy_cost_rounds_avg
+    x = np.arange(1, max_round_num + 1)
+    width = 0.35  # Width of the bars
+
+    # Create the bar plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+    rects1 = ax.bar(x - width/2, motor_position_cost_rounds_avg, width, 
+                    yerr=motor_position_cost_rounds_std, 
+                    label='Position Cost',
+                    capsize=5)
+    rects2 = ax.bar(x + width/2, motor_occupancy_cost_rounds_avg, width, 
+                    yerr=motor_occupancy_cost_rounds_std,
+                    label='Occupancy Cost',
+                    capsize=5)
+
+    # Customize the plot
+    ax.set_xlabel('Round Number')
+    ax.set_ylabel('Cost')
+    ax.set_title('Position and Occupancy Costs per Round')
+    ax.set_xticks(x)
+    ax.set_ylim(0, 5)  # Set y-axis limits from 0 to 5
+    ax.legend()
+
+    # Add some padding to the y-axis to make error bars fully visible
+    ax.margins(y=0.1)
+
+    # Optional: Add grid for better readability
+    ax.grid(True, linestyle='--', alpha=0.7)
+
+    plt.tight_layout()
+    plt.show()
+
+    exit()
 
     ######## Success rate and time consumption
     valid_rate, success_rate, failure_codes_num, failure_codes_round, growing_success_rate_rounds = dataset_result_analysis.get_success_rate(log_csv_path = dataset_result_folder + '/result_log.csv')
