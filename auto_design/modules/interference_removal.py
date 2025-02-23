@@ -287,19 +287,23 @@ class RobotOptResult:
                                             output=False)
         # render the original mesh
         original_mesh = o3d.io.read_triangle_mesh(stl_dir)
-        o3d.visualization.draw_geometries([original_mesh, optimized_mesh])
+        # o3d.visualization.draw_geometries([original_mesh, optimized_mesh])
+
         # Calculate similarity
-        pcd1 = optimized_mesh.sample_points_poisson_disk(10000)
-        pcd2 = original_mesh.sample_points_poisson_disk(10000)
+        sample_num = 5000
+        pcd1 = optimized_mesh.sample_points_poisson_disk(sample_num)
+        pcd2 = original_mesh.sample_points_poisson_disk(sample_num)
 
         # Compute the Hausdorff distance
         d1 = pcd1.compute_point_cloud_distance(pcd2)
         d2 = pcd2.compute_point_cloud_distance(pcd1)
         hausdorff_distance = max(max(d1), max(d2))
         average_point_distance = np.asarray(d2).mean()
-        print("Robot Hausdorff Distance:", hausdorff_distance)
-        print("Robot Average Point Distance:", average_point_distance)
+        # print("Robot Hausdorff Distance:", hausdorff_distance)
+        # print("Robot Average Point Distance:", average_point_distance)
         return hausdorff_distance, average_point_distance
+    
+
 class InterferenceRemoval:
     def __init__(self, args, mesh_group : Mesh_Group, motor_param_result, link_tree, father_link_dict):
         self.args = args

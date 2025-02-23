@@ -3,6 +3,13 @@ import pickle as pkl
 import matplotlib.pyplot as plt
 import os
 import sys
+from progress.bar import IncrementalBar
+
+file_path = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(file_path, '../auto_design'))
+sys.path.append(os.path.join(file_path, '../auto_design/modules'))
+
+from interference_removal import RobotOptResult
 
 '''
 This class is used to parse the result of one round of optimization. Mainly parse the log.pkl file and log.txt file.
@@ -404,6 +411,54 @@ class DatasetResultAnalysis:
             
 
 
+    def get_mesh_similarity(self, max_round_num=8):
+        hausdorff_distance_rounds_map = {}
+        average_point_distance_rounds_map = {}
+
+        # Initialize the maps
+        for i in range(1, max_round_num+1):
+            hausdorff_distance_rounds_map[i] = []
+            average_point_distance_rounds_map[i] = []
+
+        # Get the mesh similarity
+        bar = IncrementalBar('Processing', max=len(self.model_results))
+        for model_result in self.model_results:
+            bar.next()
+            if not model_result.valid_flag:
+                continue
+            if not model_result.success_flag:
+                continue
+            
+            success_round_id = model_result.success_round_id
+            if success_round_id is None:
+                print(f"Model {model_result.model_name} has no success round id")
+                continue
+
+            result_this_success_round = model_result.success_round_data
+            folder = result_this_success_round.round_folder_path
+            pkl_path = os.path.join(folder, 'robot_result.pkl')
+            #Search for the stl file in the folder
+            stl_path = None
+            for file in os.listdir(folder):
+                if file.endswith('.stl'):
+                    stl_path = os.path.join(folder, file)
+                    break
+            if stl_path is None:
+                print(f"Model {model_result.model_name} has no stl file")
+                continue
+            
+            robot_result = pkl.load(open(pkl_path, 'rb'))
+            hausdorff_distance, average_point_distance = robot_result.getMeshSimilarity(stl_dir=stl_path)
+            # print(f"Hausdorff distance: {hausdorff_distance}")
+            # print(f"Average point distance: {average_point_distance}")
+
+            hausdorff_distance_rounds_map[success_round_id].append(hausdorff_distance)
+            average_point_distance_rounds_map[success_round_id].append(average_point_distance)
+            bar.finish()
+
+        return hausdorff_distance_rounds_map, average_point_distance_rounds_map
+    
+
 if __name__ == '__main__':
     # round_folder_path = '/media/clarence/Clarence/anything2robot/result/n02085782_2100_neutral_res_e300_smoothed_scaled_20241028-063017/result_round1'
     # round_result = ResultOneRound(round_folder_path)
@@ -422,6 +477,7 @@ if __name__ == '__main__':
     dataset_result_analysis = DatasetResultAnalysis(dataset_result_folder)
     max_round_num = 8
 
+    ########### Motor cost ###########
     motor_position_cost_rounds_map, motor_occupancy_cost_rounds_map, __ = dataset_result_analysis.get_motor_cost(max_round_num=max_round_num)
 
     # Plot the average motor position cost and motor occupancy cost of each round in a bar plot. Add the     
@@ -463,8 +519,85 @@ if __name__ == '__main__':
 
     # Add some padding to the y-axis to make error bars fully visible
     ax.margins(y=0.1)
+    # Add grid for better readability
+    ax.grid(True, linestyle='--', alpha=0.7)
 
-    # Optional: Add grid for better readability
+    plt.tight_layout()
+    plt.show()
+
+
+    ########### Mesh cost ###########
+    hausdorff_distance_pkl_path = dataset_result_folder + '/hausdorff_distance_rounds_map.pkl'
+    average_point_distance_pkl_path = dataset_result_folder + '/average_point_distance_rounds_map.pkl'
+    # If the pkl file exists, load it
+    if os.path.exists(hausdorff_distance_pkl_path) and os.path.exists(average_point_distance_pkl_path):
+        print(f"Loading hausdorff_distance_rounds_map and average_point_distance_rounds_map from {hausdorff_distance_pkl_path} and {average_point_distance_pkl_path}")
+        with open(hausdorff_distance_pkl_path, 'rb') as f:
+            hausdorff_distance_rounds_map = pkl.load(f)
+        with open(average_point_distance_pkl_path, 'rb') as f:
+            average_point_distance_rounds_map = pkl.load(f)
+    else:
+        hausdorff_distance_rounds_map, average_point_distance_rounds_map = dataset_result_analysis.get_mesh_similarity(max_round_num=max_round_num)
+        # Save to a binary file
+        with open(hausdorff_distance_pkl_path, 'wb') as f:
+            pkl.dump(hausdorff_distance_rounds_map, f)
+        with open(average_point_distance_pkl_path, 'wb') as f:
+            pkl.dump(average_point_distance_rounds_map, f)
+
+    # Find the average and std of the average point distance and hausdorff distance of each round
+    scale_factor = 1.0 / 1.1
+    average_point_distance_rounds_avg = np.zeros(max_round_num)
+    average_point_distance_rounds_std = np.zeros(max_round_num)
+    scaled_average_point_distance_rounds_avg = np.zeros(max_round_num)
+    hausdorff_distance_rounds_avg = np.zeros(max_round_num)
+    hausdorff_distance_rounds_std = np.zeros(max_round_num)
+    scaled_hausdorff_distance_rounds_avg = np.zeros(max_round_num)
+    for round_id in range(1, max_round_num+1):
+        average_point_distance_this_round = np.array(average_point_distance_rounds_map[round_id])
+        average_point_distance_rounds_avg[round_id-1] = average_point_distance_this_round.mean()
+        average_point_distance_rounds_std[round_id-1] = average_point_distance_this_round.std()
+        hausdorff_distance_this_round = np.array(hausdorff_distance_rounds_map[round_id])
+        hausdorff_distance_rounds_avg[round_id-1] = hausdorff_distance_this_round.mean()
+        hausdorff_distance_rounds_std[round_id-1] = hausdorff_distance_this_round.std()
+
+        # Scale the average point distance and hausdorff distance
+        scaled_average_point_distance_rounds_avg[round_id-1] = average_point_distance_rounds_avg[round_id-1] * pow(scale_factor, round_id-1)
+        scaled_hausdorff_distance_rounds_avg[round_id-1] = hausdorff_distance_rounds_avg[round_id-1] * pow(scale_factor, round_id-1)
+
+    # Draw a bar plot of the average_point_distance_rounds_map and hausdorff_distance_rounds_map
+    x = np.arange(1, max_round_num + 1)
+    width = 0.35  # Width of the bars
+
+    # Create the bar plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+    rects1 = ax.bar(x, average_point_distance_rounds_avg, width, 
+                    yerr=average_point_distance_rounds_std, 
+                    label='Average point distance',
+                    capsize=5)
+    
+    ## Plot both average point distance and hausdorff distance in the same plot
+    # rects1 = ax.bar(x - width/2, average_point_distance_rounds_avg, width, 
+    #                 yerr=average_point_distance_rounds_std, 
+    #                 label='Average point distance',
+    #                 capsize=5)
+    # rects2 = ax.bar(x + width/2, hausdorff_distance_rounds_avg, width, 
+    #                 yerr=hausdorff_distance_rounds_std, 
+    #                 label='Hausdorff distance',
+    #                 capsize=5)
+
+    # Add a line plot of the scaled average point distance and scaled hausdorff distance
+    ax.plot(x, scaled_average_point_distance_rounds_avg, label='Scaled average point distance', color='r')
+    # ax.plot(x, scaled_hausdorff_distance_rounds_avg, label='Scaled hausdorff distance', color='g')
+    
+    ax.set_xlabel('Round Number')
+    ax.set_ylabel('Distance')
+    ax.set_title('Mesh similarity per round')
+    ax.set_xticks(x)
+    ax.legend()
+    
+    # Add some padding to the y-axis to make error bars fully visible
+    ax.margins(y=0.1)
+    # Add grid for better readability
     ax.grid(True, linestyle='--', alpha=0.7)
 
     plt.tight_layout()
@@ -472,7 +605,7 @@ if __name__ == '__main__':
 
     exit()
 
-    ######## Success rate and time consumption
+    ########### Success rate and time consumption ###########
     valid_rate, success_rate, failure_codes_num, failure_codes_round, growing_success_rate_rounds = dataset_result_analysis.get_success_rate(log_csv_path = dataset_result_folder + '/result_log.csv')
  
     avg_time_consumption_rounds, max_time_consumption_rounds, min_time_consumption_rounds, time_consumption_each_success_part = dataset_result_analysis.get_time_consumption()
