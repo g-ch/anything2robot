@@ -268,7 +268,38 @@ class RobotOptResult:
                 else:
                     # self.link_dict[self.father_link_dict[link_name]].add_torque(father_torque)
                     self.link_dict[link_name].add_torque(child_torque)
-                
+
+    def getMeshSimilarity(self, stl_dir):
+        """
+        Get the mesh similarity between the original mesh and the optimized mesh.
+        """
+        for motor_param in self.motor_results:
+            def condition_remove(pts):
+                return is_points_in_cylinder(pts, motor_param[:3], motor_param[3:6], motor_param[6], 0, 0.5)
+            self.mesh_group.move_voxels(initial_group_names=["Unoccupied"],
+                                        target_group_name="BODY",
+                                        condition_func=condition_remove)
+        all_voxels = np.vstack([self.mesh_group.get_voxels(link_name, get_index=False) for link_name in self.mesh_group.link_value_dict.keys() if link_name != "Unoccupied"])
+        
+        optimized_mesh = voxel_grid_to_mesh(voxel_positions=all_voxels, 
+                                            dir='', 
+                                            voxel_size=self.args.voxel_size, 
+                                            output=False)
+        # render the original mesh
+        original_mesh = o3d.io.read_triangle_mesh(stl_dir)
+        o3d.visualization.draw_geometries([original_mesh, optimized_mesh])
+        # Calculate similarity
+        pcd1 = optimized_mesh.sample_points_poisson_disk(10000)
+        pcd2 = original_mesh.sample_points_poisson_disk(10000)
+
+        # Compute the Hausdorff distance
+        d1 = pcd1.compute_point_cloud_distance(pcd2)
+        d2 = pcd2.compute_point_cloud_distance(pcd1)
+        hausdorff_distance = max(max(d1), max(d2))
+        average_point_distance = np.asarray(d2).mean()
+        print("Robot Hausdorff Distance:", hausdorff_distance)
+        print("Robot Average Point Distance:", average_point_distance)
+        return hausdorff_distance, average_point_distance
 class InterferenceRemoval:
     def __init__(self, args, mesh_group : Mesh_Group, motor_param_result, link_tree, father_link_dict):
         self.args = args

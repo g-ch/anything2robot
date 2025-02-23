@@ -6,7 +6,7 @@ import numpy as np
 from interference_removal import RobotOptResult, LinkResult, InterferenceRemoval
 
 # auto_design/results/gold_lynel20241010-101912_robot_result.pkl
-robot_result = pkl.load(open('./auto_design/results/lynel.pkl', 'rb'))
+robot_result = pkl.load(open('./auto_design/results/robot_result.pkl', 'rb'))
 
 
 H = np.array([
