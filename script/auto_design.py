@@ -24,8 +24,8 @@ from modules.interference_removal import InterferenceRemoval, RobotOptResult
 from modules.destruction_check import destruction_check, destruction_check_urdf_folder
 
 # Comment out the following two lines if you don't have Ansys installed
-from metamaterial_filling.script.user_stl_force_relative_density_fea_opt import stl_force_relative_density_fea_opt
-from metamaterial_filling.script.pyansys_fea.mapdl_msh_analysis import MapdlFea
+# from metamaterial_filling.script.user_stl_force_relative_density_fea_opt import stl_force_relative_density_fea_opt
+# from metamaterial_filling.script.pyansys_fea.mapdl_msh_analysis import MapdlFea
 from motor_param_lib import MotorParameterLib
 
 '''
@@ -378,11 +378,11 @@ def auto_design_function(args, mapdl_object=None):
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
 
-    parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel.stl'), help='The path to the stl mesh file.')
-    parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/gold_lynel_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
+    parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/rayquaza.stl'), help='The path to the stl mesh file.')
+    parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/rayquaza_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
     
-    parser.add_argument('--stl_mesh_path', type=str, default="/home/cc/git/anything2robot/result/n02093859_276_neutral_res_e300_smoothed_scaled.stl")
-    parser.add_argument('--joint_pkl_path', type=str, default="/home/cc/git/anything2robot/result/n02093859_276_neutral_res_e300_smoothed_joints.pkl")
+    # parser.add_argument('--stl_mesh_path', type=str, default="/home/cc/git/anything2robot/result/n02093859_276_neutral_res_e300_smoothed_scaled.stl")
+    # parser.add_argument('--joint_pkl_path', type=str, default="/home/cc/git/anything2robot/result/n02093859_276_neutral_res_e300_smoothed_joints.pkl")
 
     parser.add_argument('--result_folder', type=str, default=os.path.normpath(project_path + '/result'), help='The folder to save the results.')
 
