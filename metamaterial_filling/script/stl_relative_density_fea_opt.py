@@ -80,8 +80,26 @@ def get_equivalent_young_modulus(material_young_modulus, relative_density, young
         if relative_density >= young_modulus_curve_points_x[i] and relative_density <= young_modulus_curve_points_x[i+1]:
             # Linear interpolation
             interploation_value = young_modulus_curve_points_y[i] + (young_modulus_curve_points_y[i+1] - young_modulus_curve_points_y[i]) * (relative_density - young_modulus_curve_points_x[i]) / (young_modulus_curve_points_x[i+1] - young_modulus_curve_points_x[i])
-            return interploation_value * material_young_modulus * relative_density
+            result = interploation_value * material_young_modulus * relative_density
+            if result < 10:  # Set a lower limit for the young modulus in case of too small value
+                return 10
+            else:
+                return interploation_value * material_young_modulus * relative_density
     
+'''
+@breif: Get the equivalent stress for the metamaterial structure considering the six fold plate structure
+@param: stress: float: Von Mises stress of the metamaterial structure
+@param: relative_density: float: Relative density of the metamaterial structure
+'''
+def get_equivalent_stress_micro_structure(stress, relative_density):
+    # Consider 6 fold plate structure
+    if relative_density == 0:
+        return 10e12 # Very large number
+    elif relative_density == 1:
+        return stress
+    else:
+        return stress / relative_density * 2.63
+
 
 '''
 @breif: Main function to do the FEA optimization. The function will do meshing and FEA optimization to get the best relative density for the metamaterial structure.
@@ -160,6 +178,10 @@ def do_static_fea(args, mapdl_object=None):
     mesh_file_path_no_ext = mesh_file_path.replace('.msh', '')
     print(f'Mesh file path: {mesh_file_path_no_ext}')
 
+    recorded_relative_density = []
+    recorded_von_mises = []
+    recorded_displacement_magnitude = []
+
     # Check if using fully filled structure (relative_density=1) can meet the target
     relative_density = 1.0
 
@@ -169,35 +191,50 @@ def do_static_fea(args, mapdl_object=None):
         mapdl_created_in_this_function = True
 
     max_stress, max_displacement,von_mises, displacement_magnitude, nodes  = mapdl_object.static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=args.material_young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
+    max_stress = get_equivalent_stress_micro_structure(max_stress, relative_density) # Get the equivalent stress for the metamaterial structure considering the six fold plate structure
+
+    # Record
+    recorded_relative_density.append(relative_density)
+    recorded_von_mises.append(max_stress)
+    recorded_displacement_magnitude.append(max_displacement)
     
-    stress_to_allowed_value =  max_stress - args.max_allowd_stress
-    displacement_to_allowed_value = max_displacement- args.max_allowd_displacement
+    # Calculate the stress and displacement to the target to get gradient
+    stress_to_allowed_value =  max_stress - args.max_allowed_stress_material
+    displacement_to_allowed_value = max_displacement- args.max_allowed_displacement
 
     if stress_to_allowed_value > 0 or displacement_to_allowed_value > 0:
         print(f'The metamaterial cannot be used with the given conditions. The best relative density is 1')
         print(f'The best von Mises stress and displacement are:')
         print(f"Max von Mises stress: {max_stress}")
         print(f"Max displacement: {max_displacement}")
-        return False, relative_density, args.material_young_modulus, von_mises, displacement_magnitude, nodes
+        return False, relative_density, args.material_young_modulus, von_mises, displacement_magnitude, nodes, recorded_relative_density, recorded_von_mises, recorded_displacement_magnitude
 
+    # Check if the check_only flag is set. If yes, return the results without optimization
     if args.check_only:
-        return True, relative_density, args.material_young_modulus, von_mises, displacement_magnitude, nodes
+        return True, relative_density, args.material_young_modulus, von_mises, displacement_magnitude, nodes, recorded_relative_density, recorded_von_mises, recorded_displacement_magnitude
 
-
-    # Set the initial best values
+    # Set the initial best values as the value of relative_density=1
     best_relative_density = relative_density
     stress_of_best_relative_density = max_stress
     displacement_of_best_relative_density = max_displacement
 
-    # Start the optimization
+    # Start the optimization. Use user defined initial relative_density
     relative_density = args.initial_relative_density
     young_modulus = get_equivalent_young_modulus(args.material_young_modulus, relative_density, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)
     print(f'Equivalant young modulus: {young_modulus}')
 
     max_stress, max_displacement, von_mises, displacement_magnitude, nodes  = mapdl_object.static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
+    print(f'density: {relative_density}, stress before correction: {max_stress}')
+    max_stress = get_equivalent_stress_micro_structure(max_stress, relative_density) # Correct from macro structure to micro structure
+    print(f'density: {relative_density}, stress after correction: {max_stress}')
     
-    stress_to_allowed_value =  max_stress - args.max_allowd_stress
-    displacement_to_allowed_value = max_displacement- args.max_allowd_displacement 
+    # Record
+    recorded_relative_density.append(relative_density)
+    recorded_von_mises.append(max_stress)
+    recorded_displacement_magnitude.append(max_displacement)
+
+    stress_to_allowed_value =  max_stress - args.max_allowed_stress_material
+    displacement_to_allowed_value = max_displacement- args.max_allowed_displacement 
 
     print(f"The maximum von Mises stress and displacement of relative_density={relative_density} are:")
     print(f"Max von Mises stress: {max_stress}")
@@ -205,17 +242,28 @@ def do_static_fea(args, mapdl_object=None):
     print(f"Stress to target: {stress_to_allowed_value}")
     print(f"Displacement to target: {displacement_to_allowed_value}")
 
-    # For the first iteration, we will decrease the relative_density by 0.05
-    relative_density_new = relative_density - 0.05
+    # For the first iteration, we will decrease the relative_density by 0.1
+    relative_density_new = relative_density - 0.1
 
     for i in range(args.max_iteration):
         print(f'Iteration {i+1}:')
         
         young_modulus = get_equivalent_young_modulus(args.material_young_modulus, relative_density_new, args.young_modulus_curve_points_x, args.young_modulus_curve_points_y)        
         max_stress_new, max_displacement_new, von_mises, displacement_magnitude, nodes  = mapdl_object.static_fea_analysis(msh_file=mesh_file_path_no_ext, elastic=young_modulus, poisson_ratio=args.material_poisson_ratio, fixed_nodes=args.fixed_nodes, closest_node_num_per_fixed=args.closest_node_num_per_fixed, forces_nodes=args.forces_nodes, forces=args.forces, closest_node_num_per_force=args.closest_node_num_per_force, display=args.display_fea_result)
+        
+        if max_stress_new > 1e10 or max_stress_new < 1e-5: # not feasible. Something wrong with the model. Terminate the optimization
+            print(f'Optimization terminated. The model is not feasible.')
+            break
 
-        stress_to_allowed_value_new = max_stress_new - args.max_allowd_stress
-        displacement_to_allowed_value_new = max_displacement_new - args.max_allowd_displacement
+        max_stress_new = get_equivalent_stress_micro_structure(max_stress_new, relative_density_new) # Correct from macro structure to micro structure
+
+        # Record
+        recorded_relative_density.append(relative_density)
+        recorded_von_mises.append(max_stress)
+        recorded_displacement_magnitude.append(max_displacement)
+
+        stress_to_allowed_value_new = max_stress_new - args.max_allowed_stress_material
+        displacement_to_allowed_value_new = max_displacement_new - args.max_allowed_displacement
 
         print(f"The maximum von Mises stress and displacement of relative_density={relative_density_new} are:")
         print(f"Max von Mises stress: {max_stress_new}")
@@ -254,9 +302,9 @@ def do_static_fea(args, mapdl_object=None):
         else:
             relative_density_new = relative_density + args.learning_rate * gradient
 
-        # Check if the relative_density is in the range [0, 1]
-        if relative_density_new < 0.01:
-            relative_density_new = 0.01
+        # Check if the relative_density is in the range [0.05, 1]. Smaller than 0.05 is mostly unprintable and larger than 1 is fully filled.
+        if relative_density_new < 0.05:
+            relative_density_new = 0.05
         elif relative_density_new > 1:
             relative_density_new = 1
 
@@ -274,7 +322,7 @@ def do_static_fea(args, mapdl_object=None):
     if mapdl_created_in_this_function:
         mapdl_object.shutdown()
 
-    return True, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes
+    return True, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes, recorded_relative_density, recorded_von_mises, recorded_displacement_magnitude
 
 
 if __name__ == '__main__':
@@ -308,8 +356,8 @@ if __name__ == '__main__':
     parser.add_argument("--display_fea_result", type=bool, default=False, help="Display the models")
 
     ### Optimization parameters
-    parser.add_argument("--max_allowd_stress", type=float, default=500, help="Maximum allowed von Mises stress. MPa")
-    parser.add_argument("--max_allowd_displacement", type=float, default=2, help="Maximum allowed displacement. mm")
+    parser.add_argument("--max_allowed_stress_material", type=float, default=76, help="Maximum allowed von Mises stress. MPa")
+    parser.add_argument("--max_allowed_displacement", type=float, default=2, help="Maximum allowed displacement. mm")
     parser.add_argument("--max_iteration", type=int, default=5, help="Maximum number of iterations")
     parser.add_argument("--initial_relative_density", type=float, default=0.2, help="Initial relative density of the metamaterial structure")
     parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate for the gradient descent")

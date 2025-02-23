@@ -755,18 +755,18 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    #parser.add_argument('--input_stl_path', type=str, default=project_dir + '/result/gold_lynel_20241201-134522_good/result_round1/urdf/BODY.stl', help='Input STL file path')
-    parser.add_argument('--input_stl_path', type=str, default='/home/cc/Downloads/BODY.stl', help='Input STL file path')
+    parser.add_argument('--input_stl_path', type=str, default=project_dir + '/result/gold_lynel_20241201-134522_good/result_round1/urdf/RL_UP.stl', help='Input STL file path')
+    #parser.add_argument('--input_stl_path', type=str, default='/home/cc/Downloads/BODY_UP.stl', help='Input STL file path')
     parser.add_argument('--unit', type=str, default='m', choices=['mm', 'm'], help='Unit of the model. If the unit is in meter, we will scale the model to mm.')
-    parser.add_argument('--relative_density', type=float, default=0.05, help='Relative density of the metamaterial given by FEA results')
+    parser.add_argument('--relative_density', type=float, default=0.15, help='Relative density of the metamaterial given by FEA results')
 
-    parser.add_argument('--shell_thickness', type=float, default=1, help='Thickness of the shell. mm')
+    parser.add_argument('--shell_thickness', type=float, default=0, help='Thickness of the shell. mm')
     parser.add_argument('--shell_generation_voxel_resolution', type=float, default=1.5, help='Voxel resolution for shell generation. mm')
     
-    parser.add_argument('--plate_interval', type=float, default=20, help='Interval between plates. mm')
+    parser.add_argument('--plate_interval', type=float, default=10, help='Interval between plates. mm')
     parser.add_argument('--biased_tenon_distance', type=float, default=2.5, help='Biased length for the tenon. mm')
 
-    parser.add_argument('--output_stl_name', type=str, default='BODY_final_output_with_shell.stl', help='Output STL file path')
+    parser.add_argument('--output_stl_name', type=str, default='FR_UP_final_output_no_shell.stl', help='Output STL file path')
     parser.add_argument('--use_existing_shell', type=bool, default=False, help='Whether to use the existing shell file')
     
     parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/result/gold_lynel_20241201-134522_good/result_round1/robot_result.pkl', help='Pickle file path for the tenon position results')

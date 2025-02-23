@@ -91,183 +91,189 @@ class MapdlFea:
     @return: float: Max von Mises stress and max displacement
     '''
     def static_fea_analysis(self, msh_file, elastic=210e3, poisson_ratio=0.3, fixed_nodes=None, closest_node_num_per_fixed=1, forces_nodes=None, forces=None, closest_node_num_per_force=1, display=True):
-        # Check if the msh file exists
-        if not os.path.exists(msh_file + ".msh"):
-            raise FileNotFoundError(f"File not found: {msh_file + '.msh'}")
+        try:
         
-        # Check if forces_nodes has the same length as forces.
-        if forces_nodes is not None and forces is not None:
-            if len(forces_nodes) != len(forces):
-                raise ValueError("forces_nodes and forces must have the same length")
-        else:
-            raise ValueError("forces_nodes and forces must not be None")
-        
-        ###############################################################################
-        # # Launch MAPDL
-        # exec_loc = '/root/ansys_inc/v232/ansys/bin/ansys232'
-        # mapdl = launch_mapdl(exec_loc)
-        # print(mapdl)
-
-        # Load the mesh file
-        # mapdl.clear()
-
-        self.clear()
-
-        self.mapdl.cdread("db", msh_file, "msh")
-
-        if display:
-            self.mapdl.eplot(vtk=True, show_edges=True, show_axes=False, line_width=2, background="w")
-
-        self.mapdl.prep7() #Enters the model creation preprocessor
-
-        print("Mesh loaded from file:", msh_file)
-
-
-        ###############################################################################
-        # Material properties
-
-        # Define custom units using the UNITS command
-        self.mapdl.units('USER', 'millimeter', 'gram', 'second', 'newton', 'degree', 'ampere')
-        # self.mapdl.units("SI")  # SI - International system (m, kg, s, K).
-
-        # Define material properties
-        self.mapdl.mp('EX', 1, elastic)  # Elastic modulus (also EY, EZ)
-        self.mapdl.mp('PRXY', 1, poisson_ratio)  # Major Poisson’s ratios
-        # self.mapdl.mp('DENS', 1, 0.0078) # Mass density.
-
-        ###############################################################################
-        # Add load and constraints
-
-        # Add fixed constraints based on the user input
-        nodes = self.mapdl.mesh.nodes
-        for i in range(len(fixed_nodes)):
-            nearest_n_indices = self.find_nearest_n_nodes(nodes, fixed_nodes[i], closest_node_num_per_fixed)
+            # Check if the msh file exists
+            if not os.path.exists(msh_file + ".msh"):
+                raise FileNotFoundError(f"File not found: {msh_file + '.msh'}")
             
-            # Convert to one-based indexing for MAPDL
-            nearest_n_indices_from_1 = nearest_n_indices + 1
-            # print(f"FIXED END: Nearest node to the point {fixed_nodes[i]} is {nearest_n_indices_from_1}")
+            # Check if forces_nodes has the same length as forces.
+            if forces_nodes is not None and forces is not None:
+                if len(forces_nodes) != len(forces):
+                    raise ValueError("forces_nodes and forces must have the same length")
+            else:
+                raise ValueError("forces_nodes and forces must not be None")
+            
+            ###############################################################################
+            # # Launch MAPDL
+            # exec_loc = '/root/ansys_inc/v232/ansys/bin/ansys232'
+            # mapdl = launch_mapdl(exec_loc)
+            # print(mapdl)
 
-            # Select nodes
-            self.mapdl.nsel('S', 'NODE', vmin=nearest_n_indices_from_1[0], vmax=nearest_n_indices_from_1[0])
-            for node_seq in nearest_n_indices_from_1[1:]:
-                self.mapdl.nsel('A', 'NODE', vmin=node_seq, vmax=node_seq)
+            # Load the mesh file
+            # mapdl.clear()
 
-            # Check if the component was created correctly
-            num_nodes = self.mapdl.get(entity='NODE', item1='COUNT')
-            print(f"Number of nodes selected: {num_nodes}")
-            if num_nodes == 0:
-                raise ValueError(f"No nodes were selected for FIXED component.")
+            self.clear()
 
-            # Create the component and fix the nodes
-            if num_nodes > 1:
-                # Create the component
-                component_name = f"COMP_FIXED_{i+1}"
-                self.mapdl.cm(component_name, 'NODE')
+            self.mapdl.cdread("db", msh_file, "msh")
 
-                # Couple the nodes in this component using explicit set numbers
-                self.mapdl.cp(f"NEXT", "UX", component_name)
-                self.mapdl.cp(f"NEXT", "UY", component_name)
-                self.mapdl.cp(f"NEXT", "UZ", component_name)
+            if display:
+                self.mapdl.eplot(vtk=True, show_edges=True, show_axes=False, line_width=2, background="w")
+
+            self.mapdl.prep7() #Enters the model creation preprocessor
+
+            print("Mesh loaded from file:", msh_file)
+
+
+            ###############################################################################
+            # Material properties
+
+            # Define custom units using the UNITS command
+            self.mapdl.units('USER', 'millimeter', 'gram', 'second', 'newton', 'degree', 'ampere')
+            # self.mapdl.units("SI")  # SI - International system (m, kg, s, K).
+
+            # Define material properties
+            print(f"Defining material properties ... EX: {elastic}, Poisson ratio: {poisson_ratio}")
+            self.mapdl.mp('EX', 1, elastic)  # Elastic modulus (also EY, EZ)
+            self.mapdl.mp('PRXY', 1, poisson_ratio)  # Major Poisson’s ratios
+            # self.mapdl.mp('DENS', 1, 0.0078) # Mass density.
+
+            ###############################################################################
+            # Add load and constraints
+
+            # Add fixed constraints based on the user input
+            nodes = self.mapdl.mesh.nodes
+            for i in range(len(fixed_nodes)):
+                nearest_n_indices = self.find_nearest_n_nodes(nodes, fixed_nodes[i], closest_node_num_per_fixed)
+                
+                # Convert to one-based indexing for MAPDL
+                nearest_n_indices_from_1 = nearest_n_indices + 1
+                # print(f"FIXED END: Nearest node to the point {fixed_nodes[i]} is {nearest_n_indices_from_1}")
+
+                # Select nodes
+                self.mapdl.nsel('S', 'NODE', vmin=nearest_n_indices_from_1[0], vmax=nearest_n_indices_from_1[0])
+                for node_seq in nearest_n_indices_from_1[1:]:
+                    self.mapdl.nsel('A', 'NODE', vmin=node_seq, vmax=node_seq)
+
+                # Check if the component was created correctly
+                num_nodes = self.mapdl.get(entity='NODE', item1='COUNT')
+                print(f"Number of nodes selected: {num_nodes}")
+                if num_nodes == 0:
+                    raise ValueError(f"No nodes were selected for FIXED component.")
+
+                # Create the component and fix the nodes
+                if num_nodes > 1:
+                    # Create the component
+                    component_name = f"COMP_FIXED_{i+1}"
+                    self.mapdl.cm(component_name, 'NODE')
+
+                    # Couple the nodes in this component using explicit set numbers
+                    self.mapdl.cp(f"NEXT", "UX", component_name)
+                    self.mapdl.cp(f"NEXT", "UY", component_name)
+                    self.mapdl.cp(f"NEXT", "UZ", component_name)
+
+                    # if display:
+                    #     self.mapdl.nplot(1) # Plot the selected nodes
+
+                    self.mapdl.d('ALL', 'UX')
+                    self.mapdl.d('ALL', 'UY')
+                    self.mapdl.d('ALL', 'UZ')
+                    self.mapdl.allsel(mute=True)  # Select all nodes to find the min_x in the next step
+
+
+            # Add forces based on the user input
+            for i in range(len(forces_nodes)):
+                nearest_n_indices = self.find_nearest_n_nodes(nodes, forces_nodes[i], closest_node_num_per_force)
+
+                # Convert to one-based indexing for MAPDL
+                nearest_n_indices_from_1 = nearest_n_indices + 1
+                # print(f"Nearest node to the point {forces_nodes[i]} is {nearest_n_indices_from_1}")
+
+                # Select nodes
+                self.mapdl.nsel('S', 'NODE', vmin=nearest_n_indices_from_1[0], vmax=nearest_n_indices_from_1[0])
+                for node_seq in nearest_n_indices_from_1[1:]:
+                    self.mapdl.nsel('A', 'NODE', vmin=node_seq, vmax=node_seq)
+
+                # Check if the component was created correctly
+                num_nodes = self.mapdl.get(entity='NODE', item1='COUNT')
+                # print(f"Number of nodes selected for component {component_name}: {num_nodes}")
+                if num_nodes == 0:
+                    raise ValueError(f"No nodes were selected for component {component_name}.")
+
+                # Create the component if there are more than one nodes to be selected for a force
+                if num_nodes > 1:
+                    # Create the component
+                    component_name = f"COMP_{i+1}"
+                    self.mapdl.cm(component_name, 'NODE')
+
+                    # Couple the nodes in this component using explicit set numbers
+                    self.mapdl.cp(f"NEXT", "UX", component_name)
+                    self.mapdl.cp(f"NEXT", "UY", component_name)
+                    self.mapdl.cp(f"NEXT", "UZ", component_name)
+
+                # Apply force to one of the nodes in the component
+                force_value = forces[i]
+                self.mapdl.f(nearest_n_indices_from_1[0], 'FX', force_value[0])
+                self.mapdl.f(nearest_n_indices_from_1[0], 'FY', force_value[1])
+                self.mapdl.f(nearest_n_indices_from_1[0], 'FZ', force_value[2])
+
 
                 # if display:
                 #     self.mapdl.nplot(1) # Plot the selected nodes
-
-                self.mapdl.d('ALL', 'UX')
-                self.mapdl.d('ALL', 'UY')
-                self.mapdl.d('ALL', 'UZ')
-                self.mapdl.allsel(mute=True)  # Select all nodes to find the min_x in the next step
+                
+                # Clear the selection
+                self.mapdl.allsel()
 
 
-        # Add forces based on the user input
-        for i in range(len(forces_nodes)):
-            nearest_n_indices = self.find_nearest_n_nodes(nodes, forces_nodes[i], closest_node_num_per_force)
+            ###############################################################################
+            # Solve the Static Problem
+            # ~~~~~~~~~~~~~~~~~~~~~~~~
+            # Solve the static analysis
+            print("Solving the static problem ...")
 
-            # Convert to one-based indexing for MAPDL
-            nearest_n_indices_from_1 = nearest_n_indices + 1
-            # print(f"Nearest node to the point {forces_nodes[i]} is {nearest_n_indices_from_1}")
+            self.mapdl.run("/SOLU")
+            self.mapdl.antype("STATIC")
+            self.mapdl.solve()
+            self.mapdl.finish(mute=True)
 
-            # Select nodes
-            self.mapdl.nsel('S', 'NODE', vmin=nearest_n_indices_from_1[0], vmax=nearest_n_indices_from_1[0])
-            for node_seq in nearest_n_indices_from_1[1:]:
-                self.mapdl.nsel('A', 'NODE', vmin=node_seq, vmax=node_seq)
+            print("Static problem solved!")
 
-            # Check if the component was created correctly
-            num_nodes = self.mapdl.get(entity='NODE', item1='COUNT')
-            # print(f"Number of nodes selected for component {component_name}: {num_nodes}")
-            if num_nodes == 0:
-                raise ValueError(f"No nodes were selected for component {component_name}.")
+            # grab the result from the ``self.mapdl`` instance
+            result = self.mapdl.result
+            if display:
+                result.plot_principal_nodal_stress(
+                    0,
+                    "SEQV",
+                    lighting=False,
+                    background="w",
+                    show_edges=True,
+                    text_color="k",
+                    add_text=False,
+                )
 
-            # Create the component if there are more than one nodes to be selected for a force
-            if num_nodes > 1:
-                # Create the component
-                component_name = f"COMP_{i+1}"
-                self.mapdl.cm(component_name, 'NODE')
+            nnum, stress = result.principal_nodal_stress(0)
+            nnum, displacements = result.nodal_displacement(0)
 
-                # Couple the nodes in this component using explicit set numbers
-                self.mapdl.cp(f"NEXT", "UX", component_name)
-                self.mapdl.cp(f"NEXT", "UY", component_name)
-                self.mapdl.cp(f"NEXT", "UZ", component_name)
+            # Get max stress
+            von_mises = stress[:, -1]  # von-Mises stress is the right most column
+            max_stress = np.nanmax(von_mises)
 
-            # Apply force to one of the nodes in the component
-            force_value = forces[i]
-            self.mapdl.f(nearest_n_indices_from_1[0], 'FX', force_value[0])
-            self.mapdl.f(nearest_n_indices_from_1[0], 'FY', force_value[1])
-            self.mapdl.f(nearest_n_indices_from_1[0], 'FZ', force_value[2])
+            # Get max displacement
+            # print(displacements)
+            displacement_magnitude = np.linalg.norm(displacements[:, :3], axis=1)
+            max_displacement = np.max(displacement_magnitude)
 
+            if display:
+                self.mapdl.post_processing.plot_nodal_displacement("Z")
 
-            # if display:
-            #     self.mapdl.nplot(1) # Plot the selected nodes
-            
-            # Clear the selection
-            self.mapdl.allsel()
+            # stop self.mapdl
+            # self.mapdl.exit()
 
-
-        ###############################################################################
-        # Solve the Static Problem
-        # ~~~~~~~~~~~~~~~~~~~~~~~~
-        # Solve the static analysis
-        print("Solving the static problem ...")
-
-        self.mapdl.run("/SOLU")
-        self.mapdl.antype("STATIC")
-        self.mapdl.solve()
-        self.mapdl.finish(mute=True)
-
-        print("Static problem solved!")
-
-        # grab the result from the ``self.mapdl`` instance
-        result = self.mapdl.result
-        if display:
-            result.plot_principal_nodal_stress(
-                0,
-                "SEQV",
-                lighting=False,
-                background="w",
-                show_edges=True,
-                text_color="k",
-                add_text=False,
-            )
-
-        nnum, stress = result.principal_nodal_stress(0)
-        nnum, displacements = result.nodal_displacement(0)
-
-        # Get max stress
-        von_mises = stress[:, -1]  # von-Mises stress is the right most column
-        max_stress = np.nanmax(von_mises)
-
-        # Get max displacement
-        # print(displacements)
-        displacement_magnitude = np.linalg.norm(displacements[:, :3], axis=1)
-        max_displacement = np.max(displacement_magnitude)
-
-        if display:
-            self.mapdl.post_processing.plot_nodal_displacement("Z")
-
-        # stop self.mapdl
-        # self.mapdl.exit()
-
-        return max_stress, max_displacement, von_mises, displacement_magnitude, nodes
-
+            return max_stress, max_displacement, von_mises, displacement_magnitude, nodes
+        
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            return 1e12, 1e12, None, None, None # return a large value for the max stress and displacement, which indicates an error
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Static FEA Analysis")
