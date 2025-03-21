@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import os
 import sys
 from progress.bar import IncrementalBar
-
+import pandas as pd
 file_path = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(file_path, '../auto_design'))
 sys.path.append(os.path.join(file_path, '../auto_design/modules'))
@@ -459,6 +459,26 @@ class DatasetResultAnalysis:
         return hausdorff_distance_rounds_map, average_point_distance_rounds_map
     
 
+
+class FeaResultAnalysis:
+    def __init__(self, fea_result_csv_path, key_words_stl_file=None):
+        self.fea_result_csv_path = fea_result_csv_path
+        '''
+        csv file format:
+        robot_name	round_id	stl_file	success_flag	best_relative_density
+        '''
+        self.fea_result_df = pd.read_csv(fea_result_csv_path)
+        if key_words_stl_file is None:
+            key_words_stl_file = ['FR_LOW.stl', 'FL_UP.stl', 'FL_LOW.stl', 'RR_UP.stl', 'RL_UP.stl', 'FR_UP.stl', 'RR_LOW.stl', 'RL_LOW.stl', 'BODY.stl']
+        self.get_best_relative_density_array_of_key_words(key_words_stl_file)
+
+    def get_best_relative_density_array_of_key_words(self, key_words_stl_file):
+        # Get the best relative density array of each key word
+        self.best_relative_density_array_of_key_words = {}
+        for key_word in key_words_stl_file:
+            self.best_relative_density_array_of_key_words[key_word] = self.fea_result_df[self.fea_result_df['stl_file'] == key_word]['best_relative_density'].values
+
+
 if __name__ == '__main__':
     # round_folder_path = '/media/clarence/Clarence/anything2robot/result/n02085782_2100_neutral_res_e300_smoothed_scaled_20241028-063017/result_round1'
     # round_result = ResultOneRound(round_folder_path)
@@ -475,6 +495,8 @@ if __name__ == '__main__':
     # dataset_result_folder = '/home/cc/git/anything2robot/result'
     dataset_result_folder = "/media/clarence/Clarence/anything2robot_data/result"
     dataset_result_analysis = DatasetResultAnalysis(dataset_result_folder)
+    fea_result_csv_path = os.path.join(dataset_result_folder, '../fea_result_2024Dec/fea_result.csv')
+    
     max_round_num = 8
 
     ########### Motor cost ###########
@@ -603,8 +625,6 @@ if __name__ == '__main__':
     plt.tight_layout()
     plt.show()
 
-    exit()
-
     ########### Success rate and time consumption ###########
     valid_rate, success_rate, failure_codes_num, failure_codes_round, growing_success_rate_rounds = dataset_result_analysis.get_success_rate(log_csv_path = dataset_result_folder + '/result_log.csv')
  
@@ -640,14 +660,14 @@ if __name__ == '__main__':
     plt.show()
 
     # Plot the time consumption of each success part in a box plot
-    fig, ax = plt.subplots()
-    ax.boxplot(time_consumption_each_success_part, patch_artist=True)
-    ax.set_xticklabels(['Decompose', 'Motor opt', 'Joint connect', 'Interference removal', 'FEA'])
-    ax.set_ylabel('Time consumption (s)')
-    # Add grid
-    ax.yaxis.grid(True)
-    ax.xaxis.grid(True)
-    plt.show()
+    # fig, ax = plt.subplots()
+    # ax.boxplot(time_consumption_each_success_part, patch_artist=True)
+    # ax.set_xticklabels(['Decompose', 'Motor opt', 'Joint connect', 'Interference removal', 'FEA'])
+    # ax.set_ylabel('Time consumption (s)')
+    # # Add grid
+    # ax.yaxis.grid(True)
+    # ax.xaxis.grid(True)
+    # plt.show()
 
     # Plot the average time consumption of each success part in a pie chart
     labels = ['Decompose', 'Motor opt', 'Joint connect', 'Interference removal', 'FEA']
@@ -665,3 +685,52 @@ if __name__ == '__main__':
     ax1.axis('equal')
     plt.show()
 
+    ########### FEA result ###########
+    key_words_stl_file = ['FR_LOW.stl', 'FL_LOW.stl', 'RL_LOW.stl', 'FL_UP.stl', 'FR_UP.stl', 'RL_UP.stl', 'BODY.stl']  # 'RR_UP.stl', 'RR_LOW.stl' are always 1. Bug. Remove them.
+    fea_result_analysis = FeaResultAnalysis(fea_result_csv_path, key_words_stl_file)
+    print(fea_result_analysis.best_relative_density_array_of_key_words)
+
+    # Merge the data with Low, Up, and Body
+    key_words_merged = ['LOW', 'UP', 'BODY']
+    best_relative_density_map_merged = {}
+    for key_word in key_words_merged:
+        best_relative_density_map_merged[key_word] = []
+
+    for key_word in key_words_merged:
+        for key_word_stl_file in key_words_stl_file:
+            if key_word in key_word_stl_file:
+                # Add the best relative density array of the key word to the merged array
+                best_relative_density_map_merged[key_word] = np.concatenate([best_relative_density_map_merged[key_word], fea_result_analysis.best_relative_density_array_of_key_words[key_word_stl_file]])
+    # print(best_relative_density_map_merged)
+    avg_best_relative_density_map_merged = {}
+    std_dev_best_relative_density_map_merged = {}
+    for key_word in key_words_merged:
+        avg_best_relative_density_map_merged[key_word] = np.mean(best_relative_density_map_merged[key_word])
+        std_dev_best_relative_density_map_merged[key_word] = np.std(best_relative_density_map_merged[key_word])
+    
+    # Turn the map into a list
+    avg_best_relative_density_list = []
+    std_dev_best_relative_density_list = []
+    for key_word in key_words_merged:
+        avg_best_relative_density_list.append(avg_best_relative_density_map_merged[key_word])
+        std_dev_best_relative_density_list.append(std_dev_best_relative_density_map_merged[key_word])
+
+    # Draw a bar plot of the best relative density of each key word and add the stddev with error bar
+    x = np.arange(len(key_words_merged))  # the label locations
+    width = 0.2  # the width of the bars
+    fig, ax = plt.subplots()
+    rects1 = ax.bar(x, avg_best_relative_density_list, width, label='Average best relative density')
+    ax.errorbar(x, avg_best_relative_density_list, yerr=std_dev_best_relative_density_list, fmt='o', color='k', capsize=5)
+    x_labels = key_words_merged
+    ax.set_xticks(x)
+    ax.set_xticklabels(x_labels)
+    ax.set_ylim(0, 0.3)
+    
+    ax.set_xlabel('Body Parts')
+    ax.set_ylabel('Best relative density')
+    ax.set_title('Best relative density of each body part')
+    ax.legend()
+    plt.show()
+    
+    
+    
