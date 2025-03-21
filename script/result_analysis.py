@@ -8,6 +8,7 @@ import pandas as pd
 file_path = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(file_path, '../auto_design'))
 sys.path.append(os.path.join(file_path, '../auto_design/modules'))
+import seaborn as sns
 
 from interference_removal import RobotOptResult
 
@@ -468,15 +469,18 @@ class FeaResultAnalysis:
         robot_name	round_id	stl_file	success_flag	best_relative_density
         '''
         self.fea_result_df = pd.read_csv(fea_result_csv_path)
-        if key_words_stl_file is None:
-            key_words_stl_file = ['FR_LOW.stl', 'FL_UP.stl', 'FL_LOW.stl', 'RR_UP.stl', 'RL_UP.stl', 'FR_UP.stl', 'RR_LOW.stl', 'RL_LOW.stl', 'BODY.stl']
-        self.get_best_relative_density_array_of_key_words(key_words_stl_file)
 
-    def get_best_relative_density_array_of_key_words(self, key_words_stl_file):
+        # Remove the rows where stl file is RR_UP.stl or RR_LOW.stl because they are not always 1 due to some bug in the FEA
+        self.fea_result_df = self.fea_result_df[~self.fea_result_df['stl_file'].isin(['RR_UP.stl', 'RR_LOW.stl'])]
+
+
+    def get_best_relative_density_array_of_key_words(self, key_words, key_word_column_name='stl_file'):
         # Get the best relative density array of each key word
-        self.best_relative_density_array_of_key_words = {}
-        for key_word in key_words_stl_file:
-            self.best_relative_density_array_of_key_words[key_word] = self.fea_result_df[self.fea_result_df['stl_file'] == key_word]['best_relative_density'].values
+        best_relative_density_array_of_key_words = {}
+        for key_word in key_words:
+            best_relative_density_array_of_key_words[key_word] = self.fea_result_df[self.fea_result_df[key_word_column_name] == key_word]['best_relative_density'].values
+
+        return best_relative_density_array_of_key_words 
 
 
 if __name__ == '__main__':
@@ -498,239 +502,245 @@ if __name__ == '__main__':
     fea_result_csv_path = os.path.join(dataset_result_folder, '../fea_result_2024Dec/fea_result.csv')
     
     max_round_num = 8
+    
+    # === Global Font Style Configuration ===
+    title_fontsize = 8        # Title font size
+    label_fontsize = 8        # Axis label font size
+    tick_fontsize = 6         # Tick label size
+    legend_fontsize = 8       # Legend font size
+    suptitle_fontsize = 8     # Super title (figure-level title)
+    font_family = 'DejaVu Sans'  # You can change this to 'Arial', 'Times New Roman', etc.
 
-    ########### Motor cost ###########
-    motor_position_cost_rounds_map, motor_occupancy_cost_rounds_map, __ = dataset_result_analysis.get_motor_cost(max_round_num=max_round_num)
+    line_width = 1.5
+    marker_size = 4     
 
-    # Plot the average motor position cost and motor occupancy cost of each round in a bar plot. Add the     
-    motor_position_cost_rounds_avg = np.zeros(max_round_num)
-    motor_occupancy_cost_rounds_avg = np.zeros(max_round_num)
-    motor_position_cost_rounds_std = np.zeros(max_round_num)
-    motor_occupancy_cost_rounds_std = np.zeros(max_round_num)
-    for round_id in range(1, max_round_num+1):
-        # Turn the list into a numpy array
-        motor_position_cost_this_round = np.array(motor_position_cost_rounds_map[round_id])
-        motor_occupancy_cost_this_round = np.array(motor_occupancy_cost_rounds_map[round_id])
-        motor_position_cost_rounds_avg[round_id-1] = motor_position_cost_this_round.mean()
-        motor_occupancy_cost_rounds_avg[round_id-1] = motor_occupancy_cost_this_round.mean()
-        motor_position_cost_rounds_std[round_id-1] = motor_position_cost_this_round.std()
-        motor_occupancy_cost_rounds_std[round_id-1] = motor_occupancy_cost_this_round.std()
+    # Apply font settings globally
+    plt.rcParams.update({
+        'font.family': font_family,
+        'axes.titlesize': title_fontsize,
+        'axes.labelsize': label_fontsize,
+        'xtick.labelsize': tick_fontsize,
+        'ytick.labelsize': tick_fontsize,
+        'legend.fontsize': legend_fontsize,
+        'figure.titlesize': suptitle_fontsize
+    })
 
-    # Draw a bar plot of motor_position_cost_rounds_avg and motor_occupancy_cost_rounds_avg
-    x = np.arange(1, max_round_num + 1)
-    width = 0.35  # Width of the bars
+    
+    # For bar plots and line plots (categorical data)
+    # colors = plt.get_cmap('tab10').colors
+    # colors = plt.cm.Set2(np.linspace(0, 1, 8))  # or Set3
+    colors = sns.color_palette("muted", 8) 
 
-    # Create the bar plot
-    fig, ax = plt.subplots(figsize=(10, 6))
-    rects1 = ax.bar(x - width/2, motor_position_cost_rounds_avg, width, 
-                    yerr=motor_position_cost_rounds_std, 
-                    label='Position Cost',
-                    capsize=5)
-    rects2 = ax.bar(x + width/2, motor_occupancy_cost_rounds_avg, width, 
-                    yerr=motor_occupancy_cost_rounds_std,
-                    label='Occupancy Cost',
-                    capsize=5)
 
-    # Customize the plot
-    ax.set_xlabel('Round Number')
-    ax.set_ylabel('Cost')
-    ax.set_title('Position and Occupancy Costs per Round')
+    ########## FIGURE 1: 2x2 ##########
+    fig1, axs1 = plt.subplots(2, 2, figsize=(7.8, 5), constrained_layout=True)
+
+    #### Subplot 1: Motor Cost ####
+    ax = axs1[0, 1]
+    motor_position_cost_rounds_map, motor_occupancy_cost_rounds_map, _ = dataset_result_analysis.get_motor_cost(max_round_num=max_round_num)
+    motor_position_cost_avg = np.zeros(max_round_num)
+    motor_occupancy_cost_avg = np.zeros(max_round_num)
+    motor_position_cost_std = np.zeros(max_round_num)
+    motor_occupancy_cost_std = np.zeros(max_round_num)
+    for i in range(1, max_round_num + 1):
+        motor_position_cost_avg[i-1] = np.mean(motor_position_cost_rounds_map[i])
+        motor_position_cost_std[i-1] = np.std(motor_position_cost_rounds_map[i])
+        motor_occupancy_cost_avg[i-1] = np.mean(motor_occupancy_cost_rounds_map[i])
+        motor_occupancy_cost_std[i-1] = np.std(motor_occupancy_cost_rounds_map[i])
+
+    # Remove round 8 since it has no valid result
+    motor_position_cost_avg = motor_position_cost_avg[:-1]
+    motor_position_cost_std = motor_position_cost_std[:-1]
+    motor_occupancy_cost_avg = motor_occupancy_cost_avg[:-1]
+    motor_occupancy_cost_std = motor_occupancy_cost_std[:-1]
+
+    x = np.arange(1, max_round_num)
+    width = 0.35
+    ax.bar(x - width/2, motor_position_cost_avg, width, yerr=motor_position_cost_std, capsize=5,
+        color=colors[0], label="Position Cost")
+    ax.bar(x + width/2, motor_occupancy_cost_avg, width, yerr=motor_occupancy_cost_std, capsize=5,
+        color=colors[1], label="Occupancy Cost")
+    ax.set_xlabel("Round")
+    ax.set_ylabel("Cost")
+    ax.set_title("Motor Costs per Round")
     ax.set_xticks(x)
-    ax.set_ylim(0, 5)  # Set y-axis limits from 0 to 5
+    ax.set_ylim(0, 5)
+    ax.grid(True, linestyle="--", alpha=0.6)
     ax.legend()
 
-    # Add some padding to the y-axis to make error bars fully visible
-    ax.margins(y=0.1)
-    # Add grid for better readability
-    ax.grid(True, linestyle='--', alpha=0.7)
-
-    plt.tight_layout()
-    plt.show()
-
-
-    ########### Mesh cost ###########
-    hausdorff_distance_pkl_path = dataset_result_folder + '/hausdorff_distance_rounds_map.pkl'
-    average_point_distance_pkl_path = dataset_result_folder + '/average_point_distance_rounds_map.pkl'
-    # If the pkl file exists, load it
-    if os.path.exists(hausdorff_distance_pkl_path) and os.path.exists(average_point_distance_pkl_path):
-        print(f"Loading hausdorff_distance_rounds_map and average_point_distance_rounds_map from {hausdorff_distance_pkl_path} and {average_point_distance_pkl_path}")
-        with open(hausdorff_distance_pkl_path, 'rb') as f:
-            hausdorff_distance_rounds_map = pkl.load(f)
-        with open(average_point_distance_pkl_path, 'rb') as f:
-            average_point_distance_rounds_map = pkl.load(f)
+    #### Subplot 2: Mesh Similarity ####
+    ax = axs1[1, 0]
+    hausdorff_path = os.path.join(dataset_result_folder, 'hausdorff_distance_rounds_map.pkl')
+    avg_point_path = os.path.join(dataset_result_folder, 'average_point_distance_rounds_map.pkl')
+    if os.path.exists(hausdorff_path) and os.path.exists(avg_point_path):
+        with open(hausdorff_path, 'rb') as f:
+            hausdorff_map = pkl.load(f)
+        with open(avg_point_path, 'rb') as f:
+            avg_point_map = pkl.load(f)
     else:
-        hausdorff_distance_rounds_map, average_point_distance_rounds_map = dataset_result_analysis.get_mesh_similarity(max_round_num=max_round_num)
-        # Save to a binary file
-        with open(hausdorff_distance_pkl_path, 'wb') as f:
-            pkl.dump(hausdorff_distance_rounds_map, f)
-        with open(average_point_distance_pkl_path, 'wb') as f:
-            pkl.dump(average_point_distance_rounds_map, f)
+        hausdorff_map, avg_point_map = dataset_result_analysis.get_mesh_similarity(max_round_num=max_round_num)
+        with open(hausdorff_path, 'wb') as f:
+            pkl.dump(hausdorff_map, f)
+        with open(avg_point_path, 'wb') as f:
+            pkl.dump(avg_point_map, f)
 
-    # Find the average and std of the average point distance and hausdorff distance of each round
-    scale_factor = 1.0 / 1.1
-    average_point_distance_rounds_avg = np.zeros(max_round_num)
-    average_point_distance_rounds_std = np.zeros(max_round_num)
-    scaled_average_point_distance_rounds_avg = np.zeros(max_round_num)
-    hausdorff_distance_rounds_avg = np.zeros(max_round_num)
-    hausdorff_distance_rounds_std = np.zeros(max_round_num)
-    scaled_hausdorff_distance_rounds_avg = np.zeros(max_round_num)
-    for round_id in range(1, max_round_num+1):
-        average_point_distance_this_round = np.array(average_point_distance_rounds_map[round_id])
-        average_point_distance_rounds_avg[round_id-1] = average_point_distance_this_round.mean()
-        average_point_distance_rounds_std[round_id-1] = average_point_distance_this_round.std()
-        hausdorff_distance_this_round = np.array(hausdorff_distance_rounds_map[round_id])
-        hausdorff_distance_rounds_avg[round_id-1] = hausdorff_distance_this_round.mean()
-        hausdorff_distance_rounds_std[round_id-1] = hausdorff_distance_this_round.std()
-
-        # Scale the average point distance and hausdorff distance
-        scaled_average_point_distance_rounds_avg[round_id-1] = average_point_distance_rounds_avg[round_id-1] * pow(scale_factor, round_id-1)
-        scaled_hausdorff_distance_rounds_avg[round_id-1] = hausdorff_distance_rounds_avg[round_id-1] * pow(scale_factor, round_id-1)
-
-    # Draw a bar plot of the average_point_distance_rounds_map and hausdorff_distance_rounds_map
-    x = np.arange(1, max_round_num + 1)
-    width = 0.35  # Width of the bars
-
-    # Create the bar plot
-    fig, ax = plt.subplots(figsize=(10, 6))
-    rects1 = ax.bar(x, average_point_distance_rounds_avg, width, 
-                    yerr=average_point_distance_rounds_std, 
-                    label='Average point distance',
-                    capsize=5)
-    
-    ## Plot both average point distance and hausdorff distance in the same plot
-    # rects1 = ax.bar(x - width/2, average_point_distance_rounds_avg, width, 
-    #                 yerr=average_point_distance_rounds_std, 
-    #                 label='Average point distance',
-    #                 capsize=5)
-    # rects2 = ax.bar(x + width/2, hausdorff_distance_rounds_avg, width, 
-    #                 yerr=hausdorff_distance_rounds_std, 
-    #                 label='Hausdorff distance',
-    #                 capsize=5)
-
-    # Add a line plot of the scaled average point distance and scaled hausdorff distance
-    ax.plot(x, scaled_average_point_distance_rounds_avg, label='Scaled average point distance', color='r')
-    # ax.plot(x, scaled_hausdorff_distance_rounds_avg, label='Scaled hausdorff distance', color='g')
-    
-    ax.set_xlabel('Round Number')
-    ax.set_ylabel('Distance')
-    ax.set_title('Mesh similarity per round')
+    avg_point_avg = np.zeros(max_round_num - 1)
+    avg_point_std = np.zeros(max_round_num - 1)
+    scaled_avg_point = np.zeros(max_round_num - 1)
+    scale_factor = 1 / 1.1
+    for i in range(1, max_round_num):
+        data = np.array(avg_point_map[i])
+        avg_point_avg[i-1] = data.mean()
+        avg_point_std[i-1] = data.std()
+        scaled_avg_point[i-1] = data.mean() * (scale_factor ** (i - 1))
+    wider_width = 0.6
+    ax.bar(x, avg_point_avg, wider_width, yerr=avg_point_std, capsize=5,
+        color=colors[2], label="Avg Point Dist")
+    ax.plot(x, scaled_avg_point, color=colors[3], marker="o", label="Scaled Avg Point Dist", linewidth=line_width, markersize=marker_size)
+    ax.set_xlabel("Round")
+    ax.set_ylabel("Distance")
+    ax.set_title("Mesh Similarity per Round")
     ax.set_xticks(x)
+    ax.grid(True, linestyle="--", alpha=0.6)
     ax.legend()
-    
-    # Add some padding to the y-axis to make error bars fully visible
-    ax.margins(y=0.1)
-    # Add grid for better readability
-    ax.grid(True, linestyle='--', alpha=0.7)
 
-    plt.tight_layout()
-    plt.show()
+    #### Subplot 3: Success Rate + Time ####
+    ax1_main = axs1[0, 0]
+    ax2_twin = ax1_main.twinx()
+    _, _, failure_codes_num, _, growing_success_rate = dataset_result_analysis.get_success_rate(
+        log_csv_path=os.path.join(dataset_result_folder, 'result_log.csv'))
+    avg_time, max_time, min_time, time_parts = dataset_result_analysis.get_time_consumption()
+    # Convert time to minutes
+    avg_time = avg_time / 60
+    max_time = max_time / 60
+    min_time = min_time / 60
 
-    ########### Success rate and time consumption ###########
-    valid_rate, success_rate, failure_codes_num, failure_codes_round, growing_success_rate_rounds = dataset_result_analysis.get_success_rate(log_csv_path = dataset_result_folder + '/result_log.csv')
- 
-    avg_time_consumption_rounds, max_time_consumption_rounds, min_time_consumption_rounds, time_consumption_each_success_part = dataset_result_analysis.get_time_consumption()
-    
-    avg_time_each_success_part = np.mean(time_consumption_each_success_part, axis=0)
-    std_dev_time_each_success_part = np.std(time_consumption_each_success_part, axis=0)
-    print(f"Average time consumption each success part: {avg_time_each_success_part}")
-    print(f"Std dev time consumption each success part: {std_dev_time_each_success_part}")
+    growing_avg = np.cumsum(avg_time)
+    growing_max = np.cumsum(max_time)
+    growing_min = np.cumsum(min_time)
+    rounds = np.arange(max_round_num)
+    bar_width = 0.6
+    ax1_main.bar(rounds, growing_success_rate, bar_width, color=colors[0], alpha=0.5)
+    ax2_twin.plot(rounds, growing_avg, color=colors[1], marker='o', label="Avg Time", linewidth=line_width, markersize=marker_size)
+    ax2_twin.plot(rounds, growing_max, color=colors[2], marker='s', label="Max Time", linewidth=line_width, markersize=marker_size)
+    ax2_twin.plot(rounds, growing_min, color=colors[3], marker='^', label="Min Time", linewidth=line_width, markersize=marker_size)
+    ax1_main.set_xlabel("Round")
+    ax1_main.set_xticklabels([str(i) for i in range(0, max_round_num + 1)])
 
-    growing_avg_time_consumption_rounds = np.zeros(growing_success_rate_rounds.shape)
-    growing_max_time_consumption_rounds = np.zeros(growing_success_rate_rounds.shape)
-    growing_min_time_consumption_rounds = np.zeros(growing_success_rate_rounds.shape)
-    for i in range(growing_avg_time_consumption_rounds.shape[0]):
-        for j in range(i+1):
-            growing_avg_time_consumption_rounds[i] += avg_time_consumption_rounds[j]
-            growing_max_time_consumption_rounds[i] += max_time_consumption_rounds[j]
-            growing_min_time_consumption_rounds[i] += min_time_consumption_rounds[j]
+    ax1_main.set_ylabel("Success Rate", color=colors[0])
+    ax2_twin.set_ylabel("Time (min)", color=colors[1])
+    ax1_main.set_title("Success Rate and Time per Round")
+    ax2_twin.legend(loc="upper right")
+    ax1_main.grid(True, linestyle='--', alpha=0.5)
 
-    # Draw a bar plot of growing_success_rate_rounds and a line plot of growing_avg_time_consumption_rounds, growing_max_time_consumption_rounds, growing_min_time_consumption_rounds
-    round_num = growing_success_rate_rounds.shape[0]
-    fig, ax1 = plt.subplots()
-    ax2 = ax1.twinx()
-    ax1.bar(np.arange(round_num), growing_success_rate_rounds, color='b', alpha=0.5)
-    ax2.plot(np.arange(round_num), growing_avg_time_consumption_rounds, marker='o', color='r', label='Average time consumption')
-    ax2.plot(np.arange(round_num), growing_max_time_consumption_rounds, marker='s', color='g', label='Max time consumption')
-    ax2.plot(np.arange(round_num), growing_min_time_consumption_rounds,  marker='^', color='orange', label='Min time consumption')
-    
-    ax1.set_xlabel('Round')
-    ax1.set_ylabel('Success rate', color='b')
-    ax2.set_ylabel('Average time consumption', color='r')
-    ax2.legend()
-    plt.show()
+    # axs1[1, 1] left blank intentionally
 
-    # Plot the time consumption of each success part in a box plot
-    # fig, ax = plt.subplots()
-    # ax.boxplot(time_consumption_each_success_part, patch_artist=True)
-    # ax.set_xticklabels(['Decompose', 'Motor opt', 'Joint connect', 'Interference removal', 'FEA'])
-    # ax.set_ylabel('Time consumption (s)')
-    # # Add grid
-    # ax.yaxis.grid(True)
-    # ax.xaxis.grid(True)
-    # plt.show()
+    #### Subplot 4: FEA Density presented by rounds ####
+    ax = axs1[1, 1]
+    fea_result_analysis = FeaResultAnalysis(fea_result_csv_path)
+    key_words = [1, 2, 3, 4, 5, 6, 7]
+    key_word_column_name = 'round_id'
+    best_relative_density_array_of_key_words = fea_result_analysis.get_best_relative_density_array_of_key_words(key_words, key_word_column_name)
+    print(best_relative_density_array_of_key_words)
 
-    # Plot the average time consumption of each success part in a pie chart
-    labels = ['Decompose', 'Motor opt', 'Joint connect', 'Interference removal', 'FEA']
-    sizes = avg_time_each_success_part
-    fig1, ax1 = plt.subplots()
-    ax1.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
-    ax1.axis('equal')
-    plt.show()
+    avg_best_relative_density_of_key_words = {}
+    std_best_relative_density_of_key_words = {}
+    for k in key_words:
+        avg_best_relative_density_of_key_words[k] = np.mean(best_relative_density_array_of_key_words[k])
+        std_best_relative_density_of_key_words[k] = np.std(best_relative_density_array_of_key_words[k])
 
-    # Plot the reason of failure in a pie chart
-    labels = ['Motor cost too high', 'Mesh destroyed in interference removal', 'FEA not feasible']
-    sizes = [failure_codes_num[0], failure_codes_num[1]+failure_codes_num[2], failure_codes_num[3]]
-    fig1, ax1 = plt.subplots()
-    ax1.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
-    ax1.axis('equal')
-    plt.show()
-
-    ########### FEA result ###########
-    key_words_stl_file = ['FR_LOW.stl', 'FL_LOW.stl', 'RL_LOW.stl', 'FL_UP.stl', 'FR_UP.stl', 'RL_UP.stl', 'BODY.stl']  # 'RR_UP.stl', 'RR_LOW.stl' are always 1. Bug. Remove them.
-    fea_result_analysis = FeaResultAnalysis(fea_result_csv_path, key_words_stl_file)
-    print(fea_result_analysis.best_relative_density_array_of_key_words)
-
-    # Merge the data with Low, Up, and Body
-    key_words_merged = ['LOW', 'UP', 'BODY']
-    best_relative_density_map_merged = {}
-    for key_word in key_words_merged:
-        best_relative_density_map_merged[key_word] = []
-
-    for key_word in key_words_merged:
-        for key_word_stl_file in key_words_stl_file:
-            if key_word in key_word_stl_file:
-                # Add the best relative density array of the key word to the merged array
-                best_relative_density_map_merged[key_word] = np.concatenate([best_relative_density_map_merged[key_word], fea_result_analysis.best_relative_density_array_of_key_words[key_word_stl_file]])
-    # print(best_relative_density_map_merged)
-    avg_best_relative_density_map_merged = {}
-    std_dev_best_relative_density_map_merged = {}
-    for key_word in key_words_merged:
-        avg_best_relative_density_map_merged[key_word] = np.mean(best_relative_density_map_merged[key_word])
-        std_dev_best_relative_density_map_merged[key_word] = np.std(best_relative_density_map_merged[key_word])
-    
-    # Turn the map into a list
-    avg_best_relative_density_list = []
-    std_dev_best_relative_density_list = []
-    for key_word in key_words_merged:
-        avg_best_relative_density_list.append(avg_best_relative_density_map_merged[key_word])
-        std_dev_best_relative_density_list.append(std_dev_best_relative_density_map_merged[key_word])
-
-    # Draw a bar plot of the best relative density of each key word and add the stddev with error bar
-    x = np.arange(len(key_words_merged))  # the label locations
-    width = 0.2  # the width of the bars
-    fig, ax = plt.subplots()
-    rects1 = ax.bar(x, avg_best_relative_density_list, width, label='Average best relative density')
-    ax.errorbar(x, avg_best_relative_density_list, yerr=std_dev_best_relative_density_list, fmt='o', color='k', capsize=5)
-    x_labels = key_words_merged
-    ax.set_xticks(x)
-    ax.set_xticklabels(x_labels)
+    avg_list = [avg_best_relative_density_of_key_words[k] for k in key_words]
+    std_list = [std_best_relative_density_of_key_words[k] for k in key_words]
+    bar_x = np.arange(len(key_words))
+    bar_width = 0.6
+    ax.bar(bar_x, avg_list, bar_width, yerr=std_list, capsize=5, color=colors[4])
+    ax.set_xticks(bar_x)
+    ax.set_xticklabels(key_words)
     ax.set_ylim(0, 0.3)
+    ax.set_ylabel("Optimized Relative Density")
+    ax.set_xlabel("Round")
+    ax.set_title("Optimized Relative Density by Round")
+    ax.grid(True, linestyle='--', alpha=0.6)
+
+
+    fig1.suptitle("Robot Design Metrics – Part 1", fontsize=suptitle_fontsize)
+    fig1.savefig(os.path.join(dataset_result_folder, "robot_metrics_part1.png"), dpi=300)
+    fig1.savefig(os.path.join(dataset_result_folder, "robot_metrics_part1.pdf"), dpi=300)
+
+    ########## FIGURE 2: 1x3 ##########
+    fig2, axs2 = plt.subplots(1, 3, figsize=(7.8, 2.5), constrained_layout=True)
+
+    #### Subplot 1: Time per Part (Pie) ####
+    ax = axs2[0]
+    labels = ['Mesh Dec.', 'Motor Opt.', 'Key Voxel Srch', 'Intf Rem.', 'Density Opt.']
+    avg_time_parts = np.mean(time_parts, axis=0)
+    #ax.pie(avg_time_parts, labels=labels, autopct='%1.1f%%', startangle=90, colors=colors, textprops={'fontsize': label_fontsize})
+    # Adjust pie size and appearance
+    ax.pie(avg_time_parts, 
+           labels=labels, 
+           autopct='%1.1f%%', 
+           startangle=90, 
+           colors=colors,
+           radius=3,  # Adjust size of pie (0.8 = 80% of available space)
+           textprops={'fontsize': label_fontsize},  # Control label text size
+           pctdistance=0.75,  # Distance of percentage labels from center
+           labeldistance=1.1)  # Distance of category labels from center
     
-    ax.set_xlabel('Body Parts')
-    ax.set_ylabel('Best relative density')
-    ax.set_title('Best relative density of each body part')
-    ax.legend()
+    # Optional: ensure pie is drawn as circle even with rectangular subplot
+    ax.axis('equal')
+    
+    # Set font sizes
+    ax.set_title("Average Time per Step", fontsize=title_fontsize)
+
+    #### Subplot 2: Failure Reason Pie ####
+    ax = axs2[1]
+    failure_labels = ['Motor Cost Too High', 'Mesh Destroyed', 'FEA Not Feasible']
+    failure_sizes = [failure_codes_num[0], failure_codes_num[1] + failure_codes_num[2], failure_codes_num[3]]
+    #ax.pie(failure_sizes, labels=failure_labels, autopct='%1.1f%%', startangle=90, colors=colors, textprops={'fontsize': label_fontsize})
+    
+    # Adjust pie size and appearance
+    ax.pie(failure_sizes, 
+           labels=failure_labels, 
+           autopct='%1.1f%%', 
+           startangle=90, 
+           colors=colors,
+           radius=3,  # Adjust size of pie (0.8 = 80% of available space)
+           textprops={'fontsize': label_fontsize},  # Control label text size
+           pctdistance=0.75,  # Distance of percentage labels from center
+           labeldistance=1.1)  # Distance of category labels from center
+    
+    # Optional: ensure pie is drawn as circle even with rectangular subplot
+    ax.axis('equal')
+    ax.set_title("Failure Reasons", fontsize=title_fontsize)
+
+    #### Subplot 3: FEA Density Bar ####
+    ax = axs2[2]
+    key_words_stl_file = ['FR_LOW.stl', 'FL_LOW.stl', 'RL_LOW.stl', 'FL_UP.stl', 'FR_UP.stl', 'RL_UP.stl', 'BODY.stl']
+    key_words = ['LOW', 'UP', 'BODY']
+    fea_result_analysis = FeaResultAnalysis(fea_result_csv_path, key_words_stl_file)
+    merged = {k: [] for k in key_words}
+    best_density_map = fea_result_analysis.get_best_relative_density_array_of_key_words(key_words_stl_file)
+    for k in key_words:
+        for f in key_words_stl_file:
+            if k in f:
+                merged[k] = np.concatenate([merged[k], best_density_map[f]])
+    avg_density = [np.mean(merged[k]) for k in key_words]
+    std_density = [np.std(merged[k]) for k in key_words]
+    bar_x = np.arange(len(key_words))
+    bar_width = 0.6
+    ax.bar(bar_x, avg_density, bar_width, yerr=std_density, capsize=5, color=colors[4])
+    ax.set_xticks(bar_x)
+    ax.set_xticklabels(key_words)
+    ax.set_ylim(0, 0.3)
+    ax.set_ylabel("Best Relative Density")
+    ax.set_xlabel("Body Parts")
+    ax.set_title("Best Relative Density by Part")
+    ax.grid(True, linestyle='--', alpha=0.6)
+
+
+    fig2.suptitle("Robot Design Metrics – Part 2", fontsize=suptitle_fontsize)
+    fig2.savefig(os.path.join(dataset_result_folder, "robot_metrics_part2.png"), dpi=300)
+    fig2.savefig(os.path.join(dataset_result_folder, "robot_metrics_part2.pdf"), dpi=300)
+
     plt.show()
-    
-    
-    
+

@@ -290,7 +290,7 @@ class RobotOptResult:
         # o3d.visualization.draw_geometries([original_mesh, optimized_mesh])
 
         # Calculate similarity
-        sample_num = 5000
+        sample_num = 10000
         pcd1 = optimized_mesh.sample_points_poisson_disk(sample_num)
         pcd2 = original_mesh.sample_points_poisson_disk(sample_num)
 
