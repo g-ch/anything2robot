@@ -100,7 +100,7 @@ def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
     # Iterate through all links in the robot result and add motor to the links with father tenon
     for link_name, link in robot_result.link_dict.items():
         for i, tenon_type in enumerate(link.tenon_type):
-            if tenon_type == 'father':
+            if 'BODY' in link_name or 'UP' in link_name:
                 print("Adding motor to link: ", link_name)
                 # Extract tenon info
                 tenon_root_point = np.array(link.tenon_pos[i][:3])
@@ -109,7 +109,7 @@ def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
                 tenon_idx = link.tenon_idx[i]
 
                 # Create motor mesh if not exists
-                mesh_filename = f"motor_{i}.stl"
+                mesh_filename = f"motor_{tenon_idx}.stl"
                 mesh_path = os.path.join(output_urdf_folder, mesh_filename)
 
                 # Check if the mesh file already exists
@@ -164,12 +164,7 @@ def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
                     origin=transform
                 )
 
-                # Add to robot
-                # print(f" → Appending link {motor_link_name} and joint {joint.name}")
-                # print(f"   Parent: {joint.parent}, Child: {joint.child}")
-                # robot.links.append(new_link)
-                # robot.joints.append(joint)
-                # print(f"   Robot now has {len(robot.links)} links and {len(robot.joints)} joints")
+                # Add to robot as extra links and joints
                 extra_links.append(new_link)
                 extra_joints.append(joint)
 
