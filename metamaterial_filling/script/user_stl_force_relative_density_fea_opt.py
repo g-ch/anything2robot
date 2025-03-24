@@ -314,7 +314,10 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
     # Store the FEA result
     fea_result = FEA_Opt_Result(input_stl_name_no_ext)
     
-    nodes_seq_stress_exceeded = np.where(von_mises > args.max_allowed_stress_material)[0]
+    if von_mises is not None:
+        nodes_seq_stress_exceeded = np.where(von_mises > args.max_allowed_stress_material)[0]
+    else:
+        nodes_seq_stress_exceeded = []
 
     fea_result.set_result(success_flag, best_relative_density, young_modulus, von_mises, displacement_magnitude, nodes, args.max_allowed_stress_material, args.max_allowed_displacement, nodes_seq_stress_exceeded)
             
