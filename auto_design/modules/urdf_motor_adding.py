@@ -19,6 +19,7 @@ sys.path.append(project_dir)
 from script.motor_param_lib import MotorParameterLib
 from interference_removal import RobotOptResult, LinkResult
 
+motor_param_lib = MotorParameterLib()
 
 def rotation_matrix_from_vectors(vec1, vec2):
     """
@@ -51,6 +52,9 @@ def rotation_matrix_from_vectors(vec1, vec2):
 
 
 def fix_stl_path_issue(urdf_path, output_path):
+    """
+    Fix the stl path issue in the urdf file, change absolute path to relative path.
+    """
     with open(urdf_path, 'r') as file:
         lines = file.readlines()
 
@@ -67,8 +71,10 @@ def fix_stl_path_issue(urdf_path, output_path):
         file.writelines(lines)
 
 def create_motor_cylinder(tenon_idx):
+    """
+    Create a cylinder mesh for a motor based on the tenon index and motor library.
+    """
     # Choose size based on tenon index
-    motor_param_lib = MotorParameterLib()
     # Height (cm), Radius (cm), Max Torque (N*M) 
     # self.motor_lib = [        
     #                   #[2.25, 2.15, 0.9], # GIM3505. SITAIWEI
@@ -85,6 +91,39 @@ def create_motor_cylinder(tenon_idx):
     motor_mesh = trimesh.creation.cylinder(radius=radius, height=height, sections=32)
     return motor_mesh
 
+def get_link_global_transform(robot, link_name):
+    """
+    Returns the global transformation matrix for a given link by traversing up the kinematic chain.
+    """
+    # Base case: root link has identity transform
+    if link_name == robot.links[0].name:
+        return np.eye(4)
+
+    # Find the joint that connects to this link and follow the chain up
+    joint_chain = []
+    current_link = link_name
+
+    # Print the name of links[0]
+    print(f"links[0].name: {robot.links[0].name}")
+    
+    # Build chain of joints from current link to root
+    while current_link != robot.links[0].name:
+        found_joint = None
+        for joint in robot.joints:
+            if joint.child == current_link:
+                found_joint = joint
+                joint_chain.append(joint)
+                current_link = joint.parent
+                break
+        if not found_joint:
+            raise ValueError(f"Link '{current_link}' not connected to tree")
+
+    # Compute transformation by multiplying joint transforms from root to tip
+    transform = np.eye(4)
+    for joint in reversed(joint_chain):
+        transform = transform @ joint.origin
+
+    return transform
 
 def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
     robot = URDF.load(urdf_path)
@@ -100,7 +139,8 @@ def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
     # Iterate through all links in the robot result and add motor to the links with father tenon
     for link_name, link in robot_result.link_dict.items():
         for i, tenon_type in enumerate(link.tenon_type):
-            if 'BODY' in link_name or 'UP' in link_name:
+            #if 'BODY' in link_name or 'UP' in link_name:
+            if True: #NOTE: All the names will be covered but motors maybe duplicated. For visualization only.
                 print("Adding motor to link: ", link_name)
                 # Extract tenon info
                 tenon_root_point = np.array(link.tenon_pos[i][:3])
@@ -122,30 +162,45 @@ def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
 
                 # Compute rotation to align z-axis with tenon_root_dir
                 z_axis = np.array([0, 0, 1])
-                rot_matrix = rotation_matrix_from_vectors(tenon_root_dir, z_axis)
-
+                # print(f"tenon_root_dir: {tenon_root_dir}")
+                rot_matrix = rotation_matrix_from_vectors(z_axis, tenon_root_dir)
+                print(f"rot_matrix: {rot_matrix}")
+                
                 # Transform: rotation + translation
+                sizes = motor_param_lib.get_motor_lib()
+                motor_height = sizes[tenon_idx][0] * 0.01 # cm to m
                 transform = np.eye(4)
                 transform[:3, :3] = rot_matrix
-                transform[:3, 3] = tenon_root_point
+                transform[:3, 3] = tenon_root_point + motor_height * tenon_root_dir * 0.5
+
+                T_world_motor = transform
+                T_world_parent = get_link_global_transform(robot, link_name)
+
+                print(f"T_world_parent: {T_world_parent}")
+                print(f"T_world_motor: {T_world_motor}")
+                
+                T_parent_motor = np.linalg.inv(T_world_parent) @ T_world_motor
+                print(f"T_parent_motor: {T_parent_motor}")
+
+                zero_origin = np.eye(4)
 
                 # Create new link
                 motor_link_name = f"{link_name}_motor_{i}"
                 visual = Visual(
                     geometry=Geometry(mesh=Mesh(filename=mesh_path)),
-                    origin=transform
+                    origin=zero_origin
                 )
                 # Add collision
                 collision = Collision(
                     name=f"{motor_link_name}_collision",
                     geometry=Geometry(mesh=Mesh(filename=mesh_path)),
-                    origin=transform
+                    origin=zero_origin
                 )
                 # Add inertial
                 inertial = Inertial(
                     mass=0.01,
                     inertia=np.eye(3) * 0.0001,
-                    origin=transform
+                    origin=zero_origin
                 )
 
                 new_link = Link(
@@ -158,10 +213,10 @@ def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
                 # Create fixed joint
                 joint = Joint(
                     name=f"{motor_link_name}_joint",
-                    parent=link_name,
+                    parent=link_name, #"BODY", #link_name,
                     child=motor_link_name,
                     joint_type='fixed',
-                    origin=transform
+                    origin=T_parent_motor
                 )
 
                 # Add to robot as extra links and joints
@@ -197,11 +252,15 @@ def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
     # Fix the stl path issue
     fix_stl_path_issue(output_urdf_path, output_urdf_path)
 
+    print(f"Done! The urdf with motors is saved to {output_urdf_path}")
+
 
 if __name__ == "__main__":
-    urdf_path = "/media/clarence/Clarence/anything2robot_data/result/n02086646_422_neutral_res_e300_smoothed_scaled_20241031-014549/result_round1/urdf/n02086646_422_neutral_res_e300_smoothed_scaled20241031-014817.urdf"
-    robot_pkl_path = "/media/clarence/Clarence/anything2robot_data/result/n02086646_422_neutral_res_e300_smoothed_scaled_20241031-014549/result_round1/robot_result.pkl"
+    # urdf_path = "/media/clarence/Clarence/anything2robot_data/result/n02086646_422_neutral_res_e300_smoothed_scaled_20241031-014549/result_round1/urdf/n02086646_422_neutral_res_e300_smoothed_scaled20241031-014817.urdf"
+    # robot_pkl_path = "/media/clarence/Clarence/anything2robot_data/result/n02086646_422_neutral_res_e300_smoothed_scaled_20241031-014549/result_round1/robot_result.pkl"
     
+    robot_pkl_path = "/media/clarence/Clarence/anything2robot_data/gold_lynel_20241201-134522_good/result_round1/robot_result.pkl"
+    urdf_path = "/media/clarence/Clarence/anything2robot_data/gold_lynel_20241201-134522_good/result_round1/urdf/gold_lynel20241201-162205.urdf"
     path_fixed_urdf_path = urdf_path.replace('.urdf', '_fixed.urdf')
 
     # Get the parent parent folder of the urdf path
