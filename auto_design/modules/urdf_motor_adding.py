@@ -259,8 +259,13 @@ if __name__ == "__main__":
     # urdf_path = "/media/clarence/Clarence/anything2robot_data/result/n02086646_422_neutral_res_e300_smoothed_scaled_20241031-014549/result_round1/urdf/n02086646_422_neutral_res_e300_smoothed_scaled20241031-014817.urdf"
     # robot_pkl_path = "/media/clarence/Clarence/anything2robot_data/result/n02086646_422_neutral_res_e300_smoothed_scaled_20241031-014549/result_round1/robot_result.pkl"
     
-    robot_pkl_path = "/media/clarence/Clarence/anything2robot_data/gold_lynel_20241201-134522_good/result_round1/robot_result.pkl"
-    urdf_path = "/media/clarence/Clarence/anything2robot_data/gold_lynel_20241201-134522_good/result_round1/urdf/gold_lynel20241201-162205.urdf"
+    # robot_pkl_path = "/media/clarence/Clarence/anything2robot_data/gold_lynel_20241201-134522_good/result_round1/robot_result.pkl"
+    # urdf_path = "/media/clarence/Clarence/anything2robot_data/gold_lynel_20241201-134522_good/result_round1/urdf/gold_lynel20241201-162205.urdf"
+    
+    folder = "/media/clarence/Clarence/anything2robot_data/standford_dogs/ForPaper/n02111277_8930_neutral_res_e300_smoothed_scaled_20241030-002123/result_round2/urdf"
+    urdf_path = os.path.join(folder, "n02111277_8930_neutral_res_e300_smoothed_scaled20241030-003447.urdf")
+    robot_pkl_path = os.path.join(folder, "../robot_result.pkl")
+    
     path_fixed_urdf_path = urdf_path.replace('.urdf', '_fixed.urdf')
 
     # Get the parent parent folder of the urdf path

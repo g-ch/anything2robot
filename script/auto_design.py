@@ -381,16 +381,16 @@ def auto_design_function(args, mapdl_object=None):
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
 
-    parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/scorpiones_scaled.stl'), help='The path to the stl mesh file.')
-    parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/scorpiones_scaled_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
+    parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/Mario_Character_Image_1020080024_scaled.stl'), help='The path to the stl mesh file.')
+    parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/Mario_Character_Image_1020080024_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
     
     # parser.add_argument('--stl_mesh_path', type=str, default="/home/cc/git/anything2robot/result/n02093859_276_neutral_res_e300_smoothed_scaled.stl")
     # parser.add_argument('--joint_pkl_path', type=str, default="/home/cc/git/anything2robot/result/n02093859_276_neutral_res_e300_smoothed_joints.pkl")
 
     parser.add_argument('--result_folder', type=str, default=os.path.normpath(project_path + '/result'), help='The folder to save the results.')
 
-    parser.add_argument('--expected_x', type=float, default=100, help='The expected x-axis length of the model. (cm)')
-    parser.add_argument('--voxel_size', type=float, default=1.0, help='The size of the voxel. (cm)')
+    parser.add_argument('--expected_x', type=float, default=50, help='The expected x-axis length of the model. (cm)')
+    parser.add_argument('--voxel_size', type=float, default=0.5, help='The size of the voxel. (cm)')
     parser.add_argument('--voxel_density', type=float, default=1.2e-4, help='The estimated density of the voxel depending on the material. (kg/cm^3)')
     parser.add_argument('--joint_limitation', type=float, default=0.5, help='The limitation of the joint. +-joint_limitation. (rad)')
     parser.add_argument('--joint_limitation_from_champ', type=bool, default=True, help='Use champ controller or not. This will affect joint limits.')
@@ -401,7 +401,7 @@ if __name__=="__main__":
     parser.add_argument('--regenerate_if_fea_failed', type=bool, default=False, help='Regenerate the model if the FEA analysis failed or not. FEAs are expensive and strict.')
 
     parser.add_argument('--visualize', type=bool, default=True, help='Visualize the process or not. Need to close the windows to continue the process if turned on.')
-    parser.add_argument('--disable_joint_setting_ui', type=bool, default=True, help='Disable the joint setting UI or not')
+    parser.add_argument('--disable_joint_setting_ui', type=bool, default=False, help='Disable the joint setting UI or not')
     parser.add_argument('--joint_setting_standard_scale', type=bool, default=False, help='Scale the model to a standard scale for easier joint setting in the UI or not')
 
     ### No need to set model_name. This is a temporary value. It will be removed in the future.
