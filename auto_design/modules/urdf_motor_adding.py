@@ -164,7 +164,7 @@ def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
                 z_axis = np.array([0, 0, 1])
                 # print(f"tenon_root_dir: {tenon_root_dir}")
                 rot_matrix = rotation_matrix_from_vectors(z_axis, tenon_root_dir)
-                print(f"rot_matrix: {rot_matrix}")
+                # print(f"rot_matrix: {rot_matrix}")
                 
                 # Transform: rotation + translation
                 sizes = motor_param_lib.get_motor_lib()
@@ -176,11 +176,11 @@ def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
                 T_world_motor = transform
                 T_world_parent = get_link_global_transform(robot, link_name)
 
-                print(f"T_world_parent: {T_world_parent}")
-                print(f"T_world_motor: {T_world_motor}")
+                # print(f"T_world_parent: {T_world_parent}")
+                # print(f"T_world_motor: {T_world_motor}")
                 
                 T_parent_motor = np.linalg.inv(T_world_parent) @ T_world_motor
-                print(f"T_parent_motor: {T_parent_motor}")
+                # print(f"T_parent_motor: {T_parent_motor}")
 
                 zero_origin = np.eye(4)
 
@@ -220,8 +220,10 @@ def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
                 )
 
                 # Add to robot as extra links and joints
-                extra_links.append(new_link)
-                extra_joints.append(joint)
+                # Check if the link already exists
+                if motor_link_name not in [link.name for link in robot.links]:
+                    extra_links.append(new_link)
+                    extra_joints.append(joint)
 
     robot_with_motors = URDF(
         name=robot.name,
@@ -232,15 +234,16 @@ def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
     )
 
     # List all links
-    for link in robot_with_motors.links:
-        print(f"Link: {link.name}")
+    # for link in robot_with_motors.links:
+    #     print(f"Link: {link.name}")
 
-    # List all joints
-    for joint in robot_with_motors.joints:
-        print(f"Joint: {joint.name} - Parent: {joint.parent} -> Child: {joint.child}")
+    # # List all joints
+    # for joint in robot_with_motors.joints:
+    #     print(f"Joint: {joint.name} - Parent: {joint.parent} -> Child: {joint.child}")
 
     # Save the robot
-    output_urdf_path = os.path.join(output_urdf_folder, 'robot_with_motors.urdf')
+    ori_urdf_name = os.path.basename(urdf_path)
+    output_urdf_path = os.path.join(output_urdf_folder, ori_urdf_name.replace('fixed', '_with_motors'))
     robot_with_motors.save(output_urdf_path)
 
     # Copy the stl files to the output folder
@@ -256,28 +259,43 @@ def add_motor_to_urdf(urdf_path, pkl_result_path, output_urdf_folder):
 
 
 if __name__ == "__main__":
+    '''For single urdf file'''
     # urdf_path = "/media/clarence/Clarence/anything2robot_data/result/n02086646_422_neutral_res_e300_smoothed_scaled_20241031-014549/result_round1/urdf/n02086646_422_neutral_res_e300_smoothed_scaled20241031-014817.urdf"
     # robot_pkl_path = "/media/clarence/Clarence/anything2robot_data/result/n02086646_422_neutral_res_e300_smoothed_scaled_20241031-014549/result_round1/robot_result.pkl"
     
     # robot_pkl_path = "/media/clarence/Clarence/anything2robot_data/gold_lynel_20241201-134522_good/result_round1/robot_result.pkl"
     # urdf_path = "/media/clarence/Clarence/anything2robot_data/gold_lynel_20241201-134522_good/result_round1/urdf/gold_lynel20241201-162205.urdf"
     
-    folder = "/media/clarence/Clarence/anything2robot_data/standford_dogs/ForPaper/n02111277_8930_neutral_res_e300_smoothed_scaled_20241030-002123/result_round2/urdf"
-    urdf_path = os.path.join(folder, "n02111277_8930_neutral_res_e300_smoothed_scaled20241030-003447.urdf")
-    robot_pkl_path = os.path.join(folder, "../robot_result.pkl")
-    
-    path_fixed_urdf_path = urdf_path.replace('.urdf', '_fixed.urdf')
+    # folder = "/media/clarence/Clarence/anything2robot_data/standford_dogs/ForPaper/n02111277_8930_neutral_res_e300_smoothed_scaled_20241030-002123/result_round2/urdf"
+    # urdf_path = os.path.join(folder, "n02111277_8930_neutral_res_e300_smoothed_scaled20241030-003447.urdf")
+    # robot_pkl_path = os.path.join(folder, "../robot_result.pkl")
 
-    # Get the parent parent folder of the urdf path
-    output_urdf_folder = os.path.join(os.path.dirname(os.path.dirname(path_fixed_urdf_path)), 'urdf_with_motors')
+    '''For all urdf files in the folder'''
+    folder = "/home/clarence/ros_ws/quad_ws/src/urdf_control/urdf"
+    # Find all the urdf files in the folder and its subfolders
+    urdf_files = []
+    for root, dirs, files in os.walk(folder):
+        for file in files:
+            if file.endswith('.urdf') and 'fixed' not in file and 'with_motors' not in file:
+                urdf_files.append(os.path.join(root, file))
 
-    # Create the output urdf path if not exists
-    if not os.path.exists(output_urdf_folder):
-        os.makedirs(output_urdf_folder)
+    for urdf_path in urdf_files:
+        file_parent_folder = os.path.dirname(urdf_path)
+        robot_pkl_path = os.path.join(file_parent_folder, '../robot_result.pkl')
 
-    # Fix the stl path issue
-    fix_stl_path_issue(urdf_path, path_fixed_urdf_path)  
+        # Create the fixed urdf path
+        path_fixed_urdf_path = urdf_path.replace('.urdf', '_fixed.urdf')
 
-    # Add motor to the urdf
-    add_motor_to_urdf(path_fixed_urdf_path, robot_pkl_path, output_urdf_folder)
+        # Get the parent parent folder of the urdf path
+        output_urdf_folder = os.path.join(os.path.dirname(os.path.dirname(path_fixed_urdf_path)), 'urdf_with_motors')
+
+        # Create the output urdf path if not exists
+        if not os.path.exists(output_urdf_folder):
+            os.makedirs(output_urdf_folder)
+
+        # Fix the stl path issue
+        fix_stl_path_issue(urdf_path, path_fixed_urdf_path)  
+
+        # Add motor to the urdf
+        add_motor_to_urdf(path_fixed_urdf_path, robot_pkl_path, output_urdf_folder)
 
