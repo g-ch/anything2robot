@@ -37,6 +37,9 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 add_executable(scaleMesh src/scaleMesh.cpp)
 target_link_libraries(scaleMesh )
 
+add_executable(rotateMesh src/rotateMesh.cpp)
+target_link_libraries(rotateMesh)
+
 add_executable(replaceMesh src/replaceMesh.cpp)
 target_link_libraries(replaceMesh)
 

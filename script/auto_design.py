@@ -381,11 +381,11 @@ def auto_design_function(args, mapdl_object=None):
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Mesh Loader')
 
-    parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/Mario_Character_Image_1020080024_scaled.stl'), help='The path to the stl mesh file.')
-    parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/Mario_Character_Image_1020080024_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
+    # parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/Mario_Character_Image_1020080024_scaled.stl'), help='The path to the stl mesh file.')
+    # parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/Mario_Character_Image_1020080024_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
     
-    # parser.add_argument('--stl_mesh_path', type=str, default="/home/cc/git/anything2robot/result/n02093859_276_neutral_res_e300_smoothed_scaled.stl")
-    # parser.add_argument('--joint_pkl_path', type=str, default="/home/cc/git/anything2robot/result/n02093859_276_neutral_res_e300_smoothed_joints.pkl")
+    parser.add_argument('--stl_mesh_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/Cactus_Character_Scaled.stl'), help='The path to the stl mesh file.')
+    parser.add_argument('--joint_pkl_path', type=str, default=os.path.normpath(project_path + '/auto_design/model/given_models/Cactus_Character_Scaled_joints.pkl'), help='The path to the joint pkl file. Optional. If not provided, UI can be used to add joints.') 
 
     parser.add_argument('--result_folder', type=str, default=os.path.normpath(project_path + '/result'), help='The folder to save the results.')
 

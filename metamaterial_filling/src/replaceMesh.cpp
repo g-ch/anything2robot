@@ -6,7 +6,7 @@
 #include <fstream>
 
 // Function to move center to origin and align largest side to the bottom
-void processMesh(const std::string& inputFilename, const std::string& outputFilename, double scale=1.0) 
+void rotateMesh(const std::string& inputFilename, const std::string& outputFilename, double scale=1.0) 
 {
     Eigen::MatrixXd V;  // Vertex coordinates
     Eigen::MatrixXi F;  // Face indices
@@ -99,10 +99,10 @@ int main(int argc, char* argv[]) {
 
     if(argc == 4) {
         // Call the function with the STL file paths and scale
-        processMesh(argv[1], argv[2], std::stod(argv[3]));
+        rotateMesh(argv[1], argv[2], std::stod(argv[3]));
     }else{
         // Call the function with the STL file paths
-        processMesh(argv[1], argv[2]);
+        rotateMesh(argv[1], argv[2]);
     }
 
     return 0;
