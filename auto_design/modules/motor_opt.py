@@ -510,7 +510,23 @@ class Motor_Opt:
 
     def render(self, save_only=False, save_path=None):
         fig = go.Figure(data=[self.mesh.mesh_plotly, *self.create_motors(self.motor_results)])
-        fig.update_layout(scene_aspectmode='data')
+
+        fig.update_layout(
+            margin = {'l':0,'r':0,'t':0,'b':0},
+            scene=dict(
+                xaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)", 
+                        zeroline=False, showbackground=False, title=''),
+                yaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)",
+                        zeroline=False, showbackground=False, title=''),
+                zaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)",
+                        zeroline=False, showbackground=False, title=''),
+            ),
+            scene_aspectmode='data',
+            plot_bgcolor='rgba(0,0,0,0)',  # Transparent plot background
+            paper_bgcolor='rgba(0,0,0,0)',  # Transparent paper background
+            showlegend=False,
+            annotations=[]
+        )
 
         if not save_only:
             fig.show()

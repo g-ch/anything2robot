@@ -245,25 +245,21 @@ class Mesh_Group:
 
         fig = go.Figure(data=scatters+[mesh_plotly] if mesh_plotly is not None else scatters)
         fig.update_layout(
-            #autosize=False,
             margin = {'l':0,'r':0,'t':0,'b':0},
             scene=dict(
                 xaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)", 
-                        zeroline=False, showbackground=False, title=''),  # Remove X-axis title
+                        zeroline=False, showbackground=False, title=''),
                 yaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)",
-                        zeroline=False, showbackground=False, title=''),  # Remove Y-axis title
+                        zeroline=False, showbackground=False, title=''),
                 zaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)",
-                        zeroline=False, showbackground=False, title=''),  # Remove Z-axis title
+                        zeroline=False, showbackground=False, title=''),
             ),
             scene_aspectmode='data',
-            # plot_bgcolor='rgba(0,0,0,0)',  # Set plot background to be transparent
-            # paper_bgcolor='rgba(0,0,0,0)',  # Set paper background to be transparent
-            showlegend=False,  # Hide the legend
-            annotations=[],  # Remove annotations
-            #scene_camera=dict(up=dict(x=0, y=0, z=1), center=dict(x=0, y=-0.22, z=0), eye=dict(x=1.1, y=-0.9, z=0.4)),  # Optional: Adjust camera for better view
-            scene_camera=camera #,
-            # width=740,
-            # height=600
+            plot_bgcolor='rgba(0,0,0,0)',  # Transparent plot background
+            paper_bgcolor='rgba(0,0,0,0)',  # Transparent paper background
+            showlegend=False,
+            annotations=[],
+            scene_camera=camera
         )
 
         if not save_only:

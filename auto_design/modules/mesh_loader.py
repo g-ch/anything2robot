@@ -110,6 +110,22 @@ class Mesh:
         Render the mesh data.
         """
         fig = go.Figure(data=[self.mesh_plotly])
+        fig.update_layout(
+            margin = {'l':0,'r':0,'t':0,'b':0},
+            scene=dict(
+                xaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)", 
+                        zeroline=False, showbackground=False, title=''),
+                yaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)",
+                        zeroline=False, showbackground=False, title=''),
+                zaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)",
+                        zeroline=False, showbackground=False, title=''),
+            ),
+            scene_aspectmode='data',
+            plot_bgcolor='rgba(0,0,0,0)',  # Transparent plot background
+            paper_bgcolor='rgba(0,0,0,0)',  # Transparent paper background
+            showlegend=False,
+            annotations=[]
+        )
         #fig.show()
         if not save_only:
             fig.show()
@@ -914,13 +930,57 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
                 y.append(pos[1])
                 z.append(pos[2])
         # Update layout
-        self.fig.update_layout(scene_aspectmode='data')
+        self.fig.update_layout(
+            margin = {'l':0,'r':0,'t':0,'b':0},
+            scene=dict(
+                xaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)", 
+                        zeroline=False, showbackground=False, title=''),
+                yaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)",
+                        zeroline=False, showbackground=False, title=''),
+                zaxis=dict(showgrid=False, showticklabels=False, backgroundcolor="rgba(0,0,0,0)",
+                        zeroline=False, showbackground=False, title=''),
+            ),
+            scene_aspectmode='data',
+            plot_bgcolor='rgba(0,0,0,0)',  # Transparent plot background
+            paper_bgcolor='rgba(0,0,0,0)',  # Transparent paper background
+            showlegend=False,
+            annotations=[],
+        )
 
         # Add joint markers and axes to the plot
         self.fig.add_trace(self.mesh.mesh_plotly)
-        self.fig.add_trace(go.Scatter3d(x=x, y=y, z=z, mode='markers'))
-        cone = go.Cone(x=axis_x, y=axis_y, z=axis_z, u=direct_x, v=direct_y, w=direct_z)
-        self.fig.add_trace(cone)
+        # Add joint position markers
+        self.fig.add_trace(go.Scatter3d(x=x, y=y, z=z, mode='markers', marker=dict(size=3, color='black')))
+
+        # Add arrow shafts as thick lines
+        for i in range(len(axis_x)):
+            # Create line for arrow shaft
+            self.fig.add_trace(go.Scatter3d(
+                x=[axis_x[i], axis_x[i] + 0.4 * direct_x[i]],
+                y=[axis_y[i], axis_y[i] + 0.4 * direct_y[i]], 
+                z=[axis_z[i], axis_z[i] + 0.4 * direct_z[i]],
+                mode='lines',
+                line=dict(color='red', width=10),
+                hoverinfo='none'
+            ))
+
+            # Create cone for arrow head
+            tip_pos = np.array([axis_x[i] + 0.4 * direct_x[i], axis_y[i] + 0.4 * direct_y[i], axis_z[i] + 0.4 * direct_z[i]])
+            direction = np.array([direct_x[i], direct_y[i], direct_z[i]])
+            direction = direction / np.linalg.norm(direction)
+            base_center = tip_pos - direction * 0.1
+
+            self.fig.add_trace(go.Cone(
+                x=[base_center[0]],
+                y=[base_center[1]], 
+                z=[base_center[2]],
+                u=[direction[0]],
+                v=[direction[1]],
+                w=[direction[2]],
+                sizeref=cone_size * 0.3,  # Increased from 0.1 to 0.3 to make cone bigger
+                colorscale=[[0, 'red'], [1, 'red']],
+                showscale=False
+            ))
         # Optionally refresh the plot if required
 
 
