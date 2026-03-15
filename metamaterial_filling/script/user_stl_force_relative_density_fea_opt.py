@@ -334,4 +334,7 @@ def stl_force_relative_density_fea_opt(stl_path_input=None, robot_result_file=No
 
 
 if __name__ == "__main__":
-    stl_force_relative_density_fea_opt(stl_path_input='/media/clarence/Clarence/anything2robot/urdf/gold_lynel20241018-110051/BODY_UP.stl', robot_result_file='/media/clarence/Clarence/anything2robot/auto_design/results/gold_lynel20241018-110054_robot_result.pkl')
+    stl_force_relative_density_fea_opt(stl_path_input='/home/cc/git/anything2robot/result/gold_lynel_20241201-134522-20250404T081439Z-001/gold_lynel_20241201-134522/result_round1/urdf/FL_LOW.stl', 
+                                       robot_result_file='/home/cc/git/anything2robot/result/gold_lynel_20241201-134522-20250404T081439Z-001/gold_lynel_20241201-134522/result_round1/robot_result.pkl',
+                                       display_force_result=True,
+                                       display_fea_result=True)

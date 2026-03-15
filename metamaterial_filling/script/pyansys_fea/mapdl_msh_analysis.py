@@ -90,7 +90,7 @@ class MapdlFea:
     @param: display: bool: Display the FEA results. Default: True
     @return: float: Max von Mises stress and max displacement
     '''
-    def static_fea_analysis(self, msh_file, elastic=210e3, poisson_ratio=0.3, fixed_nodes=None, closest_node_num_per_fixed=1, forces_nodes=None, forces=None, closest_node_num_per_force=1, display=True):
+    def static_fea_analysis(self, msh_file, elastic=210e3, poisson_ratio=0.3, fixed_nodes=None, closest_node_num_per_fixed=1, forces_nodes=None, forces=None, closest_node_num_per_force=1, display=True):        
         try:
         
             # Check if the msh file exists
@@ -240,7 +240,10 @@ class MapdlFea:
 
             # grab the result from the ``self.mapdl`` instance
             result = self.mapdl.result
+
+            print(f"display: {display}")
             if display:
+                print("Plotting the principal nodal stress")
                 result.plot_principal_nodal_stress(
                     0,
                     "SEQV",
@@ -250,6 +253,8 @@ class MapdlFea:
                     text_color="k",
                     add_text=False,
                 )
+                # Save the plot to a file
+                #plt.savefig(f"{msh_file}_principal_nodal_stress.png")
 
             nnum, stress = result.principal_nodal_stress(0)
             nnum, displacements = result.nodal_displacement(0)

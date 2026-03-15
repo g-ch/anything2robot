@@ -24,7 +24,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--urdf_folder', type=str, default=project_dir + '/result/gold_lynel_20241201-134522_good/result_round1/urdf', help='Input STL files folder path')
     parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/result/gold_lynel_20241201-134522_good/result_round1/robot_result.pkl', help='Pickle file path for the tenon position results')
-
+    parser.add_argument('--skip_metamaterial_filling', type=bool, default=True, help='Skip the metamaterial filling step. Do this when your printer does not support metamaterial filling. Slow.')
     args = parser.parse_args()
 
     # urdf_folder = project_dir + "/urdf/" + args.urdf_folder_name
@@ -57,6 +57,11 @@ if __name__ == '__main__':
             plate_interval = 10
             shell_generation_voxel_resolution = 1
             shell_thickness = 1.5
+
+        if args.skip_metamaterial_filling:
+            print("Skipping the metamaterial filling step")
+            plate_interval = None
+            shell_thickness = None
 
         input_stl_path = urdf_folder + "/" + stl_file
         unit = "m"

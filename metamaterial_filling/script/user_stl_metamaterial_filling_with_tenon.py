@@ -631,6 +631,8 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
     # In Test mode, shell and metamaterial filling are not generated but tenon is added for quick testing
     TEST_MODE_NO_SHELL_NO_INNER = False
+    if shell_thickness is None or shell_generation_voxel_resolution is None:
+        TEST_MODE_NO_SHELL_NO_INNER = True
 
     if not TEST_MODE_NO_SHELL_NO_INNER:
         # Remove the smaller_model for shell file if it exists and we are not using the existing model. For quick testing.
@@ -708,24 +710,24 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     width = max(delf_x, delf_y) * safe_scale
 
     interval = plate_interval # mm. The interval between plates
-    thickness = relative_density / 6.0 * interval
+    if not TEST_MODE_NO_SHELL_NO_INNER:
+        thickness = relative_density / 6.0 * interval
 
-    # Check if thickness is smaller than 0.2
-    if thickness < 0.2:
-        thickness = 0.2
-        print('Thickness should be smaller than 0.2, set to 0.2')
-        # Correct the interval
-        # interval = thickness * 6.0 / relative_density  # No change to the interval for now
+        # Check if thickness is smaller than 0.2
+        if thickness < 0.2:
+            thickness = 0.2
+            print('Thickness should be smaller than 0.2, set to 0.2')
+            # Correct the interval
+            # interval = thickness * 6.0 / relative_density  # No change to the interval for now
 
-        print(f"Corrected interval: {interval}")
-    
-    # Make thickness a int multiple of 0.1
-    thickness = round(thickness / 0.1) * 0.1
+            print(f"Corrected interval: {interval}")
+        
+        # Make thickness a int multiple of 0.1
+        thickness = round(thickness / 0.1) * 0.1
 
-    plates_num = int(width / (thickness + interval) / 2)
-
-    # TEST CODE to getsolid model with tenon. No shell or filling. Comment out the following line to get the final model
-    if TEST_MODE_NO_SHELL_NO_INNER:
+        plates_num = int(width / (thickness + interval) / 2)
+    else:
+        plates_num = None
         thickness = None
         interval = None
 
