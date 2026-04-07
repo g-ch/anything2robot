@@ -2,8 +2,14 @@ from solid import *
 from solid.utils import *
 import math
 import os
+import subprocess
 import warnings
 import trimesh
+
+
+def get_openscad_bin():
+    return os.environ.get("OPENSCAD_BIN", "openscad")
+
 
 def mesh_difference(target_mesh_path, tool_mesh_path, result_save_path):
     # Generate the SCAD file
@@ -15,7 +21,12 @@ def mesh_difference(target_mesh_path, tool_mesh_path, result_save_path):
 
     try:
         # Use OpenSCAD's command-line interface to convert the SCAD file to an STL file
-        os.system(f'openscad -o {result_save_path} {scad_file}')
+        result = subprocess.run(
+            [get_openscad_bin(), "-o", result_save_path, scad_file],
+            check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"OpenSCAD exited with code {result.returncode}")
 
         # Check if the resulting STL file is empty
         mesh = trimesh.load(result_save_path)

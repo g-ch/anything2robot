@@ -1,7 +1,5 @@
-import pickle as pkl
 import numpy as np
 import trimesh
-import open3d as o3d
 import sys
 import os
 
@@ -10,12 +8,6 @@ script_path = os.path.dirname(os.path.realpath(__file__))
 print("Script path: ", script_path)
 
 #sys.path.append('/home/clarence/ros_ws/metamaterial_ws/src/auto_design/modules')
-
-sys.path.append(os.path.join(script_path, '../../../auto_design/modules'))
-sys.path.append(os.path.join(script_path, '../../../auto_design'))
-from interference_removal import RobotOptResult, LinkResult
-
-
 
 def transform_trimesh(mesh, transformation_matrix, save_path=None):
     # Apply transformation
@@ -41,6 +33,8 @@ def load_and_transform_stl(file_path, transformation_matrix, scale=1.0, save_pat
     return mesh
 
 def convert_to_open3d(trimesh_mesh):
+    import open3d as o3d
+
     vertices = np.asarray(trimesh_mesh.vertices)
     faces = np.asarray(trimesh_mesh.faces)
     open3d_mesh = o3d.geometry.TriangleMesh()
@@ -51,6 +45,8 @@ def convert_to_open3d(trimesh_mesh):
 
 
 def visualize_meshes(stl_files, transformation_matrices, scales=None):
+    import open3d as o3d
+
     open3d_meshes = []
     for i in range(len(stl_files)):
         if scales is not None:
@@ -174,6 +170,12 @@ def get_transformation_matrix_from_angle(rotation_point, axis, angle):
 
 
 if __name__ == "__main__":
+    import pickle as pkl
+
+    sys.path.append(os.path.join(script_path, "../../../auto_design/modules"))
+    sys.path.append(os.path.join(script_path, "../../../auto_design"))
+    from interference_removal import RobotOptResult, LinkResult
+
     # Load robot result
     robot_result = pkl.load(open('/home/clarence/ros_ws/metamaterial_ws/src/auto_design/results/lynel_robot_result.pkl', 'rb'))
     #robot_result = pkl.load(open('/home/clarence/git/anything2robot/anything2robot/auto_design/modules/lynel_robot_result.pkl', 'rb'))
@@ -217,5 +219,4 @@ if __name__ == "__main__":
     transformation_matrices = [eye_transformation_matrix, tenon_transformation_matrix]
 
     visualize_meshes(stl_files, transformation_matrices, scales)
-
 

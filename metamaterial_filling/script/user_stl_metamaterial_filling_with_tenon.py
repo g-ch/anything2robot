@@ -8,8 +8,8 @@ import os
 import argparse
 import subprocess
 import sys
-import pickle as pkl
 import shutil
+import shlex
 
 project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_dir + '/metamaterial_filling/script')
@@ -19,7 +19,7 @@ sys.path.append(project_dir)
 
 
 from metamaterial.sixFoldPlatesFillingWithShellTenon import SixFoldPlatesFillingWithShellTenon
-from metamaterial.generateMeshFromPoints import generate_mesh_from_points
+from io_interface.robot_result_compat import load_robot_result
 from mesh_operations.mesh_difference import mesh_difference
 from mesh_operations.create_box import create_box
 from mesh_operations.create_cylinder import create_cylinder
@@ -27,18 +27,10 @@ from mesh_operations.repair_mesh import repair_mesh
 
 import time
 import numpy as np
-import math
-from format_transform.off_to_stl import off_to_stl
 
 from visualization.assemble_vis import get_rotation_matrix, visualize_meshes, transform_trimesh, get_rotation_matrix_from_angle
-from visualization.mesh_and_vectors_vis import plot_mesh_with_arrows_and_colorbar
 
-from skimage import measure
 import trimesh
-import matplotlib.pyplot as plt
-import open3d as o3d
-import pyvista as pv
-import time
 
 from script.motor_param_lib import MotorParameterLib
 
@@ -54,44 +46,30 @@ from script.motor_param_lib import MotorParameterLib
     voxel_size: The size of the voxels
 '''
 def voxelize_mesh(trimesh_mesh, voxel_size):
-    # Convert trimesh mesh to Open3D mesh
-    o3d_mesh = o3d.geometry.TriangleMesh(
-        vertices=o3d.utility.Vector3dVector(trimesh_mesh.vertices),
-        triangles=o3d.utility.Vector3iVector(trimesh_mesh.faces)
-    )
-    
-    # Create a voxel grid from the Open3D mesh
-    voxel_grid = o3d.geometry.VoxelGrid.create_from_triangle_mesh(o3d_mesh, voxel_size=voxel_size)
-    
-    # Extract voxel coordinates
-    voxel_indices = np.array([voxel.grid_index for voxel in voxel_grid.get_voxels()])
-    
-    # Calculate the bounds of the voxel grid
-    min_bound = voxel_grid.origin
-    max_bound = voxel_indices.max(axis=0) * voxel_size + voxel_grid.origin
+    voxel_grid = trimesh_mesh.voxelized(pitch=voxel_size)
+    points = voxel_grid.points
+    if len(points) == 0:
+        raise ValueError("Voxelization produced no occupied cells")
 
-    # Create a 3D array to hold the voxels
-    shape = ((max_bound - min_bound) / voxel_size).astype(int) + 2
+    min_bound = points.min(axis=0) - voxel_size / 2.0
+    voxel_indices = np.floor((points - min_bound) / voxel_size).astype(int)
+    shape = voxel_indices.max(axis=0) + 1
+    max_bound = min_bound + shape * voxel_size
+
     voxels = np.zeros(shape, dtype=bool)
+    voxels[tuple(voxel_indices.T)] = True
 
-    # Set the corresponding voxels to True, clamping to avoid out-of-bounds errors
-    for idx in voxel_indices:
-        # grid_idx = ((idx * voxel_size + voxel_grid.origin) - min_bound) / voxel_size
-        # grid_idx = np.clip(grid_idx.astype(int), 0, np.array(shape) - 1)
-        voxels[tuple(idx)] = True
-
-    # Show all the points in the voxel grid as a 3D scatter plot
-    # points = np.argwhere(voxels)
-    # points = points * voxel_size + min_bound
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-    # ax.scatter(points[:, 0], points[:, 1], points[:, 2], c='b', marker='o')
-    # ax.set_xlabel('X')
-    # ax.set_ylabel('Y')
-    # ax.set_zlabel('Z')
-    # plt.show()
-                    
     return voxels, min_bound, max_bound, voxel_size
+
+
+def run_build_tool(cmake_build_dir, executable_name, *args):
+    executable_path = os.path.join(cmake_build_dir, executable_name)
+    if not os.path.exists(executable_path):
+        raise FileNotFoundError(f"Required build tool not found: {executable_path}")
+
+    command = [executable_path, *[str(arg) for arg in args]]
+    print("Running build tool:", " ".join(shlex.quote(part) for part in command))
+    subprocess.run(command, check=True)
 
 
 '''
@@ -232,7 +210,8 @@ def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=N
     # Get transformation matrix for the tenon to rotate 
     if tenon_orientation_vector is not None:
         # Get rotation angle from tenon_orientation_ori_vector_transformed1_cut to tenon_orientation_vector
-        angle = np.arccos(np.dot(tenon_orientation_ori_vector_transformed1_cut, tenon_orientation_vector))
+        dot_product = np.clip(np.dot(tenon_orientation_ori_vector_transformed1_cut, tenon_orientation_vector), -1.0, 1.0)
+        angle = np.arccos(dot_product)
 
         rotation_matrix2 = get_rotation_matrix_from_angle(tenon_direction_vector, angle)
         transformation2 = np.array([[rotation_matrix2[0, 0], rotation_matrix2[0, 1], rotation_matrix2[0, 2], 0],
@@ -259,6 +238,39 @@ def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=N
     tenon_mesh = transform_trimesh(tenon_mesh, transformation, save_path=save_path)
 
 
+def ensure_motor_tenon_template(tenon_file_folder, tenon_idx, tenon_type):
+    tenon_file_name = f'motor_{tenon_idx}_{tenon_type}.stl'
+    tenon_file_path = os.path.join(tenon_file_folder, tenon_file_name)
+    if os.path.exists(tenon_file_path):
+        return tenon_file_path
+
+    motor_param = MotorParameterLib()
+    target_radius_mm = motor_param.motor_lib[tenon_idx][1] * 10.0
+
+    available_templates = []
+    for base_idx in range(len(motor_param.motor_lib)):
+        base_path = os.path.join(tenon_file_folder, f'motor_{base_idx}_{tenon_type}.stl')
+        if os.path.exists(base_path):
+            base_radius_mm = motor_param.motor_lib[base_idx][1] * 10.0
+            available_templates.append((abs(base_radius_mm - target_radius_mm), base_idx, base_path, base_radius_mm))
+
+    if not available_templates:
+        raise FileNotFoundError(f'No template found for missing tenon file {tenon_file_path}')
+
+    _, base_idx, base_path, base_radius_mm = min(available_templates, key=lambda item: item[0])
+    scale_xy = target_radius_mm / base_radius_mm
+
+    print(
+        f'Missing tenon template {tenon_file_name}. '
+        f'Generating it by scaling motor_{base_idx}_{tenon_type}.stl with xy scale {scale_xy:.6f}.'
+    )
+
+    tenon_mesh = trimesh.load(base_path, force='mesh')
+    tenon_mesh.apply_scale([scale_xy, scale_xy, 1.0])
+    tenon_mesh.export(tenon_file_path)
+    return tenon_file_path
+
+
 '''
 @Description: Run the metamaterial filling for a given stl file
 @Input:
@@ -275,7 +287,7 @@ def transform_tenon_and_save(link, tenon_mesh, tenon_id=0, unit='m', save_path=N
     tenon_file_folder: The folder of the tenon files
     preview: Whether to preview the result
 '''
-def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density, shell_thickness, shell_generation_voxel_resolution, plate_interval, biased_tenon_distance, output_stl_name, use_existing_shell, pkl_result_path, tenon_file_folder, preview):
+def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density, shell_thickness, shell_generation_voxel_resolution, plate_interval, biased_tenon_distance, output_stl_name, use_existing_shell, pkl_result_path, tenon_file_folder, preview, output_dir=None):
 
     # Check if the input STL file exists
     if not os.path.exists(input_stl_path):
@@ -283,7 +295,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     
     current_dir = os.path.dirname(os.path.realpath(__file__))
     cmake_build_dir = os.path.join(current_dir, '../build')
-    output_folder = os.path.join(current_dir, '../data/output')
+    output_folder = output_dir or os.path.join(current_dir, '../data/output')
 
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -296,7 +308,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
         raise ValueError('Relative density should be less than 1.0')
     
     # Check and read pkl file
-    robot_result = pkl.load(open(pkl_result_path, 'rb'))
+    robot_result = load_robot_result(pkl_result_path)
 
     # for link_name in robot_result.link_dict:
     #     print("Link name: ", link_name)
@@ -424,7 +436,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     replaced_stl_save_path = os.path.join(output_folder, replaced_stl_name)
     replaced_stl_size_csv = replaced_stl_save_path.replace('.stl', '.csv')
 
-    input_stl_path_full_path = os.path.join(current_dir, '../', input_stl_path)
+    input_stl_path_full_path = os.path.abspath(input_stl_path)
 
     print(f"input_stl_path_full_path: {input_stl_path_full_path}")
     print(f"replaced_stl_save_path: {replaced_stl_save_path}")
@@ -438,16 +450,13 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
     print("Generating the replaced model...")
     if unit == 'm':
         # Scale the model to mm
-        subprocess.run(['gnome-terminal', '--', 'bash', '-c', f'cd {cmake_build_dir}; ./replaceMesh {input_stl_path_full_path} {replaced_stl_save_path} 1000']) #; exec bash
+        run_build_tool(cmake_build_dir, 'replaceMesh', input_stl_path_full_path, replaced_stl_save_path, 1000)
     else:
         # Do only the replacement
-        subprocess.run(['gnome-terminal', '--', 'bash', '-c', f'cd {cmake_build_dir}; ./replaceMesh {input_stl_path_full_path} {replaced_stl_save_path}']) #; exec bash
+        run_build_tool(cmake_build_dir, 'replaceMesh', input_stl_path_full_path, replaced_stl_save_path)
 
-    # Wait for the process to finish
-    while not os.path.exists(replaced_stl_save_path):
-        time.sleep(1)
-    
-    time.sleep(3)
+    if not os.path.exists(replaced_stl_save_path):
+        raise FileNotFoundError(f"replaceMesh did not create {replaced_stl_save_path}")
 
     # Read the size of the replaced STL file from the CSV file. Two lines, the first line is min_x,min_y,min_z, the second line is max_x,max_y,max_z
     applied_scale = 1.0
@@ -477,7 +486,7 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
         ##### Transform the tenon mesh #####
         tenon_file_name = 'motor_' + str(link.tenon_idx[i]) + '_' + link.tenon_type[i] + '.stl'
-        tenon_file_path = os.path.join(tenon_file_folder, tenon_file_name)
+        tenon_file_path = ensure_motor_tenon_template(tenon_file_folder, link.tenon_idx[i], link.tenon_type[i])
         tenon_mesh = trimesh.load(tenon_file_path)
 
         # Transform to the right position in the stl file using the "link" result from Pickle file
@@ -647,20 +656,23 @@ def run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density
 
         if do_smaller_generation:
             print("Generating the smaller model for shell...")
-            # Use gnome-terminal to run the command
-            shell_thickness = shell_thickness
-            shell_generation_voxel_resolution = shell_generation_voxel_resolution
-            subprocess.run(['gnome-terminal', '--', 'bash', '-c', f'cd {cmake_build_dir}; ./innerPointsCalculation {replaced_stl_save_path} {smaller_stl_points_bin} {shell_thickness} {shell_generation_voxel_resolution}']) #; exec bash
+            run_build_tool(
+                cmake_build_dir,
+                'innerPointsCalculation',
+                replaced_stl_save_path,
+                smaller_stl_points_bin,
+                shell_thickness,
+                shell_generation_voxel_resolution,
+            )
 
-            # Wait for the process to finish
-            while not os.path.exists(smaller_stl_points_bin):
-                time.sleep(1)
-
-            time.sleep(3)
+            if not os.path.exists(smaller_stl_points_bin):
+                raise FileNotFoundError(f"innerPointsCalculation did not create {smaller_stl_points_bin}")
             
             print(f"smaller model point bin file generated at {smaller_stl_points_bin}")
 
             # Do marching cubes to generate the smaller model
+            from metamaterial.generateMeshFromPoints import generate_mesh_from_points
+
             generate_mesh_from_points(smaller_stl_points_bin, shell_generation_voxel_resolution, smaller_stl_save_path)
 
             print(f"smaller model generated at {smaller_stl_save_path}")
@@ -779,4 +791,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     run_metamaterial_filling_for_stl_file(args.input_stl_path, args.unit, args.relative_density, args.shell_thickness, args.shell_generation_voxel_resolution, args.plate_interval, args.biased_tenon_distance, args.output_stl_name, args.use_existing_shell, args.pkl_result_path, args.tenon_file_folder, args.preview)
-

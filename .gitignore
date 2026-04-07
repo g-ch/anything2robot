@@ -7,3 +7,4 @@ urdf
 **/__pycache__/
 results/
 result/
+.conda-env/*

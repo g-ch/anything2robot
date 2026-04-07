@@ -6,7 +6,6 @@
 
 import os
 import argparse
-import subprocess
 import sys
 import time
 import tqdm
@@ -17,6 +16,17 @@ sys.path.append(project_dir)
 
 from metamaterial_filling.script.user_stl_metamaterial_filling_with_tenon import run_metamaterial_filling_for_stl_file
 
+
+def str2bool(value):
+    if isinstance(value, bool):
+        return value
+    lowered = value.lower()
+    if lowered in {"true", "1", "yes", "y"}:
+        return True
+    if lowered in {"false", "0", "no", "n"}:
+        return False
+    raise argparse.ArgumentTypeError(f"Invalid boolean value: {value}")
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Fill in the metamaterial for every stl file in the given urdf file folder.')
     # parser.add_argument('--urdf_folder_name', type=str, default='gold_lynel20241010-134328_good', help='The folder of the urdf file.')
@@ -24,7 +34,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--urdf_folder', type=str, default=project_dir + '/result/gold_lynel_20241201-134522_good/result_round1/urdf', help='Input STL files folder path')
     parser.add_argument('--pkl_result_path', type=str, default=project_dir+'/result/gold_lynel_20241201-134522_good/result_round1/robot_result.pkl', help='Pickle file path for the tenon position results')
-    parser.add_argument('--skip_metamaterial_filling', type=bool, default=True, help='Skip the metamaterial filling step. Do this when your printer does not support metamaterial filling. Slow.')
+    parser.add_argument('--skip_metamaterial_filling', type=str2bool, default=True, help='Skip the metamaterial filling step. Do this when your printer does not support metamaterial filling. Slow.')
+    parser.add_argument('--output_dir', type=str, default=None, help='Folder to save generated STL files. Defaults to a sibling folder next to the selected urdf folder.')
     args = parser.parse_args()
 
     # urdf_folder = project_dir + "/urdf/" + args.urdf_folder_name
@@ -32,12 +43,16 @@ if __name__ == '__main__':
 
     urdf_folder = args.urdf_folder
     opt_result_pkl_path = args.pkl_result_path
+    output_dir = args.output_dir or os.path.join(os.path.dirname(urdf_folder), "urdf_with_tenon")
+
+    os.makedirs(output_dir, exist_ok=True)
 
     print("Working on metamaterial for urdf files in the folder: ", urdf_folder)
     print("Using the optimization result: ", opt_result_pkl_path)
+    print("Saving generated files to: ", output_dir)
 
     # Find all the stl files in the urdf folder
-    stl_files = [f for f in os.listdir(urdf_folder) if f.endswith('.stl')]
+    stl_files = sorted(f for f in os.listdir(urdf_folder) if f.endswith('.stl'))
     print("Found ", len(stl_files), " stl files in the folder: ", urdf_folder)
 
     # Fill in the metamaterial for each stl file
@@ -71,14 +86,17 @@ if __name__ == '__main__':
         tenon_file_folder = project_dir + "/metamaterial_filling/tenon"
         preview = False
 
-        output_stl_name = stl_file.split(".")[0] + "_plate" + str(plate_interval) + '_' + str(shell_thickness) + 'mm_density_' + str(relative_density) + '30' + '.stl'
+        if args.skip_metamaterial_filling:
+            output_stl_name = stl_file.split(".")[0] + "_with_tenon.stl"
+        else:
+            output_stl_name = stl_file.split(".")[0] + "_plate" + str(plate_interval) + '_' + str(shell_thickness) + 'mm_density_' + str(relative_density) + '30' + '.stl'
 
         # Check if the output file already exists
-        output_stl_path = project_dir + "/metamaterial_filling/data/output/" + output_stl_name
+        output_stl_path = os.path.join(output_dir, output_stl_name)
         if os.path.exists(output_stl_path):
             print("Output file already exists: ", output_stl_name)
             continue
 
-        run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density, shell_thickness, shell_generation_voxel_resolution, plate_interval, biased_tenon_length, output_stl_name, use_existing_shell, pkl_result_path, tenon_file_folder, preview)
+        run_metamaterial_filling_for_stl_file(input_stl_path, unit, relative_density, shell_thickness, shell_generation_voxel_resolution, plate_interval, biased_tenon_length, output_stl_name, use_existing_shell, pkl_result_path, tenon_file_folder, preview, output_dir=output_dir)
 
         time.sleep(5)

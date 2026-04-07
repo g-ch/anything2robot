@@ -1,5 +1,4 @@
 import trimesh
-import pymeshfix
 
 
 def repair_mesh(mesh, output_path):
@@ -11,6 +10,18 @@ def repair_mesh(mesh, output_path):
         print("Attempting to repair the mesh...")
     else:
         print("No repair needed. Mesh is already watertight.")
+        return
+
+    try:
+        import pymeshfix
+    except ImportError:
+        print("pymeshfix is not installed. Falling back to basic trimesh repairs.")
+        trimesh.repair.fill_holes(mesh)
+        trimesh.repair.fix_inversion(mesh)
+        trimesh.repair.fix_winding(mesh)
+        trimesh.repair.fix_normals(mesh)
+        mesh.export(output_path)
+        print(f"Repaired mesh saved as {output_path}")
         return
 
     # Convert the Trimesh object to vertex and face arrays
@@ -48,5 +59,4 @@ if __name__ == '__main__':
     output_path = '/home/clarence/git/anything2robot/anything2robot/metamaterial_filling/data/output/BODY_replaced_repaired.stl'
 
     repair_mesh(input_path, output_path)
-
 
