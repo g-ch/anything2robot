@@ -1,0 +1,117 @@
+# Non-Commercial Research License
+
+Copyright (c) 2026 [Your Name or Organization]
+
+All rights reserved.
+
+## 1. Grant of Permission
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software, source code, associated documentation, and any other materials
+provided in this repository (collectively, the “Software”), to use, copy, modify,
+and distribute the Software, subject to the limitations and conditions below,
+for **non-commercial purposes only**, including:
+
+- academic research
+- educational use
+- personal use
+- non-commercial evaluation
+- non-commercial reproducibility of published results
+
+## 2. Non-Commercial Restriction
+
+Commercial use of the Software, in whole or in part, is **not permitted**
+without prior written permission from the copyright holder.
+
+For the purposes of this license, “Commercial use” includes, but is not limited to:
+
+- selling the Software
+- licensing, sublicensing, or distributing the Software for a fee
+- using the Software to provide paid services
+- using the Software in connection with a commercial product or service
+- using the Software internally within a for-profit entity for product development,
+  production, or business operations
+- training, fine-tuning, validating, or supporting commercial systems or products
+  using the Software
+
+Use by non-profit or academic institutions is considered non-commercial only
+to the extent that such use is not directed toward commercial advantage or monetary compensation.
+
+## 3. Redistribution
+
+Redistribution of the Software, with or without modification, is permitted
+for non-commercial purposes only, provided that all of the following conditions are met:
+
+1. This license file and the above copyright notice must be included in all copies
+   or substantial portions of the Software.
+
+2. Any modified version must clearly state that changes were made.
+
+3. Any redistribution must not remove, alter, or obscure any copyright,
+   attribution, disclaimer, or license notices in the original Software.
+
+4. Redistribution must remain under terms that are no less restrictive
+   than this license with respect to commercial use.
+
+## 4. No Trademark License
+
+This license does not grant permission to use the name, trademarks, service marks,
+logos, or branding of the copyright holder, except as required for reasonable
+and customary attribution.
+
+## 5. Patent and Other Rights
+
+No express or implied license is granted under any patent rights,
+trade secret rights, or other intellectual property rights of the copyright holder,
+except as explicitly stated in this license.
+
+## 6. Publications and Attribution
+
+If you use the Software in academic research, publications, or derived works,
+you must provide appropriate attribution to the original repository and,
+where applicable, cite the associated paper(s) listed in the repository README.
+
+## 7. Requesting Commercial Use
+
+If you wish to obtain permission for commercial use, please contact:
+
+Gang Chen
+chg10086@gmail.com  
+
+A separate commercial license may be available upon request.
+
+## 8. Disclaimer of Warranty
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+TITLE, AND NON-INFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
+BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## 9. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE COPYRIGHT HOLDER
+OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
+OR CONSEQUENTIAL DAMAGES, OR ANY LOSS OF DATA, PROFITS, REVENUE, OR BUSINESS OPPORTUNITY,
+ARISING FROM OR RELATED TO THE SOFTWARE OR THIS LICENSE, EVEN IF ADVISED OF THE POSSIBILITY
+OF SUCH DAMAGE.
+
+## 10. Termination
+
+Any use of the Software outside the scope of this license will automatically terminate
+the rights granted under this license.
+
+Upon termination, you must cease all use, copying, modification, and distribution
+of the Software under this license.
+
+## 11. Governing Terms
+
+This license constitutes the entire agreement between the user and the copyright holder
+regarding the Software, unless a separate written agreement has been entered into
+for commercial licensing or other permitted use.
+
+## 12. Acceptance
+
+By using, copying, modifying, or distributing the Software, you agree to the terms
+and conditions of this license.
