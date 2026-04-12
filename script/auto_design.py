@@ -258,6 +258,8 @@ def design_one_round(args, mesh_loader, round, log, round_result_saving_folder, 
 Check if the result already exists. If the result already exists, skip the optimization process.
 '''
 def check_if_result_exists(result_folder, model_name, max_round=8):
+    if not os.path.isdir(result_folder):
+        return False
     result_exist = False
     subfolders = [f.path for f in os.scandir(result_folder) if f.is_dir()]
 

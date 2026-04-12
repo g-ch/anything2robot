@@ -19,10 +19,17 @@ from threading import Thread
 from plotly.subplots import make_subplots
 from dash import Dash, dcc, html, Input, Output
 #import requests
-from wsgiref.simple_server import make_server
 from flask import Flask
 import time
+import socket
+import shutil
+import subprocess
 import pyvista as pv
+
+try:
+    from werkzeug.serving import make_server as _wz_make_server
+except ImportError:
+    _wz_make_server = None
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox, QPushButton
@@ -31,6 +38,37 @@ from PyQt5.QtCore import QTimer
 import sys
 import pyvista as pv
 from pyvistaqt import QtInteractor
+
+
+def _find_free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def _wait_tcp_port(host, port, timeout_sec=20.0, poll_sec=0.1):
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=1.0):
+                return True
+        except OSError:
+            time.sleep(poll_sec)
+    return False
+
+
+def _open_browser(url):
+    print("Dash Plotly UI:", url)
+    if sys.platform.startswith("linux"):
+        xdg = shutil.which("xdg-open")
+        if xdg:
+            try:
+                subprocess.Popen([xdg, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return
+            except OSError:
+                pass
+    import webbrowser
+    webbrowser.open(url)
 
 
 class Line:
@@ -247,16 +285,16 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
             QTimer.singleShot(2000, self.close) # Close the window after 2 seconds
 
         if not args.disable_joint_setting_ui:
-            # Plotly visualization in the Web UI using Dash
+            # Plotly in Dash: Werkzeug server on a free port (no fixed 8050, no duplicate run_server).
             self.fig = make_subplots(specs=[[{"type": "scene"}]])
             self.fig.add_trace(mesh.mesh_plotly)
 
-            self.server = Flask(__name__)
-            self.app = Dash(__name__, server=self.server)
+            dash_flask = Flask(__name__)
+            try:
+                self.app = Dash(__name__, server=dash_flask, suppress_callback_exceptions=True)
+            except TypeError:
+                self.app = Dash(__name__, server=dash_flask)
 
-            self.server = make_server("localhost", 8050, self.server)
-            self.server_thread = threading.Thread(target=self.server.serve_forever)
-            self.server_thread.start()
             self.app.layout = html.Div([
                 html.H4('Interactive plot with custom data source'),
                 dcc.Graph(id="graph", style={'width': '90vh', 'height': '90vh'}),
@@ -264,20 +302,37 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
             ])
 
             @self.app.callback(
-                Output("graph", "figure"), 
+                Output("graph", "figure"),
                 Input("update-button", "n_clicks"))
             def update_bar_chart(n_clicks):
                 return self.fig
 
-            def run_dash_server():
-                # Start Dash app here without the reloader
-                self.app.run_server(debug=False, use_reloader=False)
+            self._dash_port = _find_free_port()
+            if _wz_make_server is not None:
+                self._dash_srv = _wz_make_server(
+                    "127.0.0.1", self._dash_port, self.app.server, threaded=True)
+            else:
+                from wsgiref.simple_server import make_server as _ws_make_server
+                self._dash_srv = _ws_make_server(
+                    "127.0.0.1", self._dash_port, self.app.server)
 
-            self.dash_thread = threading.Thread(target=run_dash_server)
-            self.dash_thread.start()
+            def _serve_dash():
+                try:
+                    self._dash_srv.serve_forever()
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
 
-            import webbrowser
-            webbrowser.open('http://127.0.0.1:8050/')
+            self._dash_server_thread = threading.Thread(target=_serve_dash, daemon=True)
+            self._dash_server_thread.start()
+
+            dash_url = f"http://127.0.0.1:{self._dash_port}/"
+            if not _wait_tcp_port("127.0.0.1", self._dash_port):
+                print(
+                    "Warning: Dash server did not accept TCP connections in time; open this URL manually:",
+                    dash_url,
+                )
+            _open_browser(dash_url)
 
             if initialize_body:
                 self.nodes["BODY"] = TreeNode(Link("BODY"))
@@ -576,10 +631,16 @@ class LinkTreeGUI(QtWidgets.QMainWindow):
         self.shutdown()
         exit(0)
 
-    def shutdown(self):   
-        self.server.shutdown()
-        self.server_thread.join()
-        self.dash_thread.join()
+    def shutdown(self):
+        srv = getattr(self, "_dash_srv", None)
+        if srv is not None:
+            try:
+                srv.shutdown()
+            except Exception:
+                pass
+        t = getattr(self, "_dash_server_thread", None)
+        if t is not None and t.is_alive():
+            t.join(timeout=3.0)
         self.close()
 
     # Overriding the closeEvent method

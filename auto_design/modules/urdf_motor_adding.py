@@ -271,7 +271,7 @@ if __name__ == "__main__":
     # robot_pkl_path = os.path.join(folder, "../robot_result.pkl")
 
     '''For all urdf files in the folder'''
-    folder = "/home/clarence/ros_ws/quad_ws/src/urdf_control/urdf"
+    folder = "/home/clarence/ros_ws/metamaterial_ws/src/simple_robot_controller/urdf"
     # Find all the urdf files in the folder and its subfolders
     urdf_files = []
     for root, dirs, files in os.walk(folder):
